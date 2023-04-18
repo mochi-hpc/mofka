@@ -7,17 +7,14 @@
 #include <catch2/catch_all.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Provider.hpp>
-#include <mofka/Admin.hpp>
 
 static const std::string topic_type = "dummy";
 static constexpr const char* topic_config = "{ \"path\" : \"mydb\" }";
 
 TEST_CASE("Topic test", "[topic]") {
     auto engine = thallium::engine("na+sm", THALLIUM_SERVER_MODE);
-    mofka::Admin admin(engine);
     mofka::Provider provider(engine);
-    std::string addr = engine.self();
-    auto topic_id = admin.createTopic(addr, 0, topic_type, topic_config);
+    mofka::UUID topic_id;
 
     SECTION("Create TopicHandle") {
         mofka::Client client(engine);
@@ -51,6 +48,5 @@ TEST_CASE("Topic test", "[topic]") {
         REQUIRE_NOTHROW(client.makeTopicHandle(addr, 1, topic_id, false));
     }
 
-    admin.destroyTopic(addr, 0, topic_id);
     engine.finalize();
 }

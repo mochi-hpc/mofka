@@ -1,13 +1,15 @@
 /*
  * (C) 2020 The University of Chicago
- * 
+ *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __MOFKA_PROVIDER_HPP
-#define __MOFKA_PROVIDER_HPP
+#ifndef MOFKA_PROVIDER_HPP
+#define MOFKA_PROVIDER_HPP
 
+#include <mofka/Json.hpp>
 #include <thallium.hpp>
 #include <memory>
+#include <string_view>
 
 namespace mofka {
 
@@ -28,26 +30,13 @@ class Provider {
      *
      * @param engine Thallium engine to use to receive RPCs.
      * @param provider_id Provider id.
-     * @param config JSON-formatted configuration.
+     * @param config JSON configuration.
      * @param pool Argobots pool to use to handle RPCs.
      */
     Provider(const tl::engine& engine,
              uint16_t provider_id = 0,
-             const std::string& config = "",
-             const tl::pool& pool = tl::pool());
-
-    /**
-     * @brief Constructor.
-     *
-     * @param mid Margo instance id to use to receive RPCs.
-     * @param provider_id Provider id.
-     * @param config JSON-formatted configuration.
-     * @param pool Argobots pool to use to handle RPCs.
-     */
-    Provider(margo_instance_id mid,
-             uint16_t provider_id = 0,
-             const std::string& config = "",
-             const tl::pool& pool = tl::pool());
+             const rapidjson::Value& config = rapidjson::Value{},
+             const tl::pool& pool = tl::pool{});
 
     /**
      * @brief Copy-constructor is deleted.
@@ -75,19 +64,11 @@ class Provider {
     ~Provider();
 
     /**
-     * @brief Sets a security string that should be provided
-     * by Admin RPCs to accept them.
+     * @brief Return a JSON configuration of the provider.
      *
-     * @param token Security token to set.
+     * @return JSON configuration.
      */
-    void setSecurityToken(const std::string& token);
-
-    /**
-     * @brief Return a JSON-formatted configuration of the provider.
-     *
-     * @return JSON formatted string.
-     */
-    std::string getConfig() const;
+    const rapidjson::Value& getConfig() const;
 
     /**
      * @brief Checks whether the Provider instance is valid.

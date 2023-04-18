@@ -1,10 +1,10 @@
 /*
- * (C) 2020 The University of Chicago
- * 
+ * (C) 2023 The University of Chicago
+ *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __MOFKA_ASYNC_REQUEST_HPP
-#define __MOFKA_ASYNC_REQUEST_HPP
+#ifndef MOFKA_ASYNC_REQUEST_HPP
+#define MOFKA_ASYNC_REQUEST_HPP
 
 #include <memory>
 #include <string>

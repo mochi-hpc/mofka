@@ -13,17 +13,12 @@
 
 #include <thallium/serialization/stl/string.hpp>
 
-namespace tl = thallium;
-
 namespace mofka {
 
 Client::Client() = default;
 
-Client::Client(const tl::engine& engine)
+Client::Client(const thallium::engine& engine)
 : self(std::make_shared<ClientImpl>(engine)) {}
-
-Client::Client(margo_instance_id mid)
-: self(std::make_shared<ClientImpl>(mid)) {}
 
 Client::Client(const std::shared_ptr<ClientImpl>& impl)
 : self(impl) {}
@@ -36,10 +31,9 @@ Client::Client(const Client& other) = default;
 
 Client& Client::operator=(const Client& other) = default;
 
-
 Client::~Client() = default;
 
-const tl::engine& Client::engine() const {
+const thallium::engine& Client::engine() const {
     return self->m_engine;
 }
 
@@ -48,11 +42,11 @@ Client::operator bool() const {
 }
 
 TopicHandle Client::makeTopicHandle(
-        const std::string& address,
+        std::string_view address,
         uint16_t provider_id,
         const UUID& topic_id,
         bool check) const {
-    auto endpoint  = self->m_engine.lookup(address);
+    auto endpoint  = self->m_engine.lookup(std::string{address});
     auto ph        = tl::provider_handle(endpoint, provider_id);
     RequestResult<bool> result;
     result.success() = true;
@@ -68,8 +62,10 @@ TopicHandle Client::makeTopicHandle(
     }
 }
 
-std::string Client::getConfig() const {
-    return "{}";
+const rapidjson::Value& Client::getConfig() const {
+    // TODO
+    static rapidjson::Value config;
+    return config;
 }
 
 }

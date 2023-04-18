@@ -4,8 +4,10 @@ spack:
   - pkg-config
   - uuid
   - mochi-thallium ^mercury~boostsys~checksum ^libfabric fabrics=tcp,rxm
-  - nlohmann-json
+  - rapidjson
+  - valijson
   - spdlog
+  - fmt
   - tclap
   - mochi-bedrock ~ssg ~abtio
   concretizer:

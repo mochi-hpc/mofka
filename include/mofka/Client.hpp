@@ -1,15 +1,17 @@
 /*
- * (C) 2020 The University of Chicago
+ * (C) 2023 The University of Chicago
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __MOFKA_CLIENT_HPP
-#define __MOFKA_CLIENT_HPP
+#ifndef MOFKA_CLIENT_HPP
+#define MOFKA_CLIENT_HPP
 
 #include <mofka/TopicHandle.hpp>
 #include <mofka/UUID.hpp>
+#include <mofka/Json.hpp>
 #include <thallium.hpp>
 #include <memory>
+#include <string_view>
 
 namespace mofka {
 
@@ -30,13 +32,6 @@ class Client {
      * @brief Default constructor.
      */
     Client();
-
-    /**
-     * @brief Constructor using a margo instance id.
-     *
-     * @param mid Margo instance id.
-     */
-    Client(margo_instance_id mid);
 
     /**
      * @brief Constructor.
@@ -83,14 +78,14 @@ class Client {
      * @param address Address of the provider holding the database.
      * @param provider_id Provider id.
      * @param topic_id Topic UUID.
-     * @param check Checks if the Database exists by issuing an RPC.
+     * @param check Checks if the topic exists by issuing an RPC.
      *
      * @return a TopicHandle instance.
      */
-    TopicHandle makeTopicHandle(const std::string& address,
-                                      uint16_t provider_id,
-                                      const UUID& topic_id,
-                                      bool check = true) const;
+    TopicHandle makeTopicHandle(std::string_view address,
+                                uint16_t provider_id,
+                                const UUID& topic_id,
+                                bool check = true) const;
 
     /**
      * @brief Checks that the Client instance is valid.
@@ -98,11 +93,11 @@ class Client {
     operator bool() const;
 
     /**
-     * @brief Get internal configuration as a JSON-formatted string.
+     * @brief Get internal configuration.
      *
-     * @return configuration string.
+     * @return configuration.
      */
-    std::string getConfig() const;
+    const rapidjson::Value& getConfig() const;
 
     private:
 

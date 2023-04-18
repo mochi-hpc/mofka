@@ -1,10 +1,10 @@
 /*
  * (C) 2020 The University of Chicago
- * 
+ *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __MOFKA_REQUEST_RESULT_HPP
-#define __MOFKA_REQUEST_RESULT_HPP
+#ifndef MOFKA_REQUEST_RESULT_HPP
+#define MOFKA_REQUEST_RESULT_HPP
 
 #include <string>
 
@@ -28,7 +28,7 @@ namespace mofka {
  */
 template<typename T>
 class RequestResult {
-    
+
     public:
 
     RequestResult() = default;
@@ -66,14 +66,14 @@ class RequestResult {
     }
 
     /**
-     * @brief Value if the request succeeded. 
+     * @brief Value if the request succeeded.
      */
     T& value() {
         return m_value;
     }
 
     /**
-     * @brief Value if the request succeeded. 
+     * @brief Value if the request succeeded.
      */
     const T& value() const {
         return m_value;
@@ -101,7 +101,7 @@ class RequestResult {
 
 template<>
 class RequestResult<std::string> {
-    
+
     public:
 
     RequestResult() = default;
@@ -148,7 +148,7 @@ class RequestResult<std::string> {
 
 template<>
 class RequestResult<bool> {
-    
+
     public:
 
     RequestResult() = default;

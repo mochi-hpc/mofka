@@ -17,8 +17,15 @@ class MofkaFactory : public bedrock::AbstractServiceFactory {
     MofkaFactory() {}
 
     void *registerProvider(const bedrock::FactoryArgs &args) override {
-        auto provider = new mofka::Provider(args.mid, args.provider_id,
-                args.config, tl::pool(args.pool));
+        rapidjson::Document config;
+        rapidjson::ParseResult ok = config.Parse(args.config.c_str());
+        if(!ok) {
+            // TODO print error
+            return nullptr;
+        }
+        auto provider = new mofka::Provider(
+            args.mid, args.provider_id,
+            config, tl::pool(args.pool));
         return static_cast<void *>(provider);
     }
 
@@ -29,7 +36,10 @@ class MofkaFactory : public bedrock::AbstractServiceFactory {
 
     std::string getProviderConfig(void *p) override {
         auto provider = static_cast<mofka::Provider *>(p);
-        return provider->getConfig();
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        provider->getConfig().Accept(writer);
+        return buffer.GetString();
     }
 
     void *initClient(const bedrock::FactoryArgs& args) override {
@@ -42,7 +52,10 @@ class MofkaFactory : public bedrock::AbstractServiceFactory {
 
     std::string getClientConfig(void* c) override {
         auto client = static_cast<mofka::Client*>(c);
-        return client->getConfig();
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        client->getConfig().Accept(writer);
+        return buffer.GetString();
     }
 
     void *createProviderHandle(void *c, hg_addr_t address,

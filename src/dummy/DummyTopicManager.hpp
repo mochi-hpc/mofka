@@ -1,54 +1,53 @@
 /*
- * (C) 2020 The University of Chicago
- * 
+ * (C) 2023 The University of Chicago
+ *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __DUMMY_BACKEND_HPP
-#define __DUMMY_BACKEND_HPP
+#ifndef DUMMY_TOPIC_MANAGER_HPP
+#define DUMMY_TOPIC_MANAGER_HPP
 
-#include <mofka/Backend.hpp>
-
-using json = nlohmann::json;
+#include <mofka/TopicManager.hpp>
 
 /**
- * Dummy implementation of an mofka Backend.
+ * Dummy implementation of a mofka TopicManager.
  */
-class DummyTopic : public mofka::Backend {
-   
-    json m_config;
+class DummyTopicManager : public mofka::TopicManager {
+
+    rapidjson::Document m_config;
 
     public:
 
     /**
      * @brief Constructor.
      */
-    DummyTopic(const json& config)
-    : m_config(config) {}
+    DummyTopicManager(const rapidjson::Value& config) {
+        m_config.CopyFrom(config, m_config.GetAllocator());
+    }
 
     /**
      * @brief Move-constructor.
      */
-    DummyTopic(DummyTopic&&) = default;
+    DummyTopicManager(DummyTopicManager&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    DummyTopic(const DummyTopic&) = default;
+    DummyTopicManager(const DummyTopicManager&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    DummyTopic& operator=(DummyTopic&&) = default;
+    DummyTopicManager& operator=(DummyTopicManager&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    DummyTopic& operator=(const DummyTopic&) = default;
+    DummyTopicManager& operator=(const DummyTopicManager&) = default;
 
     /**
      * @brief Destructor.
      */
-    virtual ~DummyTopic() = default;
+    virtual ~DummyTopicManager() = default;
 
     /**
      * @brief Prints Hello World.
@@ -75,25 +74,16 @@ class DummyTopic : public mofka::Backend {
 
     /**
      * @brief Static factory function used by the TopicFactory to
-     * create a DummyTopic.
+     * create a DummyTopicManager.
      *
      * @param engine Thallium engine
      * @param config JSON configuration for the topic
      *
      * @return a unique_ptr to a topic
      */
-    static std::unique_ptr<mofka::Backend> create(const thallium::engine& engine, const json& config);
+    static std::unique_ptr<mofka::TopicManager> create(
+        const thallium::engine& engine, const rapidjson::Value& config);
 
-    /**
-     * @brief Static factory function used by the TopicFactory to
-     * open a DummyTopic.
-     *
-     * @param engine Thallium engine
-     * @param config JSON configuration for the topic
-     *
-     * @return a unique_ptr to a topic
-     */
-    static std::unique_ptr<mofka::Backend> open(const thallium::engine& engine, const json& config);
 };
 
 #endif

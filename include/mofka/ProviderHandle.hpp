@@ -1,10 +1,10 @@
 /*
- * (C) 2020 The University of Chicago
+ * (C) 2023 The University of Chicago
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __MOFKA_PROVIDER_HANDLE_HPP
-#define __MOFKA_PROVIDER_HANDLE_HPP
+#ifndef MOFKA_PROVIDER_HANDLE_HPP
+#define MOFKA_PROVIDER_HANDLE_HPP
 
 #include <thallium.hpp>
 

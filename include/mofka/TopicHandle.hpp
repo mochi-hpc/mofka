@@ -1,22 +1,20 @@
 /*
  * (C) 2020 The University of Chicago
- * 
+ *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __MOFKA_TOPIC_HANDLE_HPP
-#define __MOFKA_TOPIC_HANDLE_HPP
+#ifndef MOFKA_TOPIC_HANDLE_HPP
+#define MOFKA_TOPIC_HANDLE_HPP
 
 #include <thallium.hpp>
-#include <memory>
-#include <unordered_set>
-#include <nlohmann/json.hpp>
+#include <rapidjson/document.h>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/AsyncRequest.hpp>
+#include <memory>
+#include <unordered_set>
 
 namespace mofka {
-
-namespace tl = thallium;
 
 class Client;
 class TopicHandleImpl;

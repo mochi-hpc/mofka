@@ -1,10 +1,10 @@
 /*
  * (C) 2020 The University of Chicago
- * 
+ *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __MOFKA_UUID_UTIL_HPP
-#define __MOFKA_UUID_UTIL_HPP
+#ifndef MOFKA_UUID_UTIL_HPP
+#define MOFKA_UUID_UTIL_HPP
 
 #include <uuid/uuid.h>
 #include <string>
@@ -122,7 +122,7 @@ struct UUID {
      * @brief randomize the current UUID.
      */
     void randomize() {
-        uuid_generate(m_data); 
+        uuid_generate(m_data);
     }
 
     /**
@@ -153,7 +153,7 @@ namespace std {
      * @brief Specialization of std::hash for mofka::UUID
      */
     template<>
-    struct hash<mofka::UUID> 
+    struct hash<mofka::UUID>
     {
         size_t operator()(const mofka::UUID& id) const
         {

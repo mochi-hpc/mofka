@@ -1,5 +1,5 @@
 /*
- * (C) 2020 The University of Chicago
+ * (C) 2023 The University of Chicago
  *
  * See COPYRIGHT in top-level directory.
  */
@@ -9,18 +9,10 @@
 
 #include <thallium/serialization/stl/string.hpp>
 
-namespace tl = thallium;
-
 namespace mofka {
 
-Provider::Provider(const tl::engine& engine, uint16_t provider_id, const std::string& config, const tl::pool& p)
+Provider::Provider(const tl::engine& engine, uint16_t provider_id, const rapidjson::Value& config, const thallium::pool& p)
 : self(std::make_shared<ProviderImpl>(engine, provider_id, p)) {
-    self->get_engine().push_finalize_callback(this, [p=this]() { p->self.reset(); });
-    (void)config;
-}
-
-Provider::Provider(margo_instance_id mid, uint16_t provider_id, const std::string& config, const tl::pool& p)
-: self(std::make_shared<ProviderImpl>(mid, provider_id, p)) {
     self->get_engine().push_finalize_callback(this, [p=this]() { p->self.reset(); });
     (void)config;
 }
@@ -37,16 +29,14 @@ Provider::~Provider() {
     }
 }
 
-std::string Provider::getConfig() const {
-    return "{}";
+const rapidjson::Value& Provider::getConfig() const {
+    // TODO
+    static rapidjson::Value config;
+    return config;
 }
 
 Provider::operator bool() const {
     return static_cast<bool>(self);
-}
-
-void Provider::setSecurityToken(const std::string& token) {
-    if(self) self->m_token = token;
 }
 
 }

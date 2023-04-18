@@ -2,7 +2,7 @@
 # See COPYRIGHT in top-level directory.
 cmake_minimum_required (VERSION 3.8)
 project (mofka C CXX)
-set (CMAKE_CXX_STANDARD 14)
+set (CMAKE_CXX_STANDARD 17)
 enable_testing ()
 
 add_definitions (-Wextra -Wall -Wpedantic)
@@ -50,12 +50,14 @@ find_package (PkgConfig REQUIRED)
 find_package (thallium REQUIRED)
 # search for uuid
 pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
-# search for nlohmann/json
-find_package (nlohmann_json REQUIRED)
+# search for RapidJSON
+find_package (RapidJSON REQUIRED)
 # search for TCLAP
 find_package (TCLAP REQUIRED)
 # search for spdlog
 find_package (spdlog REQUIRED)
+# search for fmt package
+find_package (fmt REQUIRED)
 # search of bedrock if needed
 if (${ENABLE_BEDROCK})
     find_package (bedrock REQUIRED)

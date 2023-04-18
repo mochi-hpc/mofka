@@ -8,7 +8,6 @@
 #include <mofka/Client.hpp>
 #include <mofka/Provider.hpp>
 #include <mofka/TopicHandle.hpp>
-#include <mofka/Admin.hpp>
 
 static constexpr const char* topic_config = "{ \"path\" : \"mydb\" }";
 static const std::string topic_type = "dummy";
@@ -18,9 +17,8 @@ TEST_CASE("Client test", "[client]") {
     auto engine = thallium::engine("na+sm", THALLIUM_SERVER_MODE);
     // Initialize the provider
     mofka::Provider provider(engine);
-    mofka::Admin admin(engine);
-    std::string addr = engine.self();
-    auto topic_id = admin.createTopic(addr, 0, topic_type, topic_config);
+
+    mofka::UUID topic_id;
 
     SECTION("Open topic") {
         mofka::Client client(engine);
@@ -33,6 +31,5 @@ TEST_CASE("Client test", "[client]") {
         REQUIRE_THROWS_AS(client.makeTopicHandle(addr, 0, bad_id), mofka::Exception);
     }
 
-    admin.destroyTopic(addr, 0, topic_id);
     engine.finalize();
 }
