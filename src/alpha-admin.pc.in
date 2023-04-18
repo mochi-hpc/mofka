@@ -1,0 +1,12 @@
+prefix=@DEST_DIR@
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: alpha-admin
+Description: <insert description here>
+Version: @ALPHA_VERSION@
+
+Requires: thallium uuid
+Libs: -L${libdir} @ADMIN_PRIVATE_LIBS@ -lstdc++
+Cflags: -I${includedir}

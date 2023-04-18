@@ -1,0 +1,17 @@
+spack:
+  specs:
+  - cmake
+  - pkg-config
+  - uuid
+  - mochi-thallium ^mercury~boostsys~checksum ^libfabric fabrics=tcp,rxm
+  - nlohmann-json
+  - spdlog
+  - tclap
+  - mochi-bedrock ~ssg ~abtio
+  concretizer:
+    unify: true
+    reuse: false
+  modules:
+    prefix_inspections:
+      lib: [LD_LIBRARY_PATH]
+      lib64: [LD_LIBRARY_PATH]

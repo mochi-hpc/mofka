@@ -1,0 +1,30 @@
+on:
+  push:
+    paths:
+      - initial-setup.json
+    branches:
+      - main
+
+name: Initial project setup
+
+jobs:
+  setup:
+    if: ${{ !contains (github.repository, '/thallium-microservice-template') }}
+    name: Initial project setup
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup from initial-setup.py
+      run: |
+        python3 "${GITHUB_WORKSPACE}/.github/initial-setup.py"
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: Initial project setup from template
