@@ -3,11 +3,11 @@
  * 
  * See COPYRIGHT in top-level directory.
  */
-#include "alpha/Exception.hpp"
-#include "alpha/AsyncRequest.hpp"
+#include "mofka/Exception.hpp"
+#include "mofka/AsyncRequest.hpp"
 #include "AsyncRequestImpl.hpp"
 
-namespace alpha {
+namespace mofka {
 
 AsyncRequest::AsyncRequest() = default;
 
@@ -47,14 +47,14 @@ AsyncRequest& AsyncRequest::operator=(AsyncRequest&& other) {
 }
 
 void AsyncRequest::wait() const {
-    if(not self) throw Exception("Invalid alpha::AsyncRequest object");
+    if(not self) throw Exception("Invalid mofka::AsyncRequest object");
     if(self->m_waited) return;
     self->m_wait_callback(*self);
     self->m_waited = true;
 }
 
 bool AsyncRequest::completed() const {
-    if(not self) throw Exception("Invalid alpha::AsyncRequest object");
+    if(not self) throw Exception("Invalid mofka::AsyncRequest object");
     return self->m_async_response.received();
 }
 

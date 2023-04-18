@@ -3,9 +3,9 @@ exec_prefix=${prefix}
 libdir=${prefix}/lib
 includedir=${prefix}/include
 
-Name: alpha-admin
+Name: mofka-admin
 Description: <insert description here>
-Version: @ALPHA_VERSION@
+Version: @MOFKA_VERSION@
 
 Requires: thallium uuid
 Libs: -L${libdir} @ADMIN_PRIVATE_LIBS@ -lstdc++

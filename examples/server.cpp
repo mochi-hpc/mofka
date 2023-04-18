@@ -3,14 +3,14 @@
  * 
  * See COPYRIGHT in top-level directory.
  */
-#include <alpha/Provider.hpp>
+#include <mofka/Provider.hpp>
 #include <iostream>
 #include <vector>
 #include <spdlog/spdlog.h>
 #include <tclap/CmdLine.h>
 
 namespace tl = thallium;
-namespace snt = alpha;
+namespace snt = mofka;
 
 static std::string g_address = "na+sm";
 static unsigned    g_num_providers = 1;
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
 
 void parse_command_line(int argc, char** argv) {
     try {
-        TCLAP::CmdLine cmd("Spawns a Alpha daemon", ' ', "0.1");
+        TCLAP::CmdLine cmd("Spawns a Mofka daemon", ' ', "0.1");
         TCLAP::ValueArg<std::string> addressArg("a","address","Address or protocol (e.g. ofi+tcp)", true,"","string");
         TCLAP::ValueArg<unsigned>    providersArg("n", "num-providers", "Number of providers to spawn (default 1)", false, 1, "int");
         TCLAP::SwitchArg progressThreadArg("p","use-progress-thread","Use a Mercury progress thread", cmd, false);

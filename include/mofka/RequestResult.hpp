@@ -3,12 +3,12 @@
  * 
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __ALPHA_REQUEST_RESULT_HPP
-#define __ALPHA_REQUEST_RESULT_HPP
+#ifndef __MOFKA_REQUEST_RESULT_HPP
+#define __MOFKA_REQUEST_RESULT_HPP
 
 #include <string>
 
-namespace alpha {
+namespace mofka {
 
 /**
  * @brief The RequestResult object is a generic object

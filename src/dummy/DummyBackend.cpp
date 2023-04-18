@@ -6,31 +6,31 @@
 #include "DummyBackend.hpp"
 #include <iostream>
 
-ALPHA_REGISTER_BACKEND(dummy, DummyResource);
+MOFKA_REGISTER_BACKEND(dummy, DummyTopic);
 
-void DummyResource::sayHello() {
+void DummyTopic::sayHello() {
     std::cout << "Hello World" << std::endl;
 }
 
-alpha::RequestResult<int32_t> DummyResource::computeSum(int32_t x, int32_t y) {
-    alpha::RequestResult<int32_t> result;
+mofka::RequestResult<int32_t> DummyTopic::computeSum(int32_t x, int32_t y) {
+    mofka::RequestResult<int32_t> result;
     result.value() = x + y;
     return result;
 }
 
-alpha::RequestResult<bool> DummyResource::destroy() {
-    alpha::RequestResult<bool> result;
+mofka::RequestResult<bool> DummyTopic::destroy() {
+    mofka::RequestResult<bool> result;
     result.value() = true;
     // or result.success() = true
     return result;
 }
 
-std::unique_ptr<alpha::Backend> DummyResource::create(const thallium::engine& engine, const json& config) {
+std::unique_ptr<mofka::Backend> DummyTopic::create(const thallium::engine& engine, const json& config) {
     (void)engine;
-    return std::unique_ptr<alpha::Backend>(new DummyResource(config));
+    return std::unique_ptr<mofka::Backend>(new DummyTopic(config));
 }
 
-std::unique_ptr<alpha::Backend> DummyResource::open(const thallium::engine& engine, const json& config) {
+std::unique_ptr<mofka::Backend> DummyTopic::open(const thallium::engine& engine, const json& config) {
     (void)engine;
-    return std::unique_ptr<alpha::Backend>(new DummyResource(config));
+    return std::unique_ptr<mofka::Backend>(new DummyTopic(config));
 }

@@ -3,13 +3,13 @@
  * 
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __ALPHA_ASYNC_REQUEST_IMPL_H
-#define __ALPHA_ASYNC_REQUEST_IMPL_H
+#ifndef __MOFKA_ASYNC_REQUEST_IMPL_H
+#define __MOFKA_ASYNC_REQUEST_IMPL_H
 
 #include <functional>
 #include <thallium.hpp>
 
-namespace alpha {
+namespace mofka {
 
 namespace tl = thallium;
 

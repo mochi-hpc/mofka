@@ -3,10 +3,10 @@ exec_prefix=${prefix}
 libdir=${prefix}/lib
 includedir=${prefix}/include
 
-Name: alpha-client
+Name: mofka-server
 Description: <insert description here>
-Version: @ALPHA_VERSION@
+Version: @MOFKA_VERSION@
 
 Requires: thallium uuid
-Libs: -L${libdir} @CLIENT_PRIVATE_LIBS@ -lstdc++
+Libs: -L${libdir} @SERVER_PRIVATE_LIBS@ -lstdc++
 Cflags: -I${includedir}

@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "alpha/Provider.hpp"
+#include "mofka/Provider.hpp"
 
 #include "ProviderImpl.hpp"
 
@@ -11,7 +11,7 @@
 
 namespace tl = thallium;
 
-namespace alpha {
+namespace mofka {
 
 Provider::Provider(const tl::engine& engine, uint16_t provider_id, const std::string& config, const tl::pool& p)
 : self(std::make_shared<ProviderImpl>(engine, provider_id, p)) {

@@ -3,26 +3,26 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __ALPHA_CLIENT_HPP
-#define __ALPHA_CLIENT_HPP
+#ifndef __MOFKA_CLIENT_HPP
+#define __MOFKA_CLIENT_HPP
 
-#include <alpha/ResourceHandle.hpp>
-#include <alpha/UUID.hpp>
+#include <mofka/TopicHandle.hpp>
+#include <mofka/UUID.hpp>
 #include <thallium.hpp>
 #include <memory>
 
-namespace alpha {
+namespace mofka {
 
 class ClientImpl;
-class ResourceHandle;
+class TopicHandle;
 
 /**
  * @brief The Client object is the main object used to establish
- * a connection with a Alpha service.
+ * a connection with a Mofka service.
  */
 class Client {
 
-    friend class ResourceHandle;
+    friend class TopicHandle;
 
     public:
 
@@ -76,20 +76,20 @@ class Client {
     const thallium::engine& engine() const;
 
     /**
-     * @brief Creates a handle to a remote resource and returns.
+     * @brief Creates a handle to a remote topic and returns.
      * You may set "check" to false if you know for sure that the
-     * corresponding resource exists, which will avoid one RPC.
+     * corresponding topic exists, which will avoid one RPC.
      *
      * @param address Address of the provider holding the database.
      * @param provider_id Provider id.
-     * @param resource_id Resource UUID.
+     * @param topic_id Topic UUID.
      * @param check Checks if the Database exists by issuing an RPC.
      *
-     * @return a ResourceHandle instance.
+     * @return a TopicHandle instance.
      */
-    ResourceHandle makeResourceHandle(const std::string& address,
+    TopicHandle makeTopicHandle(const std::string& address,
                                       uint16_t provider_id,
-                                      const UUID& resource_id,
+                                      const UUID& topic_id,
                                       bool check = true) const;
 
     /**

@@ -6,14 +6,14 @@
 #ifndef __DUMMY_BACKEND_HPP
 #define __DUMMY_BACKEND_HPP
 
-#include <alpha/Backend.hpp>
+#include <mofka/Backend.hpp>
 
 using json = nlohmann::json;
 
 /**
- * Dummy implementation of an alpha Backend.
+ * Dummy implementation of an mofka Backend.
  */
-class DummyResource : public alpha::Backend {
+class DummyTopic : public mofka::Backend {
    
     json m_config;
 
@@ -22,33 +22,33 @@ class DummyResource : public alpha::Backend {
     /**
      * @brief Constructor.
      */
-    DummyResource(const json& config)
+    DummyTopic(const json& config)
     : m_config(config) {}
 
     /**
      * @brief Move-constructor.
      */
-    DummyResource(DummyResource&&) = default;
+    DummyTopic(DummyTopic&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    DummyResource(const DummyResource&) = default;
+    DummyTopic(const DummyTopic&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    DummyResource& operator=(DummyResource&&) = default;
+    DummyTopic& operator=(DummyTopic&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    DummyResource& operator=(const DummyResource&) = default;
+    DummyTopic& operator=(const DummyTopic&) = default;
 
     /**
      * @brief Destructor.
      */
-    virtual ~DummyResource() = default;
+    virtual ~DummyTopic() = default;
 
     /**
      * @brief Prints Hello World.
@@ -63,37 +63,37 @@ class DummyResource : public alpha::Backend {
      *
      * @return a RequestResult containing the result.
      */
-    alpha::RequestResult<int32_t> computeSum(int32_t x, int32_t y) override;
+    mofka::RequestResult<int32_t> computeSum(int32_t x, int32_t y) override;
 
     /**
-     * @brief Destroys the underlying resource.
+     * @brief Destroys the underlying topic.
      *
      * @return a RequestResult<bool> instance indicating
      * whether the database was successfully destroyed.
      */
-    alpha::RequestResult<bool> destroy() override;
+    mofka::RequestResult<bool> destroy() override;
 
     /**
-     * @brief Static factory function used by the ResourceFactory to
-     * create a DummyResource.
+     * @brief Static factory function used by the TopicFactory to
+     * create a DummyTopic.
      *
      * @param engine Thallium engine
-     * @param config JSON configuration for the resource
+     * @param config JSON configuration for the topic
      *
-     * @return a unique_ptr to a resource
+     * @return a unique_ptr to a topic
      */
-    static std::unique_ptr<alpha::Backend> create(const thallium::engine& engine, const json& config);
+    static std::unique_ptr<mofka::Backend> create(const thallium::engine& engine, const json& config);
 
     /**
-     * @brief Static factory function used by the ResourceFactory to
-     * open a DummyResource.
+     * @brief Static factory function used by the TopicFactory to
+     * open a DummyTopic.
      *
      * @param engine Thallium engine
-     * @param config JSON configuration for the resource
+     * @param config JSON configuration for the topic
      *
-     * @return a unique_ptr to a resource
+     * @return a unique_ptr to a topic
      */
-    static std::unique_ptr<alpha::Backend> open(const thallium::engine& engine, const json& config);
+    static std::unique_ptr<mofka::Backend> open(const thallium::engine& engine, const json& config);
 };
 
 #endif

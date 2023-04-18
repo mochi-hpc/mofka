@@ -3,63 +3,63 @@
  * 
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __ALPHA_RESOURCE_HANDLE_HPP
-#define __ALPHA_RESOURCE_HANDLE_HPP
+#ifndef __MOFKA_TOPIC_HANDLE_HPP
+#define __MOFKA_TOPIC_HANDLE_HPP
 
 #include <thallium.hpp>
 #include <memory>
 #include <unordered_set>
 #include <nlohmann/json.hpp>
-#include <alpha/Client.hpp>
-#include <alpha/Exception.hpp>
-#include <alpha/AsyncRequest.hpp>
+#include <mofka/Client.hpp>
+#include <mofka/Exception.hpp>
+#include <mofka/AsyncRequest.hpp>
 
-namespace alpha {
+namespace mofka {
 
 namespace tl = thallium;
 
 class Client;
-class ResourceHandleImpl;
+class TopicHandleImpl;
 
 /**
- * @brief A ResourceHandle object is a handle for a remote resource
- * on a server. It enables invoking the resource's functionalities.
+ * @brief A TopicHandle object is a handle for a remote topic
+ * on a server. It enables invoking the topic's functionalities.
  */
-class ResourceHandle {
+class TopicHandle {
 
     friend class Client;
 
     public:
 
     /**
-     * @brief Constructor. The resulting ResourceHandle handle will be invalid.
+     * @brief Constructor. The resulting TopicHandle handle will be invalid.
      */
-    ResourceHandle();
+    TopicHandle();
 
     /**
      * @brief Copy-constructor.
      */
-    ResourceHandle(const ResourceHandle&);
+    TopicHandle(const TopicHandle&);
 
     /**
      * @brief Move-constructor.
      */
-    ResourceHandle(ResourceHandle&&);
+    TopicHandle(TopicHandle&&);
 
     /**
      * @brief Copy-assignment operator.
      */
-    ResourceHandle& operator=(const ResourceHandle&);
+    TopicHandle& operator=(const TopicHandle&);
 
     /**
      * @brief Move-assignment operator.
      */
-    ResourceHandle& operator=(ResourceHandle&&);
+    TopicHandle& operator=(TopicHandle&&);
 
     /**
      * @brief Destructor.
      */
-    ~ResourceHandle();
+    ~TopicHandle();
 
     /**
      * @brief Returns the client this database has been opened with.
@@ -68,17 +68,17 @@ class ResourceHandle {
 
 
     /**
-     * @brief Checks if the ResourceHandle instance is valid.
+     * @brief Checks if the TopicHandle instance is valid.
      */
     operator bool() const;
 
     /**
-     * @brief Sends an RPC to the resource to make it print a hello message.
+     * @brief Sends an RPC to the topic to make it print a hello message.
      */
     void sayHello() const;
 
     /**
-     * @brief Requests the target resource to compute the sum of two numbers.
+     * @brief Requests the target topic to compute the sum of two numbers.
      * If result is null, it will be ignored. If req is not null, this call
      * will be non-blocking and the caller is responsible for waiting on
      * the request.
@@ -96,13 +96,13 @@ class ResourceHandle {
 
     /**
      * @brief Constructor is private. Use a Client object
-     * to create a ResourceHandle instance.
+     * to create a TopicHandle instance.
      *
      * @param impl Pointer to implementation.
      */
-    ResourceHandle(const std::shared_ptr<ResourceHandleImpl>& impl);
+    TopicHandle(const std::shared_ptr<TopicHandleImpl>& impl);
 
-    std::shared_ptr<ResourceHandleImpl> self;
+    std::shared_ptr<TopicHandleImpl> self;
 };
 
 }

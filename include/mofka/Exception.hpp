@@ -3,13 +3,13 @@
  * 
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __ALPHA_EXCEPTION_HPP
-#define __ALPHA_EXCEPTION_HPP
+#ifndef __MOFKA_EXCEPTION_HPP
+#define __MOFKA_EXCEPTION_HPP
 
 #include <exception>
 #include <string>
 
-namespace alpha {
+namespace mofka {
 
 class Exception : public std::exception {
 

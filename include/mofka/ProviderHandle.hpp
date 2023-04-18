@@ -3,12 +3,12 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __ALPHA_PROVIDER_HANDLE_HPP
-#define __ALPHA_PROVIDER_HANDLE_HPP
+#ifndef __MOFKA_PROVIDER_HANDLE_HPP
+#define __MOFKA_PROVIDER_HANDLE_HPP
 
 #include <thallium.hpp>
 
-namespace alpha {
+namespace mofka {
 
 using ProviderHandle = thallium::provider_handle;
 
