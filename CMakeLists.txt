@@ -5,7 +5,7 @@ project (mofka C CXX)
 set (CMAKE_CXX_STANDARD 17)
 enable_testing ()
 
-add_definitions (-Wextra -Wall -Wpedantic)
+add_definitions (-Wextra -Wall -Wpedantic -std=c++17)
 
 add_library (coverage_config INTERFACE)
 
