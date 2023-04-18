@@ -54,7 +54,6 @@ set_target_properties (mofka-client
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
 
-if (${ENABLE_BEDROCK})
 # bedrock module library
 add_library (mofka-bedrock-module ${module-src-files})
 target_link_libraries (mofka-bedrock-module mofka-server mofka-client bedrock-server coverage_config)
@@ -66,7 +65,6 @@ target_include_directories (mofka-bedrock-module BEFORE PUBLIC
 set_target_properties (mofka-bedrock-module
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
-endif ()
 
 # installation stuff (packaging and install commands)
 write_basic_package_version_file (

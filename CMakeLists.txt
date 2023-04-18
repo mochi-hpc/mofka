@@ -11,7 +11,6 @@ add_library (coverage_config INTERFACE)
 
 option (ENABLE_TESTS    "Build tests" OFF)
 option (ENABLE_EXAMPLES "Build examples" OFF)
-option (ENABLE_BEDROCK  "Build bedrock module" OFF)
 option (ENABLE_COVERAGE "Build with coverage" OFF)
 
 # add our cmake module directory to the path
@@ -59,9 +58,7 @@ find_package (spdlog REQUIRED)
 # search for fmt package
 find_package (fmt REQUIRED)
 # search of bedrock if needed
-if (${ENABLE_BEDROCK})
-    find_package (bedrock REQUIRED)
-endif ()
+find_package (bedrock REQUIRED)
 
 # library version set here (e.g. for shared libs).
 set (MOFKA_VERSION_MAJOR 0)

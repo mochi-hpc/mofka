@@ -9,7 +9,7 @@ spack:
   - spdlog
   - fmt
   - tclap
-  - mochi-bedrock ~ssg ~abtio
+  - mochi-bedrock+ssg
   concretizer:
     unify: true
     reuse: false
