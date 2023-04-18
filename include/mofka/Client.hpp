@@ -6,7 +6,7 @@
 #ifndef MOFKA_CLIENT_HPP
 #define MOFKA_CLIENT_HPP
 
-#include <mofka/TopicHandle.hpp>
+#include <mofka/ServiceHandle.hpp>
 #include <mofka/UUID.hpp>
 #include <mofka/Json.hpp>
 #include <thallium.hpp>
@@ -16,7 +16,7 @@
 namespace mofka {
 
 class ClientImpl;
-class TopicHandle;
+class ServiceHandle;
 
 /**
  * @brief The Client object is the main object used to establish
@@ -24,7 +24,7 @@ class TopicHandle;
  */
 class Client {
 
-    friend class TopicHandle;
+    friend class ServiceHandle;
 
     public:
 
@@ -71,21 +71,13 @@ class Client {
     const thallium::engine& engine() const;
 
     /**
-     * @brief Creates a handle to a remote topic and returns.
-     * You may set "check" to false if you know for sure that the
-     * corresponding topic exists, which will avoid one RPC.
+     * @brief Creates a ServiceHandle representing a Mofka service.
      *
-     * @param address Address of the provider holding the database.
-     * @param provider_id Provider id.
-     * @param topic_id Topic UUID.
-     * @param check Checks if the topic exists by issuing an RPC.
+     * @param filename SSG group file name of the service.
      *
-     * @return a TopicHandle instance.
+     * @return a ServiceHandle instance.
      */
-    TopicHandle makeTopicHandle(std::string_view address,
-                                uint16_t provider_id,
-                                const UUID& topic_id,
-                                bool check = true) const;
+    ServiceHandle connect(std::string_view ssgfile) const;
 
     /**
      * @brief Checks that the Client instance is valid.

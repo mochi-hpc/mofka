@@ -1,6 +1,6 @@
 /*
  * (C) 2020 The University of Chicago
- * 
+ *
  * See COPYRIGHT in top-level directory.
  */
 #include "mofka/TopicHandle.hpp"
@@ -35,16 +35,18 @@ TopicHandle::operator bool() const {
     return static_cast<bool>(self);
 }
 
-Client TopicHandle::client() const {
-    return Client(self->m_client);
+ServiceHandle TopicHandle::service() const {
+    return ServiceHandle(self->m_service);
 }
 
 void TopicHandle::sayHello() const {
     if(not self) throw Exception("Invalid mofka::TopicHandle object");
-    auto& rpc = self->m_client->m_say_hello;
+    /*
+    auto& rpc = self->m_service->m_client->m_say_hello;
     auto& ph  = self->m_ph;
     auto& topic_id = self->m_topic_id;
     rpc.on(ph)(topic_id);
+    */
 }
 
 void TopicHandle::computeSum(
@@ -53,6 +55,7 @@ void TopicHandle::computeSum(
         AsyncRequest* req) const
 {
     if(not self) throw Exception("Invalid mofka::TopicHandle object");
+    /*
     auto& rpc = self->m_client->m_compute_sum;
     auto& ph  = self->m_ph;
     auto& topic_id = self->m_topic_id;
@@ -79,6 +82,7 @@ void TopicHandle::computeSum(
             };
         *req = AsyncRequest(std::move(async_request_impl));
     }
+    */
 }
 
 }

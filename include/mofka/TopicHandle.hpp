@@ -1,5 +1,5 @@
 /*
- * (C) 2020 The University of Chicago
+ * (C) 2023 The University of Chicago
  *
  * See COPYRIGHT in top-level directory.
  */
@@ -16,16 +16,16 @@
 
 namespace mofka {
 
-class Client;
+class ServiceHandle;
 class TopicHandleImpl;
 
 /**
  * @brief A TopicHandle object is a handle for a remote topic
- * on a server. It enables invoking the topic's functionalities.
+ * on a set of servers. It enables invoking the topic's functionalities.
  */
 class TopicHandle {
 
-    friend class Client;
+    friend class ServiceHandle;
 
     public:
 
@@ -60,9 +60,9 @@ class TopicHandle {
     ~TopicHandle();
 
     /**
-     * @brief Returns the client this database has been opened with.
+     * @brief Returns the ServiceHandle this topic has been opened with.
      */
-    Client client() const;
+    ServiceHandle service() const;
 
 
     /**

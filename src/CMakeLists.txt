@@ -5,6 +5,7 @@ set (server-src-files
 
 set (client-src-files
      Client.cpp
+     ServiceHandle.cpp
      TopicHandle.cpp
      AsyncRequest.cpp)
 

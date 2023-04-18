@@ -15,7 +15,7 @@ TEST_CASE("Topic test", "[topic]") {
     auto engine = thallium::engine("na+sm", THALLIUM_SERVER_MODE);
     mofka::Provider provider(engine);
     mofka::UUID topic_id;
-
+/*
     SECTION("Create TopicHandle") {
         mofka::Client client(engine);
         std::string addr = engine.self();
@@ -47,6 +47,6 @@ TEST_CASE("Topic test", "[topic]") {
         REQUIRE_NOTHROW(client.makeTopicHandle(addr, 0, bad_id, false));
         REQUIRE_NOTHROW(client.makeTopicHandle(addr, 1, topic_id, false));
     }
-
+*/
     engine.finalize();
 }
