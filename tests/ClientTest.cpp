@@ -11,7 +11,11 @@
 
 TEST_CASE("Client test", "[client]") {
 
+    spdlog::set_level(spdlog::level::from_str("critical"));
+    auto remove_file = EnsureFileRemoved{"mofka.ssg"};
+
     auto server = bedrock::Server("na+sm", config);
+    auto gid = server.getSSGManager().getGroup("mofka_group")->getHandle<uint64_t>();
     auto engine = server.getMargoManager().getThalliumEngine();
 
     SECTION("Initialize a client") {
@@ -19,7 +23,14 @@ TEST_CASE("Client test", "[client]") {
         REQUIRE(!static_cast<bool>(client));
         client = mofka::Client{engine};
         REQUIRE(static_cast<bool>(client));
+
+        SECTION("Initialize a service handle") {
+            mofka::ServiceHandle sh;
+            REQUIRE(!static_cast<bool>(sh));
+            sh = client.connect(mofka::SSGGroupID{gid});
+            REQUIRE(static_cast<bool>(sh));
+        }
     }
 
-    engine.finalize();
+    server.finalize();
 }

@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
         mofka::Client client(engine);
 
         // Create ServiceHandle
-        mofka::ServiceHandle service = client.connect(g_ssgfile);
+        mofka::ServiceHandle service = client.connect(mofka::SSGFileName{g_ssgfile});
 
     } catch(const mofka::Exception& ex) {
         std::cerr << ex.what() << std::endl;

@@ -43,7 +43,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
     public:
 
-    std::string          m_token;
+    tl::engine           m_engine;
     tl::pool             m_pool;
     // Admin RPC
     tl::remote_procedure m_create_topic;
@@ -58,6 +58,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
     ProviderImpl(const tl::engine& engine, uint16_t provider_id, const tl::pool& pool)
     : tl::provider<ProviderImpl>(engine, provider_id)
+    , m_engine(engine)
     , m_pool(pool)
     , m_create_topic(define("mofka_create_topic", &ProviderImpl::createTopic, pool))
     , m_destroy_topic(define("mofka_destroy_topic", &ProviderImpl::destroyTopic, pool))
@@ -133,18 +134,9 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     }
 
     void destroyTopic(const tl::request& req,
-                         const std::string& token,
-                         const UUID& topic_id) {
+                      const UUID& topic_id) {
         RequestResult<bool> result;
         spdlog::trace("[mofka:{}] Received destroyTopic request for topic {}", id(), topic_id.to_string());
-
-        if(m_token.size() > 0 && m_token != token) {
-            result.success() = false;
-            result.error() = "Invalid security token";
-            req.respond(result);
-            spdlog::error("[mofka:{}] Invalid security token {}", id(), token);
-            return;
-        }
 
         {
             std::lock_guard<tl::mutex> lock(m_backends_mtx);

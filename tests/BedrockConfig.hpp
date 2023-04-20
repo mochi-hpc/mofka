@@ -3,6 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
+#include <string>
+#include <cstdio>
 
 static inline const char* config = R"(
 {
@@ -14,7 +16,26 @@ static inline const char* config = R"(
             "name" : "my_mofka_provider",
             "type" : "mofka"
         }
+    ],
+    "ssg" : [
+        {
+            "name" : "mofka_group",
+            "method" : "init",
+            "group_file" : "mofka.ssg"
+        }
     ]
 }
 )";
 
+struct EnsureFileRemoved {
+
+    std::string m_filename;
+
+    template<typename ... Args>
+    EnsureFileRemoved(Args&&... args)
+    : m_filename(std::forward<Args>(args)...) {}
+
+    ~EnsureFileRemoved() {
+        std::remove(m_filename.c_str());
+    }
+};

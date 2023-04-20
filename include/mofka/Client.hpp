@@ -19,6 +19,25 @@ class ClientImpl;
 class ServiceHandle;
 
 /**
+ * @brief SSGFileName is a string_view representing the name
+ * of an SSG group file.
+ */
+struct SSGFileName : public std::string_view {
+    template<typename ... Args>
+    explicit SSGFileName(Args&&... args)
+    : std::string_view(std::forward<Args>(args)...) {}
+};
+
+/**
+ * @brief The SSGGroupID is a wrapper for an ssg_group_id_t
+ * (without having to rely on including SSG).
+ */
+struct SSGGroupID {
+    uint64_t value;
+    explicit SSGGroupID(uint64_t v) : value(v) {}
+};
+
+/**
  * @brief The Client object is the main object used to establish
  * a connection with a Mofka service.
  */
@@ -77,7 +96,16 @@ class Client {
      *
      * @return a ServiceHandle instance.
      */
-    ServiceHandle connect(std::string_view ssgfile) const;
+    ServiceHandle connect(SSGFileName ssgfile) const;
+
+    /**
+     * @brief Creates a ServiceHandle representing a Mofka service.
+     *
+     * @param group_id SSG group id.
+     *
+     * @return a ServiceHandle instance.
+     */
+    ServiceHandle connect(SSGGroupID gid) const;
 
     /**
      * @brief Checks that the Client instance is valid.

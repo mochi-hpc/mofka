@@ -34,6 +34,7 @@ Client& Client::operator=(const Client& other) = default;
 Client::~Client() = default;
 
 const thallium::engine& Client::engine() const {
+    if(!self) throw Exception("Uninitialized ServiceHandle instance");
     return self->m_engine;
 }
 
@@ -41,13 +42,30 @@ Client::operator bool() const {
     return static_cast<bool>(self);
 }
 
-ServiceHandle Client::connect(std::string_view ssgfile) const {
-    // TODO
-    (void)ssgfile;
-    return {};
+ServiceHandle Client::connect(SSGFileName ssgfile) const {
+    if(!self) throw Exception("Uninitialized ServiceHandle instance");
+    try {
+        auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(std::string{ssgfile});
+        auto service_handle_impl = std::make_shared<ServiceHandleImpl>(self, std::move(bsgh));
+        return ServiceHandle(std::move(service_handle_impl));
+    } catch(const std::exception& ex) {
+        throw Exception(ex.what());
+    }
+}
+
+ServiceHandle Client::connect(SSGGroupID gid) const {
+    if(!self) throw Exception("Uninitialized ServiceHandle instance");
+    try {
+        auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(gid.value);
+        auto service_handle_impl = std::make_shared<ServiceHandleImpl>(self, std::move(bsgh));
+        return ServiceHandle(std::move(service_handle_impl));
+    } catch(const std::exception& ex) {
+        throw Exception(ex.what());
+    }
 }
 
 const rapidjson::Value& Client::getConfig() const {
+    if(!self) throw Exception("Uninitialized ServiceHandle instance");
     // TODO
     static rapidjson::Value config;
     return config;
