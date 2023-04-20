@@ -4,9 +4,10 @@ libdir=${prefix}/lib
 includedir=${prefix}/include
 
 Name: mofka-server
-Description: <insert description here>
+Description: Event streaming service for HPC based on Mochi
 Version: @MOFKA_VERSION@
 
-Requires: thallium uuid
+Requires: thallium uuid fmt RapidJSON
+Requires.private: spdlog
 Libs: -L${libdir} @SERVER_PRIVATE_LIBS@ -lstdc++
 Cflags: -I${includedir}
