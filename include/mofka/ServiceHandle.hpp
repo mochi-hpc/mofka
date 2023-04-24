@@ -66,11 +66,32 @@ class ServiceHandle {
      */
     Client client() const;
 
-
     /**
      * @brief Checks if the ServiceHandle instance is valid.
      */
     operator bool() const;
+
+    /**
+     * @brief Create a topic with a given name, if it does not exist yet.
+     *
+     * @param name Name of the topic.
+     * @param config Json configuration of the topic.
+     * @param type Type of TopicManager to use.
+     *
+     * @return a TopicHandle representing the topic.
+     */
+    TopicHandle createTopic(std::string_view name,
+                            std::string_view config = "{}",
+                            std::string_view type = "dummy");
+
+    /**
+     * @brief Open an existing topic with the given name.
+     *
+     * @param name Name of the topic.
+     *
+     * @return a TopicHandle representing the topic.
+     */
+    TopicHandle openTopic(std::string_view name);
 
     private:
 
