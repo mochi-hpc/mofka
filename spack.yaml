@@ -3,10 +3,10 @@ spack:
   - cmake
   - pkg-config
   - uuid
-  - mochi-thallium ^mercury~boostsys~checksum ^libfabric fabrics=tcp,rxm
+  - mochi-thallium
   - rapidjson
   - valijson
-  - spdlog
+  - spdlog+fmt_external
   - fmt
   - tclap
   - mochi-bedrock@0.6.0:+ssg
