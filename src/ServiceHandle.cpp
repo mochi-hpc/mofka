@@ -52,7 +52,7 @@ TopicHandle ServiceHandle::createTopic(
             std::string{type});
     if(!response.success())
         throw Exception(response.error());
-    return std::make_shared<TopicHandleImpl>(self, response.value());
+    return std::make_shared<TopicHandleImpl>(name, self, response.value());
 }
 
 TopicHandle ServiceHandle::openTopic(std::string_view name) {
@@ -62,7 +62,7 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
         self->m_client->m_open_topic.on(ph)(std::string{name});
     if(!response.success())
         throw Exception(response.error());
-    return std::make_shared<TopicHandleImpl>(self, response.value());
+    return std::make_shared<TopicHandleImpl>(name, self, response.value());
 }
 
 }

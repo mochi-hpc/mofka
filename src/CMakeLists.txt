@@ -7,6 +7,7 @@ set (client-src-files
      Client.cpp
      ServiceHandle.cpp
      TopicHandle.cpp
+     Producer.cpp
      AsyncRequest.cpp)
 
 set (admin-src-files

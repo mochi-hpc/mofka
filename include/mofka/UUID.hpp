@@ -148,7 +148,6 @@ struct UUID {
 
 namespace std {
 
-
     /**
      * @brief Specialization of std::hash for mofka::UUID
      */

@@ -1,5 +1,5 @@
 /*
- * (C) 2020 The University of Chicago
+ * (C) 2023 The University of Chicago
  *
  * See COPYRIGHT in top-level directory.
  */
@@ -10,6 +10,7 @@
 #include "AsyncRequestImpl.hpp"
 #include "ClientImpl.hpp"
 #include "TopicHandleImpl.hpp"
+#include "ProducerImpl.hpp"
 
 #include <thallium/serialization/stl/string.hpp>
 #include <thallium/serialization/stl/pair.hpp>
@@ -35,10 +36,20 @@ TopicHandle::operator bool() const {
     return static_cast<bool>(self);
 }
 
+const std::string& TopicHandle::name() const {
+    return self->m_name;
+}
+
 ServiceHandle TopicHandle::service() const {
     return ServiceHandle(self->m_service);
 }
 
+Producer TopicHandle::producer(std::string_view name,
+                               ProducerOptions options) const {
+    return std::make_shared<ProducerImpl>(name, options, self);
+}
+
+#if 0
 void TopicHandle::sayHello() const {
     if(not self) throw Exception("Invalid mofka::TopicHandle object");
     /*
@@ -84,5 +95,6 @@ void TopicHandle::computeSum(
     }
     */
 }
+#endif
 
 }
