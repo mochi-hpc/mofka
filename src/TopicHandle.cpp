@@ -7,6 +7,7 @@
 #include "mofka/RequestResult.hpp"
 #include "mofka/Exception.hpp"
 
+#include "PimplUtil.hpp"
 #include "AsyncRequestImpl.hpp"
 #include "ClientImpl.hpp"
 #include "TopicHandleImpl.hpp"
@@ -17,24 +18,7 @@
 
 namespace mofka {
 
-TopicHandle::TopicHandle() = default;
-
-TopicHandle::TopicHandle(const std::shared_ptr<TopicHandleImpl>& impl)
-: self(impl) {}
-
-TopicHandle::TopicHandle(const TopicHandle&) = default;
-
-TopicHandle::TopicHandle(TopicHandle&&) = default;
-
-TopicHandle& TopicHandle::operator=(const TopicHandle&) = default;
-
-TopicHandle& TopicHandle::operator=(TopicHandle&&) = default;
-
-TopicHandle::~TopicHandle() = default;
-
-TopicHandle::operator bool() const {
-    return static_cast<bool>(self);
-}
+PIMPL_DEFINE_COMMON_FUNCTIONS(TopicHandle);
 
 const std::string& TopicHandle::name() const {
     return self->m_name;
