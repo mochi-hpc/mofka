@@ -8,6 +8,8 @@ set (client-src-files
      ServiceHandle.cpp
      TopicHandle.cpp
      Producer.cpp
+     Data.cpp
+     Metadata.cpp
      AsyncRequest.cpp)
 
 set (admin-src-files
