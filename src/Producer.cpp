@@ -9,6 +9,7 @@
 #include "mofka/TopicHandle.hpp"
 
 #include "AsyncRequestImpl.hpp"
+#include "FutureImpl.hpp"
 #include "ClientImpl.hpp"
 #include "ProducerImpl.hpp"
 #include "PimplUtil.hpp"
@@ -30,6 +31,14 @@ ProducerOptions Producer::options() const {
 
 TopicHandle Producer::topic() const {
     return TopicHandle(self->m_topic);
+}
+
+Future<EventID> Producer::push(Metadata metadata, Data data) const {
+    // TODO
+    return Future<EventID>(
+        std::make_shared<FutureImpl>(),
+        [](std::shared_ptr<FutureImpl>) -> EventID { return 0; },
+        [](std::shared_ptr<FutureImpl>) -> bool { return true; });
 }
 
 }

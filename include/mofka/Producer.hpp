@@ -11,6 +11,10 @@
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/AsyncRequest.hpp>
+#include <mofka/Metadata.hpp>
+#include <mofka/Data.hpp>
+#include <mofka/EventID.hpp>
+#include <mofka/Future.hpp>
 #include <memory>
 
 namespace mofka {
@@ -81,6 +85,17 @@ class Producer {
      * @brief Checks if the Producer instance is valid.
      */
     operator bool() const;
+
+    /**
+     * @brief Pushes an event into the producer's underlying topic,
+     * returning a Future that can be awaited.
+     *
+     * @param metadata Metadata of the event.
+     * @param data Optional data to attach to the event.
+     *
+     * @return a Future<EventID> tracking the asynchronous operation.
+     */
+    Future<EventID> push(Metadata metadata, Data data = Data{}) const;
 
     private:
 
