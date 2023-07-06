@@ -22,9 +22,26 @@ class Metadata {
     public:
 
     /**
-     * @brief Constructor. The resulting Metadata handle will be invalid.
+     * @brief Constructor taking a string. The string will be moved
+     * into the Metadata object, hence it is passed by value.
+     *
+     * @param json JSON string.
+     * @param validate Validate that the string is actually JSON.
+     *
+     * Note: if validate is left to false, validation will happen
+     * only when events are pushed into a producer and only if the topic's
+     * Validator requires the Metadata to be valid JSON.
      */
-    Metadata();
+    Metadata(std::string json = "{}", bool validate = false);
+
+    /**
+     * @brief Constructor taking an already formed JSON document.
+     * The document will be moved into the Metadata object, hence it
+     * is passed by value.
+     *
+     * @param json
+     */
+    Metadata(rapidjson::Document json);
 
     /**
      * @brief Copy-constructor.
@@ -57,14 +74,40 @@ class Metadata {
     operator bool() const;
 
     /**
-     * @brief Create a Metadata object from a JSON string.
+     * @brief Returns the underlying JSON document.
+     *
+     * Note: if the Metadata has been constructed from a string,
+     * this function will trigger its parsing into a JSON document.
      */
-    static Metadata FromJSON(std::string_view json);
+    const rapidjson::Document& json() const;
 
     /**
-     * @brief Create a Metadata object from an existing JSON document.
+     * @brief Returns the underlying JSON document.
+     *
+     * Note: if the Metadata has been constructed from a string,
+     * this function will trigger its parsing into a JSON document.
+     * The string representation will also be invalidated.
      */
-    static Metadata FromJSON(rapidjson::Document json);
+    rapidjson::Document& json();
+
+    /**
+     * @brief Returns the underlying string representation
+     * of the Metadata.
+     *
+     * Note: if the Metadata has been constructed from a JSON document,
+     * this function will trigger its serialization into a string.
+     */
+    const std::string& string() const;
+
+    /**
+     * @brief Returns the underlying string representation
+     * of the Metadata.
+     *
+     * Note: if the Metadata has been constructed from a JSON document,
+     * this function will trigger its serialization into a string.
+     * The JSON representation will also be invalidated.
+     */
+    std::string& string();
 
     private:
 

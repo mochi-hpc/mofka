@@ -6,7 +6,9 @@
 #ifndef MOFKA_METADATA_IMPL_H
 #define MOFKA_METADATA_IMPL_H
 
-#include <mofka/Json.hpp>
+#include "mofka/Json.hpp"
+#include "mofka/Metadata.hpp"
+#include "RapidJsonUtil.hpp"
 
 namespace mofka {
 
@@ -14,11 +16,57 @@ class MetadataImpl {
 
     public:
 
-    MetadataImpl(rapidjson::Document doc)
-    : m_json(std::move(doc)) {}
+    enum Type : uint8_t {
+        Json   = 0x1,
+        String = 0x2
+    };
 
+    MetadataImpl(rapidjson::Document doc)
+    : m_json(std::move(doc))
+    , m_type(Type::Json) {}
+
+    MetadataImpl(std::string str, bool validate)
+    : m_string(std::move(str))
+    , m_type(Type::String) {
+        if(validate && !ValidateIsJson(m_string))
+            throw Exception("String provided to Metadata constructor is not valid JSON");
+    }
+
+    void ensureString() {
+        if(m_type & Type::String) return;
+        m_string.clear();
+        StringWrapper buffer(m_string);
+        rapidjson::Writer<StringWrapper> writer(buffer);
+        m_json.Accept(writer);
+        m_type |= Type::String;
+    }
+
+    void ensureJson() {
+        if(m_type & Type::Json) return;
+        m_json = rapidjson::Document{};
+        rapidjson::ParseResult ok = m_json.Parse(m_string.c_str(), m_string.size());
+        if(!ok) {
+           throw Exception(fmt::format(
+                "Could not parse Metadata string: {} ({})",
+                rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+        }
+        m_type |= Type::Json;
+    }
+
+    std::string         m_string;
     rapidjson::Document m_json;
+    uint8_t             m_type;
 };
+
+template<typename A>
+void save(A& ar, const Metadata& metadata) {
+    ar(metadata.string());
+}
+
+template<typename A>
+void load(A& ar, Metadata& metadata) {
+    ar(metadata.string());
+}
 
 }
 

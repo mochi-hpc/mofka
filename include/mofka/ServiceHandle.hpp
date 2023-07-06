@@ -11,6 +11,8 @@
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/AsyncRequest.hpp>
+#include <mofka/Serializer.hpp>
+#include <mofka/Metadata.hpp>
 #include <memory>
 #include <unordered_set>
 
@@ -19,6 +21,14 @@ namespace mofka {
 class Client;
 class ServiceHandleImpl;
 class TopicHandle;
+
+struct TopicBackendConfig : public Metadata {
+
+    template<typename ... Args>
+    TopicBackendConfig(Args&&... args)
+    : Metadata(std::forward<Args>(args)...) {}
+
+};
 
 /**
  * @brief A ServiceHandle object is a handle for a Mofka service
@@ -75,14 +85,14 @@ class ServiceHandle {
      * @brief Create a topic with a given name, if it does not exist yet.
      *
      * @param name Name of the topic.
-     * @param config Json configuration of the topic.
-     * @param type Type of TopicManager to use.
+     * @param config Json configuration of the topic's backend.
+     * @param serializer Serializer to use for all the events in the topic.
      *
      * @return a TopicHandle representing the topic.
      */
     TopicHandle createTopic(std::string_view name,
-                            std::string_view config = "{}",
-                            std::string_view type = "dummy");
+                            TopicBackendConfig config = TopicBackendConfig{},
+                            Serializer serializer = Serializer{});
 
     /**
      * @brief Open an existing topic with the given name.

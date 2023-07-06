@@ -10,6 +10,7 @@ set (client-src-files
      Producer.cpp
      Data.cpp
      Metadata.cpp
+     Serializer.cpp
      AsyncRequest.cpp)
 
 set (admin-src-files
@@ -30,20 +31,6 @@ set (mofka-pkg "share/cmake/mofka")
 # set version fo shared library
 set (mofka-vers "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}")
 
-# server library
-add_library (mofka-server ${server-src-files} ${dummy-src-files})
-target_link_libraries (mofka-server
-    PUBLIC thallium PkgConfig::uuid fmt::fmt rapidjson
-    PRIVATE spdlog::spdlog coverage_config)
-target_include_directories (mofka-server PUBLIC $<INSTALL_INTERFACE:include>)
-target_include_directories (mofka-server BEFORE PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories (mofka-server BEFORE PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-set_target_properties (mofka-server
-    PROPERTIES VERSION ${MOFKA_VERSION}
-    SOVERSION ${MOFKA_VERSION_MAJOR})
-
 # client library
 add_library (mofka-client ${client-src-files})
 target_link_libraries (mofka-client
@@ -54,6 +41,20 @@ target_include_directories (mofka-client BEFORE PUBLIC
 target_include_directories (mofka-client BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 set_target_properties (mofka-client
+    PROPERTIES VERSION ${MOFKA_VERSION}
+    SOVERSION ${MOFKA_VERSION_MAJOR})
+
+# server library
+add_library (mofka-server ${server-src-files} ${dummy-src-files})
+target_link_libraries (mofka-server
+    PUBLIC thallium PkgConfig::uuid fmt::fmt rapidjson
+    PRIVATE mofka-client spdlog::spdlog coverage_config)
+target_include_directories (mofka-server PUBLIC $<INSTALL_INTERFACE:include>)
+target_include_directories (mofka-server BEFORE PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
+target_include_directories (mofka-server BEFORE PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+set_target_properties (mofka-server
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
 

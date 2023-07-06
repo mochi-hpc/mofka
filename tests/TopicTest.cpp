@@ -25,16 +25,18 @@ TEST_CASE("TopicHandle test", "[topic]") {
         auto sh = client.connect(mofka::SSGGroupID{gid});
         REQUIRE(static_cast<bool>(sh));
 
+        auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"dummy\"}"};
+
         SECTION("Create and open a topic") {
             mofka::TopicHandle topic;
             REQUIRE(!static_cast<bool>(topic));
-            topic = sh.createTopic("mytopic");
+            topic = sh.createTopic("mytopic", topic_config);
             REQUIRE(static_cast<bool>(topic));
             auto topic2 = sh.openTopic("mytopic");
             REQUIRE(static_cast<bool>(topic2));
 
             SECTION("Create a topic with a name that already exists") {
-                REQUIRE_THROWS_AS(sh.createTopic("mytopic"), mofka::Exception);
+                REQUIRE_THROWS_AS(sh.createTopic("mytopic", topic_config), mofka::Exception);
             }
 
             SECTION("Open a topic that doesn't exist") {

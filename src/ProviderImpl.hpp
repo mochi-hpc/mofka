@@ -8,6 +8,7 @@
 
 #include "mofka/TopicManager.hpp"
 #include "mofka/UUID.hpp"
+#include "MetadataImpl.hpp"
 
 #include <thallium.hpp>
 #include <thallium/serialization/stl/string.hpp>
@@ -92,27 +93,39 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
     void createTopic(const tl::request& req,
                      const std::string& topic_name,
-                     const std::string& topic_config,
-                     const std::string& topic_type) {
+                     Metadata backend_config,
+                     Metadata serializer_metadata) {
 
         spdlog::trace("[mofka:{}] Received createTopic request", id());
         spdlog::trace("[mofka:{}] => name   = {}", id(), topic_name);
-        spdlog::trace("[mofka:{}] => type   = {}", id(), topic_type);
-        spdlog::trace("[mofka:{}] => config = {}", id(), topic_config);
 
         auto topic_id = UUID::generate();
         RequestResult<UUID> result;
 
-        rapidjson::Document json_config;
-        rapidjson::ParseResult ok = json_config.Parse(topic_config.c_str());
-        if(!ok) {
-            result.error() = fmt::format(
-                "Could not parse topic configuration for topic \"{}\": {} ({})",
-                topic_name, rapidjson::GetParseError_En(ok.Code()), ok.Offset());
+        rapidjson::Document* backend_config_json = nullptr;
+        try {
+            backend_config_json = &backend_config.json();
+        } catch(const Exception& ex) {
             result.success() = false;
+            result.error() = ex.what();
             spdlog::error("[mofka:{}] {}", id(), result.error());
             req.respond(result);
             return;
+        }
+
+        std::string topic_type = "mofka";
+        if(backend_config_json->GetType() == rapidjson::kObjectType) {
+            auto topic_type_it = backend_config_json->FindMember("__type__");
+            if(topic_type_it != backend_config_json->MemberEnd()) {
+                if(topic_type_it->value.GetType() != rapidjson::kStringType) {
+                    result.success() = false;
+                    result.error() = "Invalid type for __type__ field in topic config, expected string";
+                    req.respond(result);
+                    spdlog::error("[mofka:{}] {}", id(), result.error());
+                    return;
+                }
+                topic_type = topic_type_it->value.GetString();
+            }
         }
 
         std::lock_guard<tl::mutex> lock(m_topics_mtx);
@@ -127,7 +140,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
         std::shared_ptr<TopicManager> topic;
         try {
-            topic = TopicFactory::createTopic(topic_type, get_engine(), json_config);
+            topic = TopicFactory::createTopic(topic_type, get_engine(), *backend_config_json);
         } catch(const std::exception& ex) {
             result.success() = false;
             result.error() = fmt::format("Error when creating topic \"{}\": {}", ex.what());

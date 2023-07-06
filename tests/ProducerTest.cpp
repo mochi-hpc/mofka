@@ -26,7 +26,8 @@ TEST_CASE("Producer test", "[producer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        topic = sh.createTopic("mytopic");
+        auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"dummy\"}"};
+        topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
 
         SECTION("Create a producer from the topic") {

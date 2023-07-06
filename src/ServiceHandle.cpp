@@ -13,9 +13,7 @@
 #include "ClientImpl.hpp"
 #include "ServiceHandleImpl.hpp"
 #include "TopicHandleImpl.hpp"
-
-#include <thallium/serialization/stl/string.hpp>
-#include <thallium/serialization/stl/pair.hpp>
+#include "MetadataImpl.hpp"
 
 namespace mofka {
 
@@ -26,14 +24,16 @@ Client ServiceHandle::client() const {
 }
 
 TopicHandle ServiceHandle::createTopic(
-        std::string_view name, std::string_view config, std::string_view type) {
+        std::string_view name,
+        TopicBackendConfig config,
+        Serializer serializer) {
     const auto hash = std::hash<decltype(name)>()(name);
     const auto ph   = self->m_mofka_phs[hash % self->m_mofka_phs.size()];
     RequestResult<UUID> response =
         self->m_client->m_create_topic.on(ph)(
             std::string{name},
-            std::string{config},
-            std::string{type});
+            static_cast<Metadata&>(config),
+            serializer.metadata());
     if(!response.success())
         throw Exception(response.error());
     return std::make_shared<TopicHandleImpl>(name, self, response.value());

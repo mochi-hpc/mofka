@@ -26,7 +26,8 @@ TEST_CASE("Event producer test", "[event-producer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        topic = sh.createTopic("mytopic");
+        auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"dummy\"}"};
+        topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
         mofka::ProducerOptions options;
         auto producer = topic.producer("myproducer", options);
@@ -34,9 +35,9 @@ TEST_CASE("Event producer test", "[event-producer]") {
 
         SECTION("Push events into the topic using the producer") {
             auto future = producer.push(
-                mofka::Metadata::FromJSON("{\"name\":\"matthieu\"}"),
+                mofka::Metadata("{\"name\":\"matthieu\"}"),
                 mofka::Data{nullptr, 0});
-            auto event_id = future.wait();
+            future.wait();
         }
     }
 
