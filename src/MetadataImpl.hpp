@@ -19,7 +19,7 @@ class MetadataImpl {
 
     enum Type : uint8_t {
         String     = 0x1, /* string field is up to date */
-        ValidJson  = 0x2, /* the string is up to date and we know it's valid JSON */
+        ValidJson  = 0x3, /* the string is up to date and we know it's valid JSON (implies String) */
         ActualJson = 0x6, /* the json field is up to date (implies ValidJson) */
     };
 
@@ -33,7 +33,7 @@ class MetadataImpl {
         if(validate && !ValidateIsJson(m_string))
             throw Exception("String provided to Metadata constructor is not valid JSON");
         if(validate)
-            m_type |= Type::ValidJson;
+            m_type = Type::ValidJson;
     }
 
     void ensureString() {
@@ -74,8 +74,7 @@ class MetadataImpl {
 
 template<typename A>
 void save(A& ar, const Metadata& metadata) {
-    auto& str = metadata.string();
-    ar(str);
+    ar((const std::string&)metadata.string());
 }
 
 template<typename A>

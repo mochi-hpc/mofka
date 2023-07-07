@@ -128,6 +128,12 @@ class Metadata {
     Metadata(const std::shared_ptr<MetadataImpl>& impl);
 
     std::shared_ptr<MetadataImpl> self;
+
+    template<typename A>
+    friend void save(A& ar, const Metadata& metadata);
+
+    template<typename A>
+    friend void load(A& ar, Metadata& metadata);
 };
 
 }

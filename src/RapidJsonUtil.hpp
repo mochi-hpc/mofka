@@ -29,9 +29,32 @@ class StringWrapper {
         return;
     }
 
-  private:
+    private:
 
     std::string& m_str;
+};
+
+template<typename ArchiveType>
+class ArchiveWrapper {
+
+    public:
+
+    typedef char Ch;
+
+    ArchiveWrapper(ArchiveType& arch) : m_archive(arch) {}
+
+    void Put(char c) {
+        m_archive.write(&c, 1);
+    }
+
+    void Flush() {
+        return;
+    }
+
+    private:
+
+    ArchiveType& m_archive;
+
 };
 
 static inline bool ValidateIsJson(std::string_view json) {
