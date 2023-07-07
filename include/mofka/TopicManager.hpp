@@ -68,6 +68,11 @@ class TopicManager {
     virtual Metadata getValidatorMetadata() const = 0;
 
     /**
+     * @brief Get the Metadata of the TargetSelector associated with this topic.
+     */
+    virtual Metadata getTargetSelectorMetadata() const = 0;
+
+    /**
      * @brief Get the Metadata of the Serializer associated with this topic.
      */
     virtual Metadata getSerializerMetadata() const = 0;
@@ -125,6 +130,7 @@ class TopicFactory {
             const thallium::engine& engine,
             const Metadata& config,
             const Metadata& validator,
+            const Metadata& selector,
             const Metadata& serializer);
 
     private:
@@ -132,6 +138,7 @@ class TopicFactory {
     static std::unordered_map<std::string,
                 std::function<std::unique_ptr<TopicManager>(
                     const thallium::engine&,
+                    const Metadata&,
                     const Metadata&,
                     const Metadata&,
                     const Metadata&)>> create_fn;
@@ -154,8 +161,9 @@ class __MofkaTopicManagerRegistration {
             backend_name, [](const thallium::engine& engine,
                              const mofka::Metadata& config,
                              const mofka::Metadata& validator,
+                             const mofka::Metadata& selector,
                              const mofka::Metadata& serializer) {
-                return TopicManagerType::create(engine, config, validator, serializer);
+                return TopicManagerType::create(engine, config, validator, selector, serializer);
             });
     }
 };

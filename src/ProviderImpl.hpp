@@ -98,12 +98,13 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                      const std::string& topic_name,
                      Metadata backend_config,
                      Metadata validator_meta,
+                     Metadata selector_meta,
                      Metadata serializer_meta) {
 
         spdlog::trace("[mofka:{}] Received createTopic request", id());
         spdlog::trace("[mofka:{}] => name       = {}", id(), topic_name);
 
-        using ResultType = std::tuple<Metadata, Metadata>;
+        using ResultType = std::tuple<Metadata, Metadata, Metadata>;
         RequestResult<ResultType> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
 
@@ -137,6 +138,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                 topic_type, get_engine(),
                 backend_config,
                 validator_meta,
+                selector_meta,
                 serializer_meta);
         } catch(const std::exception& ex) {
             result.success() = false;
@@ -155,6 +157,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             m_topics_by_name[topic_name] = topic;
             result.value() = std::make_tuple(
                 topic->getValidatorMetadata(),
+                topic->getTargetSelectorMetadata(),
                 topic->getSerializerMetadata());
         }
 
@@ -165,7 +168,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void openTopic(const tl::request& req,
                    const std::string& topic_name) {
         spdlog::trace("[mofka:{}] Received openTopic request for topic {}", id(), topic_name);
-        using ResultType = std::tuple<Metadata, Metadata>;
+        using ResultType = std::tuple<Metadata, Metadata, Metadata>;
         RequestResult<ResultType> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
 
@@ -173,6 +176,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         result.success() = true;
         result.value() = std::make_tuple(
                 topic->getValidatorMetadata(),
+                topic->getTargetSelectorMetadata(),
                 topic->getSerializerMetadata());
         spdlog::trace("[mofka:{}] Code successfully executed on topic {}", id(), topic_name);
     }

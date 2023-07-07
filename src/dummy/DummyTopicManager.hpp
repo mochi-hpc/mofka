@@ -17,6 +17,7 @@ class DummyTopicManager : public mofka::TopicManager {
 
     Metadata m_config;
     Metadata m_validator;
+    Metadata m_selector;
     Metadata m_serializer;
 
     public:
@@ -27,9 +28,11 @@ class DummyTopicManager : public mofka::TopicManager {
     DummyTopicManager(
         const Metadata& config,
         const Metadata& validator,
+        const Metadata& selector,
         const Metadata& serializer)
     : m_config(config)
     , m_validator(validator)
+    , m_selector(selector)
     , m_serializer(serializer) {}
 
     /**
@@ -61,6 +64,11 @@ class DummyTopicManager : public mofka::TopicManager {
      * @brief Get the Metadata of the Validator associated with this topic.
      */
     virtual Metadata getValidatorMetadata() const override;
+
+    /**
+     * @brief Get the Metadata of the TargetSelector associated with this topic.
+     */
+    virtual Metadata getTargetSelectorMetadata() const override;
 
     /**
      * @brief Get the Metadata of the Serializer associated with this topic.
@@ -105,6 +113,7 @@ class DummyTopicManager : public mofka::TopicManager {
         const thallium::engine& engine,
         const Metadata& config,
         const Metadata& validator,
+        const Metadata& selector,
         const Metadata& serializer);
 
 };

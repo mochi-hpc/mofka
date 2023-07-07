@@ -18,6 +18,10 @@ Metadata DummyTopicManager::getSerializerMetadata() const {
     return m_serializer;
 }
 
+Metadata DummyTopicManager::getTargetSelectorMetadata() const {
+    return m_selector;
+}
+
 void DummyTopicManager::sayHello() {
     std::cout << "Hello World" << std::endl;
 }
@@ -39,9 +43,11 @@ std::unique_ptr<mofka::TopicManager> DummyTopicManager::create(
         const thallium::engine& engine,
         const Metadata& config,
         const Metadata& validator,
+        const Metadata& selector,
         const Metadata& serializer) {
     (void)engine;
-    return std::unique_ptr<mofka::TopicManager>(new DummyTopicManager(config, validator, serializer));
+    return std::unique_ptr<mofka::TopicManager>(
+        new DummyTopicManager(config, validator, selector, serializer));
 }
 
 }

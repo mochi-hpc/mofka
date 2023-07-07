@@ -13,6 +13,7 @@
 #include <mofka/AsyncRequest.hpp>
 #include <mofka/Serializer.hpp>
 #include <mofka/Validator.hpp>
+#include <mofka/TargetSelector.hpp>
 #include <mofka/Metadata.hpp>
 #include <memory>
 #include <unordered_set>
@@ -87,6 +88,8 @@ class ServiceHandle {
      *
      * @param name Name of the topic.
      * @param config Json configuration of the topic's backend.
+     * @param validator Validator object to validate events pushed to the topic.
+     * @param selector TargetSelector object of the topic.
      * @param serializer Serializer to use for all the events in the topic.
      *
      * @return a TopicHandle representing the topic.
@@ -94,6 +97,7 @@ class ServiceHandle {
     TopicHandle createTopic(std::string_view name,
                             TopicBackendConfig config = TopicBackendConfig{},
                             Validator validator = Validator{},
+                            TargetSelector selector = TargetSelector{},
                             Serializer serializer = Serializer{});
 
     /**

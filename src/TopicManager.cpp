@@ -14,6 +14,7 @@ std::unordered_map<
             const thallium::engine&,
             const Metadata&,
             const Metadata&,
+            const Metadata&,
             const Metadata&)>> TopicFactory::create_fn;
 
 std::unique_ptr<TopicManager> TopicFactory::createTopic(
@@ -21,11 +22,12 @@ std::unique_ptr<TopicManager> TopicFactory::createTopic(
         const thallium::engine& engine,
         const Metadata& config,
         const Metadata& validator,
+        const Metadata& selector,
         const Metadata& serializer) {
     auto it = create_fn.find(std::string{backend_name});
     if(it == create_fn.end()) return nullptr;
     auto& f = it->second;
-    return f(engine, config, validator, serializer);
+    return f(engine, config, validator, selector, serializer);
 }
 
 }
