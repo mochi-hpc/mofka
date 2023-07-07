@@ -12,6 +12,7 @@
 #include <mofka/Exception.hpp>
 #include <mofka/AsyncRequest.hpp>
 #include <mofka/Serializer.hpp>
+#include <mofka/Validator.hpp>
 #include <mofka/Metadata.hpp>
 #include <memory>
 #include <unordered_set>
@@ -92,6 +93,7 @@ class ServiceHandle {
      */
     TopicHandle createTopic(std::string_view name,
                             TopicBackendConfig config = TopicBackendConfig{},
+                            Validator validator = Validator{},
                             Serializer serializer = Serializer{});
 
     /**

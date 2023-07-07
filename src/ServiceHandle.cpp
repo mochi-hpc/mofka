@@ -26,6 +26,7 @@ Client ServiceHandle::client() const {
 TopicHandle ServiceHandle::createTopic(
         std::string_view name,
         TopicBackendConfig config,
+        Validator validator,
         Serializer serializer) {
     const auto hash = std::hash<decltype(name)>()(name);
     const auto ph   = self->m_mofka_phs[hash % self->m_mofka_phs.size()];
@@ -33,6 +34,7 @@ TopicHandle ServiceHandle::createTopic(
         self->m_client->m_create_topic.on(ph)(
             std::string{name},
             static_cast<Metadata&>(config),
+            validator.metadata(),
             serializer.metadata());
     if(!response.success())
         throw Exception(response.error());

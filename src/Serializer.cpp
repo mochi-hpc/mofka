@@ -18,11 +18,11 @@ PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(Serializer);
 Serializer::Serializer()
 : self(std::make_shared<SimpleSerializerImpl>()) {}
 
-void Serializer::serialize(Archive& archive, const Metadata& metadata) {
+void Serializer::serialize(Archive& archive, const Metadata& metadata) const {
     self->serialize(archive, metadata);
 }
 
-void Serializer::deserialize(Archive& archive, Metadata& metadata) {
+void Serializer::deserialize(Archive& archive, Metadata& metadata) const {
     self->deserialize(archive, metadata);
 }
 

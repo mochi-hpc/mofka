@@ -63,6 +63,24 @@ struct AutoDeregisteringRPC : public tl::remote_procedure {
     }
 };
 
+template<typename ResponseType>
+struct AutoResponse {
+
+    AutoResponse(const tl::request& req, ResponseType& resp)
+    : m_req(req)
+    , m_resp(resp) {}
+
+    AutoResponse(const AutoResponse&) = delete;
+    AutoResponse(AutoResponse&&) = delete;
+
+    ~AutoResponse() {
+        m_req.respond(m_resp);
+    }
+
+    const tl::request& m_req;
+    ResponseType&      m_resp;
+};
+
 class ProviderImpl : public tl::provider<ProviderImpl> {
 
     auto id() const { return get_provider_id(); } // for convenience
@@ -94,13 +112,15 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void createTopic(const tl::request& req,
                      const std::string& topic_name,
                      Metadata backend_config,
-                     Metadata serializer_metadata) {
+                     Metadata validator_meta,
+                     Metadata serializer_meta) {
 
         spdlog::trace("[mofka:{}] Received createTopic request", id());
         spdlog::trace("[mofka:{}] => name   = {}", id(), topic_name);
 
         auto topic_id = UUID::generate();
         RequestResult<UUID> result;
+        AutoResponse<decltype(result)> ensureResponse(req, result);
 
         rapidjson::Document* backend_config_json = nullptr;
         try {
@@ -109,7 +129,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             result.success() = false;
             result.error() = ex.what();
             spdlog::error("[mofka:{}] {}", id(), result.error());
-            req.respond(result);
             return;
         }
 
@@ -120,7 +139,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                 if(topic_type_it->value.GetType() != rapidjson::kStringType) {
                     result.success() = false;
                     result.error() = "Invalid type for __type__ field in topic config, expected string";
-                    req.respond(result);
                     spdlog::error("[mofka:{}] {}", id(), result.error());
                     return;
                 }
@@ -134,7 +152,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             result.error() = fmt::format("Topic with name \"{}\" already exists", topic_name);
             result.success() = false;
             spdlog::error("[mofka:{}] {}", id(), result.error());
-            req.respond(result);
             return;
         }
 
@@ -145,7 +162,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             result.success() = false;
             result.error() = fmt::format("Error when creating topic \"{}\": {}", ex.what());
             spdlog::error("[mofka:{}] {}", id(), result.error());
-            req.respond(result);
             return;
         }
 
@@ -154,7 +170,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             result.error() = fmt::format(
                 "Unknown topic type \"{}\" for topic \"{}\"", topic_type, topic_name);
             spdlog::error("[mofka:{}] {}", id(), result.error());
-            req.respond(result);
             return;
         } else {
             m_topics_by_uuid[topic_id]   = topic;
@@ -162,7 +177,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             result.value() = topic_id;
         }
 
-        req.respond(result);
         spdlog::trace("[mofka:{}] Successfully created topic \"{}\" with id {} of type {}",
                 id(), topic_name, topic_id.to_string(), topic_type);
     }
@@ -171,9 +185,9 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                    const std::string& topic_name) {
         spdlog::trace("[mofka:{}] Received openTopic request for topic {}", id(), topic_name);
         RequestResult<bool> result;
+        AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result.success() = true;
-        req.respond(result);
         spdlog::trace("[mofka:{}] Code successfully executed on topic {}", id(), topic_name);
     }
 
@@ -182,9 +196,9 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                     int32_t x, int32_t y) {
         spdlog::trace("[mofka:{}] Received sayHello request for topic {}", id(), topic_id.to_string());
         RequestResult<int32_t> result;
+        AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_UUID(topic, topic_id);
         result = topic->computeSum(x, y);
-        req.respond(result);
         spdlog::trace("[mofka:{}] Successfully executed computeSum on topic {}", id(), topic_id.to_string());
     }
 

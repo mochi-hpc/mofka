@@ -11,6 +11,7 @@ set (client-src-files
      Data.cpp
      Metadata.cpp
      Serializer.cpp
+     Validator.cpp
      AsyncRequest.cpp)
 
 set (admin-src-files

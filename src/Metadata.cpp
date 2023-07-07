@@ -24,9 +24,13 @@ const std::string& Metadata::string() const {
     return self->m_string;
 }
 
+bool Metadata::isValidJson() const {
+    return self->validateJson();
+}
+
 std::string& Metadata::string() {
     self->ensureString();
-    self->m_type &= ~MetadataImpl::Type::Json; /* invalidate json */
+    self->m_type &= ~MetadataImpl::Type::ActualJson; /* invalidate json */
     return self->m_string;
 }
 

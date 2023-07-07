@@ -37,7 +37,7 @@ class SerializerInterface {
      * @param archive Archive into which to serialize the metadata.
      * @param metadata Metadata to serialize.
      */
-    virtual void serialize(Archive& archive, const Metadata& metadata) = 0;
+    virtual void serialize(Archive& archive, const Metadata& metadata) const = 0;
 
     /**
      * @brief Deserialize the Metadata from the Archive.
@@ -46,12 +46,12 @@ class SerializerInterface {
      * @param archive Archive from which to deserialize the metadata.
      * @param metadata Metadata to deserialize.
      */
-    virtual void deserialize(Archive& archive, Metadata& metadata) = 0;
+    virtual void deserialize(Archive& archive, Metadata& metadata) const = 0;
 
     /**
      * @brief Convert the underlying serializer implementation into a Metadata
      * object that can be stored (e.g. if the serializer uses a compression
-     * algorith, the Metadata could contain the parameters used for
+     * algorithm, the Metadata could contain the parameters used for
      * compression, so that someone could restore a Serializer with the
      * same parameters later when deserializing objects).
      *
@@ -109,7 +109,7 @@ class Serializer {
      * @param archive Archive into which to serialize the metadata.
      * @param metadata Metadata to serialize.
      */
-    void serialize(Archive& archive, const Metadata& metadata);
+    void serialize(Archive& archive, const Metadata& metadata) const;
 
     /**
      * @brief Deserialize the Metadata from the Archive.
@@ -118,12 +118,12 @@ class Serializer {
      * @param archive Archive from which to deserialize the metadata.
      * @param metadata Metadata to deserialize.
      */
-    void deserialize(Archive& archive, Metadata& metadata);
+    void deserialize(Archive& archive, Metadata& metadata) const;
 
     /**
      * @brief Convert the underlying serializer implementation into a Metadata
      * object that can be stored (e.g. if the serializer uses a compression
-     * algorith, the Metadata could contain the parameters used for
+     * algorithm, the Metadata could contain the parameters used for
      * compression, so that someone could restore a Serializer with the
      * same parameters later when deserializing objects).
      *

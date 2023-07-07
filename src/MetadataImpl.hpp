@@ -17,19 +17,22 @@ class MetadataImpl {
     public:
 
     enum Type : uint8_t {
-        Json   = 0x1,
-        String = 0x2
+        String     = 0x1, /* string field is up to date */
+        ValidJson  = 0x2, /* the string is up to date and we know it's valid JSON */
+        ActualJson = 0x5, /* the json field is up to date (implies ValidJson) */
     };
 
     MetadataImpl(rapidjson::Document doc)
     : m_json(std::move(doc))
-    , m_type(Type::Json) {}
+    , m_type(Type::ActualJson) {}
 
     MetadataImpl(std::string str, bool validate)
     : m_string(std::move(str))
     , m_type(Type::String) {
         if(validate && !ValidateIsJson(m_string))
             throw Exception("String provided to Metadata constructor is not valid JSON");
+        if(validate)
+            m_type |= Type::ValidJson;
     }
 
     void ensureString() {
@@ -42,7 +45,7 @@ class MetadataImpl {
     }
 
     void ensureJson() {
-        if(m_type & Type::Json) return;
+        if(m_type & Type::ActualJson) return;
         m_json = rapidjson::Document{};
         rapidjson::ParseResult ok = m_json.Parse(m_string.c_str(), m_string.size());
         if(!ok) {
@@ -50,7 +53,17 @@ class MetadataImpl {
                 "Could not parse Metadata string: {} ({})",
                 rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
         }
-        m_type |= Type::Json;
+        m_type |= Type::ActualJson;
+    }
+
+    bool validateJson() {
+        if(m_type & Type::ValidJson) return true;
+        if(ValidateIsJson(m_string)) {
+            m_type |= Type::ValidJson;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     std::string         m_string;

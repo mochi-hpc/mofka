@@ -15,7 +15,7 @@ class SimpleSerializerImpl : public SerializerInterface {
 
     public:
 
-    void serialize(Archive& archive, const Metadata& metadata) override {
+    void serialize(Archive& archive, const Metadata& metadata) const override {
         auto& json = metadata.json();
         rapidjson::StringBuffer buffer;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -23,7 +23,7 @@ class SimpleSerializerImpl : public SerializerInterface {
         archive.write(buffer.GetString(), buffer.GetSize());
     }
 
-    void deserialize(Archive& archive, Metadata& metadata) override {
+    void deserialize(Archive& archive, Metadata& metadata) const override {
         metadata.json() = rapidjson::Document{};
         auto reader = [&](const void* data, std::size_t size) {
             metadata.json().Parse(static_cast<const char*>(data), size);

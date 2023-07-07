@@ -8,22 +8,17 @@
 
 #include <fmt/format.h>
 #include <exception>
+#include <stdexcept>
 
 namespace mofka {
 
-class Exception : public std::exception {
-
-    std::string m_error;
+class Exception : public std::logic_error {
 
     public:
 
     template<typename ... Args>
     Exception(Args&&... args)
-    : m_error(fmt::format(std::forward<Args>(args)...)) {}
-
-    virtual const char* what() const noexcept override {
-        return m_error.c_str();
-    }
+    : std::logic_error(fmt::format(std::forward<Args>(args)...)) {}
 };
 
 }

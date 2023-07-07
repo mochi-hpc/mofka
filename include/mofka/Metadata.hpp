@@ -74,6 +74,14 @@ class Metadata {
     operator bool() const;
 
     /**
+     * @brief Checks if the content of the Metadata is valid JSON.
+     * If the Metadata has been initialized from a JSON document,
+     * the call will be trivial. Other, the Metadata's string will
+     * be validated but not converted into JSON.
+     */
+    bool isValidJson() const;
+
+    /**
      * @brief Returns the underlying JSON document.
      *
      * Note: if the Metadata has been constructed from a string,
