@@ -8,21 +8,29 @@
 
 #include <mofka/TopicManager.hpp>
 
+namespace mofka {
+
 /**
  * Dummy implementation of a mofka TopicManager.
  */
 class DummyTopicManager : public mofka::TopicManager {
 
-    rapidjson::Document m_config;
+    Metadata m_config;
+    Metadata m_validator;
+    Metadata m_serializer;
 
     public:
 
     /**
      * @brief Constructor.
      */
-    DummyTopicManager(const rapidjson::Value& config) {
-        m_config.CopyFrom(config, m_config.GetAllocator());
-    }
+    DummyTopicManager(
+        const Metadata& config,
+        const Metadata& validator,
+        const Metadata& serializer)
+    : m_config(config)
+    , m_validator(validator)
+    , m_serializer(serializer) {}
 
     /**
      * @brief Move-constructor.
@@ -32,7 +40,7 @@ class DummyTopicManager : public mofka::TopicManager {
     /**
      * @brief Copy-constructor.
      */
-    DummyTopicManager(const DummyTopicManager&) = default;
+    DummyTopicManager(const DummyTopicManager&) = delete;
 
     /**
      * @brief Move-assignment operator.
@@ -42,12 +50,22 @@ class DummyTopicManager : public mofka::TopicManager {
     /**
      * @brief Copy-assignment operator.
      */
-    DummyTopicManager& operator=(const DummyTopicManager&) = default;
+    DummyTopicManager& operator=(const DummyTopicManager&) = delete;
 
     /**
      * @brief Destructor.
      */
     virtual ~DummyTopicManager() = default;
+
+    /**
+     * @brief Get the Metadata of the Validator associated with this topic.
+     */
+    virtual Metadata getValidatorMetadata() const override;
+
+    /**
+     * @brief Get the Metadata of the Serializer associated with this topic.
+     */
+    virtual Metadata getSerializerMetadata() const override;
 
     /**
      * @brief Prints Hello World.
@@ -77,13 +95,20 @@ class DummyTopicManager : public mofka::TopicManager {
      * create a DummyTopicManager.
      *
      * @param engine Thallium engine
-     * @param config JSON configuration for the topic
+     * @param config Metadata configuration for the manager.
+     * @param validator Metadata of the topic's Validator.
+     * @param serializer Metadata of the topic's Serializer.
      *
-     * @return a unique_ptr to a topic
+     * @return a unique_ptr to a TopicManager.
      */
     static std::unique_ptr<mofka::TopicManager> create(
-        const thallium::engine& engine, const rapidjson::Value& config);
+        const thallium::engine& engine,
+        const Metadata& config,
+        const Metadata& validator,
+        const Metadata& serializer);
 
 };
+
+}
 
 #endif

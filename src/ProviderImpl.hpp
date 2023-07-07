@@ -122,20 +122,11 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         RequestResult<UUID> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
 
-        rapidjson::Document* backend_config_json = nullptr;
-        try {
-            backend_config_json = &backend_config.json();
-        } catch(const Exception& ex) {
-            result.success() = false;
-            result.error() = ex.what();
-            spdlog::error("[mofka:{}] {}", id(), result.error());
-            return;
-        }
-
         std::string topic_type = "mofka";
-        if(backend_config_json->GetType() == rapidjson::kObjectType) {
-            auto topic_type_it = backend_config_json->FindMember("__type__");
-            if(topic_type_it != backend_config_json->MemberEnd()) {
+        auto& backend_config_json = backend_config.json();
+        if(backend_config_json.GetType() == rapidjson::kObjectType) {
+            auto topic_type_it = backend_config_json.FindMember("__type__");
+            if(topic_type_it != backend_config_json.MemberEnd()) {
                 if(topic_type_it->value.GetType() != rapidjson::kStringType) {
                     result.success() = false;
                     result.error() = "Invalid type for __type__ field in topic config, expected string";
@@ -157,7 +148,11 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
         std::shared_ptr<TopicManager> topic;
         try {
-            topic = TopicFactory::createTopic(topic_type, get_engine(), *backend_config_json);
+            topic = TopicFactory::createTopic(
+                topic_type, get_engine(),
+                backend_config,
+                validator_meta,
+                serializer_meta);
         } catch(const std::exception& ex) {
             result.success() = false;
             result.error() = fmt::format("Error when creating topic \"{}\": {}", ex.what());

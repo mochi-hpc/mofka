@@ -10,15 +10,22 @@ namespace mofka {
 std::unordered_map<
     std::string,
     std::function<
-        std::unique_ptr<TopicManager>(const thallium::engine&, const rapidjson::Value&)>> TopicFactory::create_fn;
+        std::unique_ptr<TopicManager>(
+            const thallium::engine&,
+            const Metadata&,
+            const Metadata&,
+            const Metadata&)>> TopicFactory::create_fn;
 
-std::unique_ptr<TopicManager> TopicFactory::createTopic(std::string_view backend_name,
-                                                        const thallium::engine& engine,
-                                                        const rapidjson::Value& config) {
+std::unique_ptr<TopicManager> TopicFactory::createTopic(
+        std::string_view backend_name,
+        const thallium::engine& engine,
+        const Metadata& config,
+        const Metadata& validator,
+        const Metadata& serializer) {
     auto it = create_fn.find(std::string{backend_name});
     if(it == create_fn.end()) return nullptr;
     auto& f = it->second;
-    return f(engine, config);
+    return f(engine, config, validator, serializer);
 }
 
 }
