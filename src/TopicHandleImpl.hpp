@@ -7,7 +7,8 @@
 #define MOFKA_TOPIC_HANDLE_IMPL_H
 
 #include "ServiceHandleImpl.hpp"
-#include "mofka/UUID.hpp"
+#include "mofka/Validator.hpp"
+#include "mofka/Serializer.hpp"
 #include <string_view>
 
 namespace mofka {
@@ -18,16 +19,19 @@ class TopicHandleImpl {
 
     std::string                        m_name;
     std::shared_ptr<ServiceHandleImpl> m_service;
-    UUID                               m_topic_id;
+    Validator                          m_validator;
+    Serializer                         m_serializer;
 
     TopicHandleImpl() = default;
 
     TopicHandleImpl(std::string_view name,
                     std::shared_ptr<ServiceHandleImpl> service,
-                    UUID topic_id)
+                    Validator validator,
+                    Serializer serializer)
     : m_name(name)
     , m_service(std::move(service))
-    , m_topic_id(topic_id) {}
+    , m_validator(std::move(validator))
+    , m_serializer(std::move(serializer)) {}
 };
 
 }

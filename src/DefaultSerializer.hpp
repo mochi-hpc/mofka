@@ -3,15 +3,15 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_SIMPLE_SERIALIZER_IMPL_H
-#define MOFKA_SIMPLE_SERIALIZER_IMPL_H
+#ifndef MOFKA_DEFAULT_SERIALIZER_H
+#define MOFKA_DEFAULT_SERIALIZER_H
 
 #include "mofka/Serializer.hpp"
 #include "mofka/Json.hpp"
 
 namespace mofka {
 
-class SimpleSerializerImpl : public SerializerInterface {
+class DefaultSerializer : public SerializerInterface {
 
     public:
 
@@ -35,10 +35,10 @@ class SimpleSerializerImpl : public SerializerInterface {
         return Metadata{"{}"};
     }
 
-    void fromMetadata(const Metadata& metadata) override {
+    static std::shared_ptr<SerializerInterface> Create(const Metadata& metadata) {
         (void)metadata;
+        return std::make_shared<DefaultSerializer>();
     }
-
 };
 
 }

@@ -6,6 +6,7 @@
 #ifndef MOFKA_METADATA_IMPL_H
 #define MOFKA_METADATA_IMPL_H
 
+#include <iostream>
 #include "mofka/Json.hpp"
 #include "mofka/Metadata.hpp"
 #include "RapidJsonUtil.hpp"
@@ -19,10 +20,10 @@ class MetadataImpl {
     enum Type : uint8_t {
         String     = 0x1, /* string field is up to date */
         ValidJson  = 0x2, /* the string is up to date and we know it's valid JSON */
-        ActualJson = 0x5, /* the json field is up to date (implies ValidJson) */
+        ActualJson = 0x6, /* the json field is up to date (implies ValidJson) */
     };
 
-    MetadataImpl(rapidjson::Document doc)
+    explicit MetadataImpl(rapidjson::Document doc)
     : m_json(std::move(doc))
     , m_type(Type::ActualJson) {}
 
@@ -73,12 +74,15 @@ class MetadataImpl {
 
 template<typename A>
 void save(A& ar, const Metadata& metadata) {
-    ar(metadata.string());
+    auto& str = metadata.string();
+    ar(str);
 }
 
 template<typename A>
 void load(A& ar, Metadata& metadata) {
-    ar(metadata.string());
+    std::string str;
+    ar(str);
+    metadata.string() = std::move(str);
 }
 
 }

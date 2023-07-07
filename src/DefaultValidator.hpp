@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_SIMPLE_VALIDATOR_IMPL_H
-#define MOFKA_SIMPLE_VALIDATOR_IMPL_H
+#ifndef MOFKA_DEFAULT_VALIDATOR_H
+#define MOFKA_DEFAULT_VALIDATOR_H
 
 #include "mofka/Metadata.hpp"
 #include "mofka/Validator.hpp"
@@ -14,7 +14,7 @@
 
 namespace mofka {
 
-class SimpleValidatorImpl : public ValidatorInterface {
+class DefaultValidator : public ValidatorInterface {
 
     public:
 
@@ -27,8 +27,9 @@ class SimpleValidatorImpl : public ValidatorInterface {
         return Metadata{"{}"};
     }
 
-    void fromMetadata(const Metadata& metadata) override {
+    static std::shared_ptr<ValidatorInterface> Create(const Metadata& metadata) {
         (void)metadata;
+        return std::make_shared<DefaultValidator>();
     }
 
 };

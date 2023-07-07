@@ -30,7 +30,7 @@ bool Metadata::isValidJson() const {
 
 std::string& Metadata::string() {
     self->ensureString();
-    self->m_type &= ~MetadataImpl::Type::ActualJson; /* invalidate json */
+    self->m_type = MetadataImpl::Type::String; /* invalidate json */
     return self->m_string;
 }
 
@@ -41,7 +41,7 @@ const rapidjson::Document& Metadata::json() const {
 
 rapidjson::Document& Metadata::json() {
     self->ensureJson();
-    self->m_type &= ~MetadataImpl::Type::String; /* invalidate string */
+    self->m_type = MetadataImpl::Type::ActualJson; /* invalidate string */
     return self->m_json;
 }
 

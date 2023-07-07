@@ -8,8 +8,15 @@
 
 #include <mofka/Metadata.hpp>
 #include <mofka/Exception.hpp>
+#include <functional>
 #include <exception>
 #include <stdexcept>
+
+/**
+ * @brief Helper class to register validator types into the validator factory.
+ */
+template<typename ValidatorType>
+class __MofkaValidatorRegistration;
 
 namespace mofka {
 
@@ -58,12 +65,14 @@ class ValidatorInterface {
      */
     virtual Metadata metadata() const = 0;
 
+
     /**
-     * @brief Restore the state of a validator from the provided Metadata.
+     * @note A ValidatorInterface class must also provide a static Create
+     * function with the following prototype, instanciating a shared_ptr of
+     * the class from the provided Metadata:
      *
-     * @param metadata Metadata containing the state of the validator.
+     * static std::shared_ptr<ValidatorInterface> Create(const Metadata&);
      */
-    virtual void fromMetadata(const Metadata& metadata) = 0;
 };
 
 class Validator {
@@ -122,19 +131,42 @@ class Validator {
     Metadata metadata() const;
 
     /**
-     * @brief Restore the state of a validator from the provided Metadata.
+     * @brief Factory function to create a Validator instance
+     * when the underlying implementation is not known.
      *
-     * @param metadata Metadata containing the state of the validator.
+     * @param metadata Metadata of the Validator.
+     *
+     * @return Validator instance.
      */
-    void fromMetadata(const Metadata& metadata);
+    static Validator FromMetadata(const Metadata& metadata);
 
     private:
 
     std::shared_ptr<ValidatorInterface> self;
 
     Validator(const std::shared_ptr<ValidatorInterface>& impl);
+
+    template<typename T>
+    friend class ::__MofkaValidatorRegistration;
+
+    static void RegisterValidatorType(
+            std::string_view name,
+            std::function<std::shared_ptr<ValidatorInterface>(const Metadata&)> ctor);
 };
 
 }
+
+#define MOFKA_REGISTER_VALIDATOR(__name, __type) \
+    static __MofkaValidatorRegistration<__type> __mofka ## __name ## _validator( #__name )
+
+template<typename ValidatorType>
+class __MofkaValidatorRegistration {
+
+    public:
+
+    __MofkaValidatorRegistration(std::string_view name) {
+        mofka::Validator::RegisterValidatorType(name, ValidatorType::Create);
+    }
+};
 
 #endif

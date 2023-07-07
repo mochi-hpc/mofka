@@ -33,21 +33,6 @@
             __var__ = it->second;\
         } while(0)
 
-#define FIND_TOPIC_BY_UUID(__var__, __uuid__) \
-        std::shared_ptr<TopicManager> __var__;\
-        do {\
-            std::lock_guard<tl::mutex> lock(m_topics_mtx);\
-            auto it = m_topics_by_uuid.find(__uuid__);\
-            if(it == m_topics_by_uuid.end()) {\
-                result.success() = false;\
-                result.error() = fmt::format("Topic with id \"{}\" not found", __uuid__.to_string());\
-                req.respond(result);\
-                spdlog::error("[mofka:{}] Topic with id \"{}\" not found", id(), __uuid__.to_string());\
-                return;\
-            }\
-            __var__ = it->second;\
-        } while(0)
-
 namespace mofka {
 
 using namespace std::string_literals;
@@ -116,14 +101,14 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                      Metadata serializer_meta) {
 
         spdlog::trace("[mofka:{}] Received createTopic request", id());
-        spdlog::trace("[mofka:{}] => name   = {}", id(), topic_name);
+        spdlog::trace("[mofka:{}] => name       = {}", id(), topic_name);
 
-        auto topic_id = UUID::generate();
-        RequestResult<UUID> result;
+        using ResultType = std::tuple<Metadata, Metadata>;
+        RequestResult<ResultType> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
 
         std::string topic_type = "mofka";
-        auto& backend_config_json = backend_config.json();
+        const auto& backend_config_json = backend_config.json();
         if(backend_config_json.GetType() == rapidjson::kObjectType) {
             auto topic_type_it = backend_config_json.FindMember("__type__");
             if(topic_type_it != backend_config_json.MemberEnd()) {
@@ -167,34 +152,40 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             spdlog::error("[mofka:{}] {}", id(), result.error());
             return;
         } else {
-            m_topics_by_uuid[topic_id]   = topic;
             m_topics_by_name[topic_name] = topic;
-            result.value() = topic_id;
+            result.value() = std::make_tuple(
+                topic->getValidatorMetadata(),
+                topic->getSerializerMetadata());
         }
 
-        spdlog::trace("[mofka:{}] Successfully created topic \"{}\" with id {} of type {}",
-                id(), topic_name, topic_id.to_string(), topic_type);
+        spdlog::trace("[mofka:{}] Successfully created topic \"{}\" of type {}",
+                id(), topic_name, topic_type);
     }
 
     void openTopic(const tl::request& req,
                    const std::string& topic_name) {
         spdlog::trace("[mofka:{}] Received openTopic request for topic {}", id(), topic_name);
-        RequestResult<bool> result;
+        using ResultType = std::tuple<Metadata, Metadata>;
+        RequestResult<ResultType> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
+
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result.success() = true;
+        result.value() = std::make_tuple(
+                topic->getValidatorMetadata(),
+                topic->getSerializerMetadata());
         spdlog::trace("[mofka:{}] Code successfully executed on topic {}", id(), topic_name);
     }
 
     void computeSum(const tl::request& req,
-                    const UUID& topic_id,
+                    const std::string& topic_name,
                     int32_t x, int32_t y) {
-        spdlog::trace("[mofka:{}] Received sayHello request for topic {}", id(), topic_id.to_string());
+        spdlog::trace("[mofka:{}] Received sayHello request for topic {}", id(), topic_name);
         RequestResult<int32_t> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
-        FIND_TOPIC_BY_UUID(topic, topic_id);
+        FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->computeSum(x, y);
-        spdlog::trace("[mofka:{}] Successfully executed computeSum on topic {}", id(), topic_id.to_string());
+        spdlog::trace("[mofka:{}] Successfully executed computeSum on topic {}", id(), topic_name);
     }
 
 };

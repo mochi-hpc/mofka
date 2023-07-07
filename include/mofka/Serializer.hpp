@@ -8,6 +8,15 @@
 
 #include <mofka/Archive.hpp>
 #include <mofka/Metadata.hpp>
+#include <functional>
+#include <exception>
+#include <stdexcept>
+
+/**
+ * @brief Helper class to register validator types into the validator factory.
+ */
+template<typename SerializerType>
+class __MofkaSerializerRegistration;
 
 namespace mofka {
 
@@ -60,11 +69,12 @@ class SerializerInterface {
     virtual Metadata metadata() const = 0;
 
     /**
-     * @brief Restore the state of a serializer from the provided Metadata.
+     * @note A SerializerInterface class must also provide a static Create
+     * function with the following prototype, instanciating a shared_ptr of
+     * the class from the provided Metadata:
      *
-     * @param metadata Metadata containing the state of the serializer.
+     * static std::shared_ptr<SerializerInterface> Create(const Metadata&);
      */
-    virtual void fromMetadata(const Metadata& metadata) = 0;
 };
 
 class Serializer {
@@ -132,11 +142,14 @@ class Serializer {
     Metadata metadata() const;
 
     /**
-     * @brief Restore the state of a serializer from the provided Metadata.
+     * @brief Factory function to create a Serializer instance
+     * when the underlying implementation is not known.
      *
-     * @param metadata Metadata containing the state of the serializer.
+     * @param metadata Metadata of the Serializer.
+     *
+     * @return Serializer instance.
      */
-    void fromMetadata(const Metadata& metadata);
+    static Serializer FromMetadata(const Metadata& metadata);
 
     /**
      * @brief Checks for the validity of the underlying pointer.
@@ -148,8 +161,28 @@ class Serializer {
     std::shared_ptr<SerializerInterface> self;
 
     Serializer(const std::shared_ptr<SerializerInterface>& impl);
+
+    template<typename T>
+    friend class ::__MofkaSerializerRegistration;
+
+    static void RegisterSerializerType(
+            std::string_view name,
+            std::function<std::shared_ptr<SerializerInterface>(const Metadata&)> ctor);
 };
 
 }
+
+#define MOFKA_REGISTER_SERIALIZER(__name, __type) \
+    static __MofkaSerializerRegistration<__type> __mofka ## __name ## _serializer( #__name )
+
+template<typename SerializerType>
+class __MofkaSerializerRegistration {
+
+    public:
+
+    __MofkaSerializerRegistration(std::string_view name) {
+        mofka::Serializer::RegisterSerializerType(name, SerializerType::Create);
+    }
+};
 
 #endif
