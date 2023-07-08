@@ -12,6 +12,7 @@ set (client-src-files
      Metadata.cpp
      Serializer.cpp
      TargetSelector.cpp
+     PartitionTargetInfo.cpp
      Validator.cpp
      AsyncRequest.cpp)
 

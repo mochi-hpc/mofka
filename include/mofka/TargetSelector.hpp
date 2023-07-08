@@ -21,15 +21,71 @@ class __MofkaTargetSelectorRegistration;
 
 namespace mofka {
 
+class PartitionTargetInfoImpl; 
+
 /**
  * @brief The PartitionTargetInfo structure holds information about
- * a particular Mofka provider holding a partition of a topic.
+ * a particular Mofka provider holding a partition of a topic. The
+ * public interface allows accessing a server address, provider id,
+ * and a UUID. Contrary to the address and provider id, the UUID
+ * is meant not to change when the service is restarted or when
+ * the partition migrates to another server.
  */
-struct PartitionTargetInfo {
-    /* TODO */
-    UUID        uuid;
-    std::string hostname;
-    uint16_t    provider_id;
+class PartitionTargetInfo {
+
+    public:
+
+    /**
+     * @brief Identifier uniquely identifying the partition even if
+     * the service restarts or the partition is migrated to another server.
+     */
+    UUID uuid() const;
+
+    /**
+     * @brief Current address of the target.
+     */
+    const std::string& address() const;
+
+    /**
+     * @brief Current provider ID.
+     */
+    uint16_t providerID() const;
+
+    /**
+     * @brief Move constructor.
+     */
+    PartitionTargetInfo(PartitionTargetInfo&&);
+
+    /**
+     * @brief Copy constructor.
+     */
+    PartitionTargetInfo(const PartitionTargetInfo&);
+
+    /**
+     * @brief Move-assignment operator.
+     */
+    PartitionTargetInfo& operator=(PartitionTargetInfo&&);
+
+    /**
+     * @brief Copy-assignment operator.
+     */
+    PartitionTargetInfo& operator=(const PartitionTargetInfo&);
+
+    /**
+     * @brief Destructor.
+     */
+    ~PartitionTargetInfo();
+
+    /**
+     * @brief Checks for the validity of the internal self pointer.
+     */
+    operator bool() const;
+
+    private:
+
+    std::shared_ptr<PartitionTargetInfoImpl> self;
+
+    PartitionTargetInfo(const std::shared_ptr<PartitionTargetInfoImpl>& impl);
 };
 
 /**
