@@ -24,7 +24,7 @@ class DefaultValidator : public ValidatorInterface {
     }
 
     Metadata metadata() const override {
-        return Metadata{"{}"};
+        return Metadata{"{\"type\":\"default\"}"};
     }
 
     static std::shared_ptr<ValidatorInterface> Create(const Metadata& metadata) {

@@ -35,16 +35,6 @@ class Archive {
     virtual void read(void* buffer, std::size_t size) = 0;
 
     /**
-     * @brief Feed is a function of read that feeds the underlying
-     * raw data into a user-provided function. The function will be
-     * called only once, on a memory segment representing the whole
-     * content of the archive.
-     *
-     * @param reader Reader function.
-     */
-    virtual void feed(const std::function<void(const void*, std::size_t)>& reader) = 0;
-
-    /**
      * @brief Write size bytes from the buffer into the archive.
      *
      * @param buffer Buffer.

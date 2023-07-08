@@ -32,7 +32,7 @@ class DefaultTargetSelector : public TargetSelectorInterface {
     }
 
     Metadata metadata() const override {
-        return Metadata{"{}"};
+        return Metadata{"{\"type\":\"default\"}"};
     }
 
     static std::shared_ptr<TargetSelectorInterface> Create(const Metadata& metadata) {

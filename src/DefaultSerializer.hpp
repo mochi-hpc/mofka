@@ -16,23 +16,22 @@ class DefaultSerializer : public SerializerInterface {
     public:
 
     void serialize(Archive& archive, const Metadata& metadata) const override {
-        auto& json = metadata.json();
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        json.Accept(writer);
-        archive.write(buffer.GetString(), buffer.GetSize());
+        const auto& str = metadata.string();
+        size_t s = str.size();
+        archive.write(&s, sizeof(s));
+        archive.write(str.data(), s);
     }
 
     void deserialize(Archive& archive, Metadata& metadata) const override {
-        metadata.json() = rapidjson::Document{};
-        auto reader = [&](const void* data, std::size_t size) {
-            metadata.json().Parse(static_cast<const char*>(data), size);
-        };
-        archive.feed(reader);
+        auto& str = metadata.string();
+        size_t s = 0;
+        archive.read(&s, sizeof(s));
+        str.resize(s);
+        archive.read(const_cast<char*>(str.data()), s);
     }
 
     Metadata metadata() const override {
-        return Metadata{"{}"};
+        return Metadata{"{\"type\":\"default\"}"};
     }
 
     static std::shared_ptr<SerializerInterface> Create(const Metadata& metadata) {
