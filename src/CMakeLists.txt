@@ -14,6 +14,7 @@ set (client-src-files
      TargetSelector.cpp
      PartitionTargetInfo.cpp
      Validator.cpp
+     ThreadPool.cpp
      AsyncRequest.cpp)
 
 set (admin-src-files

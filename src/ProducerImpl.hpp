@@ -18,14 +18,17 @@ class ProducerImpl {
     public:
 
     std::string                      m_name;
-    ProducerOptions                  m_options;
+    BatchSize                        m_batch_size;
+    ThreadPool                       m_thread_pool;
     std::shared_ptr<TopicHandleImpl> m_topic;
 
     ProducerImpl(std::string_view name,
-                 ProducerOptions options,
+                 BatchSize batch_size,
+                 ThreadPool thread_pool,
                  std::shared_ptr<TopicHandleImpl> topic)
     : m_name(name)
-    , m_options(std::move(options))
+    , m_batch_size(batch_size)
+    , m_thread_pool(std::move(thread_pool))
     , m_topic(std::move(topic)) {}
 };
 

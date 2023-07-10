@@ -33,8 +33,7 @@ TEST_CASE("Producer test", "[producer]") {
         SECTION("Create a producer from the topic") {
             mofka::Producer producer;
             REQUIRE(!static_cast<bool>(producer));
-            mofka::ProducerOptions options;
-            producer = topic.producer("myproducer", options);
+            producer = topic.producer("myproducer");
             REQUIRE(static_cast<bool>(producer));
             REQUIRE(producer.name() == "myproducer");
             REQUIRE(static_cast<bool>(producer.topic()));

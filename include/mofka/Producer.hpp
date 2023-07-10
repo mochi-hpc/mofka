@@ -15,6 +15,7 @@
 #include <mofka/Data.hpp>
 #include <mofka/EventID.hpp>
 #include <mofka/Future.hpp>
+#include <mofka/ThreadPool.hpp>
 #include <memory>
 
 namespace mofka {
@@ -22,8 +23,22 @@ namespace mofka {
 class TopicHandle;
 class ProducerImpl;
 
-class ProducerOptions {
+/**
+ * @brief Strongly typped size_t meant to store the batch size to
+ * use when creating a Producer.
+ */
+struct BatchSize {
 
+    std::size_t value;
+
+    explicit constexpr BatchSize(std::size_t val)
+    : value(val) {}
+
+    /**
+     * @brief Returns a value telling the producer to try its best
+     * to adapt the batch size to the use-case and workload.
+     */
+    static BatchSize Adaptive();
 };
 
 /**
@@ -74,7 +89,12 @@ class Producer {
      * @brief Returns a copy of the options provided when
      * the Producer was created.
      */
-    ProducerOptions options() const;
+    BatchSize batchSize() const;
+
+    /**
+     * @brief Returns the ThreadPool associated with the Producer.
+     */
+    ThreadPool threadPool() const;
 
     /**
      * @brief Returns the TopicHandle this producer has been created from.

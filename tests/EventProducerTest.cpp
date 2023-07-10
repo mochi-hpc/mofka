@@ -29,8 +29,7 @@ TEST_CASE("Event producer test", "[event-producer]") {
         auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"dummy\"}"};
         topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
-        mofka::ProducerOptions options;
-        auto producer = topic.producer("myproducer", options);
+        auto producer = topic.producer("myproducer");
         REQUIRE(static_cast<bool>(producer));
 
         SECTION("Push events into the topic using the producer") {

@@ -87,7 +87,8 @@ class TopicHandle {
      * @return a Producer object.
      */
     Producer producer(std::string_view name = "",
-                      ProducerOptions options = ProducerOptions{}) const;
+                      BatchSize batch_size = BatchSize::Adaptive(),
+                      ThreadPool thread_pool = ThreadPool{}) const;
 
     private:
 

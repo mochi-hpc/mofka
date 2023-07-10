@@ -29,8 +29,9 @@ ServiceHandle TopicHandle::service() const {
 }
 
 Producer TopicHandle::producer(std::string_view name,
-                               ProducerOptions options) const {
-    return std::make_shared<ProducerImpl>(name, options, self);
+                               BatchSize batch_size,
+                               ThreadPool thread_pool) const {
+    return std::make_shared<ProducerImpl>(name, batch_size, thread_pool, self);
 }
 
 #if 0
