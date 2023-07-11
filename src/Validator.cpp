@@ -19,8 +19,8 @@ PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(Validator);
 Validator::Validator()
 : self(std::make_shared<DefaultValidator>()) {}
 
-void Validator::validate(const Metadata& metadata) const {
-    self->validate(metadata);
+void Validator::validate(const Metadata& metadata, const Data& data) const {
+    self->validate(metadata, data);
 }
 
 Metadata Validator::metadata() const {

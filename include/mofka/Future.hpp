@@ -12,8 +12,6 @@
 
 namespace mofka {
 
-class FutureImpl;
-
 /**
  * @brief Future objects are used to keep track of
  * on-going asynchronous operations.
@@ -59,7 +57,7 @@ class Future {
     ResultType wait() const {
         if(!m_wait)
             throw Exception("Calling Future::wait on an invalid future");
-        return m_wait(self);
+        return m_wait();
     }
 
     /**
@@ -68,32 +66,22 @@ class Future {
     bool completed() const {
         if(!m_completed)
             throw Exception("Calling Future::completed on an invalid future");
-        return m_completed(self);
+        return m_completed();
     }
 
     /**
-     * @brief Checks if the Collection object is valid.
+     * @brief Constructor meant for classes that actually know what the
+     * internals of the future are.
      */
-    operator bool() const {
-        return static_cast<bool>(self);
-    }
-
-    /**
-     * @brief Constructor meant for classes that actually know what
-     * a FutureImpl is.
-     */
-    Future(const std::shared_ptr<FutureImpl>& impl,
-           std::function<ResultType(std::shared_ptr<FutureImpl>)> wait_fn,
-           std::function<bool(std::shared_ptr<FutureImpl>)> completed_fn)
-    : self(impl)
-    , m_wait(std::move(wait_fn))
+    Future(std::function<ResultType()> wait_fn,
+           std::function<bool()> completed_fn)
+    : m_wait(std::move(wait_fn))
     , m_completed(std::move(completed_fn)) {}
 
     private:
 
-    std::shared_ptr<FutureImpl>                            self;
-    std::function<ResultType(std::shared_ptr<FutureImpl>)> m_wait;
-    std::function<bool(std::shared_ptr<FutureImpl>)>       m_completed;
+    std::function<ResultType()> m_wait;
+    std::function<bool()>       m_completed;
 
 };
 

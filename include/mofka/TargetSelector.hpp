@@ -21,7 +21,7 @@ class __MofkaTargetSelectorRegistration;
 
 namespace mofka {
 
-class PartitionTargetInfoImpl; 
+class PartitionTargetInfoImpl;
 
 /**
  * @brief The PartitionTargetInfo structure holds information about
@@ -86,6 +86,8 @@ class PartitionTargetInfo {
     std::shared_ptr<PartitionTargetInfoImpl> self;
 
     PartitionTargetInfo(const std::shared_ptr<PartitionTargetInfoImpl>& impl);
+
+    friend class std::hash<PartitionTargetInfo>;
 };
 
 /**

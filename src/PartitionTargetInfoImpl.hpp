@@ -26,4 +26,17 @@ class PartitionTargetInfoImpl {
 
 }
 
+namespace std {
+
+template<>
+struct hash<mofka::PartitionTargetInfo> {
+
+    std::size_t operator()(const mofka::PartitionTargetInfo& p) const noexcept {
+        return std::hash<std::shared_ptr<mofka::PartitionTargetInfoImpl>>()(p.self);
+    }
+
+};
+
+}
+
 #endif

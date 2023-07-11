@@ -7,6 +7,7 @@
 #define MOFKA_VALIDATOR_HPP
 
 #include <mofka/Metadata.hpp>
+#include <mofka/Data.hpp>
 #include <mofka/Exception.hpp>
 #include <functional>
 #include <exception>
@@ -53,10 +54,14 @@ class ValidatorInterface {
     /**
      * @brief Validate that the Metadata it correct, throwing an
      * InvalidMetadata exception is the Metadata is not valid.
+     * The Data associated with the Metadata is also provided,
+     * although most validator are only meant to validate the
+     * Metadata, not the Data content.
      *
      * @param metadata Metadata to validate.
+     * @param data Associated data.
      */
-    virtual void validate(const Metadata& metadata) const = 0;
+    virtual void validate(const Metadata& metadata, const Data& data) const = 0;
 
     /**
      * @brief Convert the underlying validator implementation into a Metadata
@@ -118,10 +123,14 @@ class Validator {
     /**
      * @brief Validate that the Metadata it correct, throwing an
      * InvalidMetadata exception is the Metadata is not valid.
+     * The Data associated with the Metadata is also provided,
+     * although most validator are only meant to validate the
+     * Metadata, not the Data content.
      *
      * @param metadata Metadata to validate.
+     * @param data Associated data.
      */
-    void validate(const Metadata& metadata) const;
+    void validate(const Metadata& metadata, const Data& data) const;
 
     /**
      * @brief Convert the underlying validator implementation into a Metadata

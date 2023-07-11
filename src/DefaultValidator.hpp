@@ -18,7 +18,8 @@ class DefaultValidator : public ValidatorInterface {
 
     public:
 
-    void validate(const Metadata& metadata) const override {
+    void validate(const Metadata& metadata, const Data& data) const override {
+        (void)data;
         if(!metadata.isValidJson())
             throw InvalidMetadata("Metadata object does not contain valid JSON metadata");
     }
