@@ -62,7 +62,7 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
                 std::lock_guard<thallium::mutex> guard{self->m_batch_queues_mtx};
                 auto& queue_ptr = self->m_batch_queues[target];
                 if(!queue_ptr) {
-                    queue_ptr.reset(new ActiveBatchQueue{threadPool()});
+                    queue_ptr.reset(new ActiveBatchQueue{threadPool(), batchSize()});
                 }
                 queue = queue_ptr;
             }

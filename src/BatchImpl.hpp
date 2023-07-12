@@ -54,8 +54,6 @@ class BatchImpl {
         std::vector<char>& m_buffer;
     };
 
-    mutable thallium::mutex    m_mtx; /* mutex protecting access to the batch */
-
     std::vector<size_t>        m_meta_sizes;      /* size of each serialized metadata object */
     std::vector<char>          m_meta_buffer;     /* packed serialized metadata objects */
     std::vector<size_t>        m_data_offsets;    /* offset at which the data for each metata starts */
@@ -66,6 +64,14 @@ class BatchImpl {
     std::vector<Promise<EventID>> m_promises; /* promise associated with each event */
 
     public:
+
+    void setPromises(EventID firstID) {
+        auto id = firstID;
+        for(auto& promise : m_promises) {
+            promise.setValue(id);
+            ++id;
+        }
+    }
 
     void push(
             const Metadata& metadata,
@@ -109,18 +115,15 @@ class BatchImpl {
     size_t totalSize() const {
         return m_total_data_size;
     }
-
-    auto lock() const {
-        return std::unique_lock<decltype(m_mtx)>{m_mtx};
-    }
 };
 
 class ActiveBatchQueue {
 
     public:
 
-    ActiveBatchQueue(ThreadPool thread_pool)
-    : m_thread_pool{std::move(thread_pool)} {
+    ActiveBatchQueue(ThreadPool thread_pool, BatchSize batch_size)
+    : m_thread_pool{std::move(thread_pool)}
+    , m_batch_size{batch_size} {
         start();
     }
 
@@ -133,8 +136,23 @@ class ActiveBatchQueue {
             const Serializer& serializer,
             const Data& data,
             Promise<EventID> promise) {
-        // TODO
-        promise.setValue(0);
+        bool need_notification;
+        {
+            auto adaptive = m_batch_size == BatchSize::Adaptive();
+            need_notification = adaptive;
+            std::unique_lock<thallium::mutex> guard{m_mutex};
+            if(m_batch_queue.empty())
+                m_batch_queue.push(std::make_shared<BatchImpl>());
+            auto last_batch = m_batch_queue.back();
+            if(!adaptive && last_batch->count() == m_batch_size.value) {
+                m_batch_queue.push(std::make_shared<BatchImpl>());
+                last_batch = m_batch_queue.back();
+                need_notification = true;
+            }
+            last_batch->push(metadata, serializer, data, std::move(promise));
+        }
+        if(need_notification)
+            m_cv.notify_one();
     }
 
     void stop() {
@@ -156,19 +174,31 @@ class ActiveBatchQueue {
     private:
 
     void loop() {
+        const auto adaptive = m_batch_size == BatchSize::Adaptive();
         m_running = true;
         std::unique_lock<thallium::mutex> guard{m_mutex};
         while(!m_need_stop || !m_batch_queue.empty()) {
             m_cv.wait(guard, [this]() {
                 return m_need_stop || !m_batch_queue.empty();
             });
-            // TODO check if we can process a batch
+            if(m_batch_queue.empty()) continue;
+            do {
+                auto batch = m_batch_queue.front();
+                if(!adaptive && !m_need_stop && batch->count() != m_batch_size.value)
+                    break;
+                m_batch_queue.pop();
+                guard.unlock();
+                // TODO send the batch and get the resuling event ID
+                batch->setPromises(0); // TODO modify this
+                guard.lock();
+            } while(m_need_stop);
         }
         m_running = false;
         m_terminated.set_value();
     }
 
     ThreadPool                             m_thread_pool;
+    BatchSize                              m_batch_size;
     std::queue<std::shared_ptr<BatchImpl>> m_batch_queue;
     thallium::managed<thallium::thread>    m_sender_ult;
     bool                                   m_need_stop = false;
