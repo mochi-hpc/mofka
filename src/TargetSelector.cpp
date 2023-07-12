@@ -8,6 +8,7 @@
 #include "MetadataImpl.hpp"
 #include "PimplUtil.hpp"
 #include "DefaultTargetSelector.hpp"
+#include <fmt/format.h>
 #include <unordered_map>
 
 namespace mofka {
@@ -61,10 +62,10 @@ TargetSelector TargetSelector::FromMetadata(const Metadata& metadata) {
     auto type_str = std::string{type.GetString()};
     auto it = targetSelectorFactories.find(type_str);
     if(it == targetSelectorFactories.end()) {
-        throw Exception(
+        throw Exception(fmt::format(
             "Cannor create TargetSelector from Metadata: "
             "unknown TargetSelector type \"{}\"",
-            type_str);
+            type_str));
     }
     return (it->second)(metadata);
 }

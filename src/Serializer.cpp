@@ -8,6 +8,7 @@
 #include "MetadataImpl.hpp"
 #include "PimplUtil.hpp"
 #include "DefaultSerializer.hpp"
+#include <fmt/format.h>
 #include <unordered_map>
 
 namespace mofka {
@@ -61,10 +62,10 @@ Serializer Serializer::FromMetadata(const Metadata& metadata) {
     auto type_str = std::string{type.GetString()};
     auto it = serializerFactories.find(type_str);
     if(it == serializerFactories.end()) {
-        throw Exception(
+        throw Exception(fmt::format(
                 "Cannor create Serializer from Metadata: "
                 "unknown Serializer type \"{}\"",
-                type_str);
+                type_str));
     }
     return (it->second)(metadata);
 }

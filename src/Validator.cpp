@@ -8,6 +8,7 @@
 #include "MetadataImpl.hpp"
 #include "PimplUtil.hpp"
 #include "DefaultValidator.hpp"
+#include <fmt/format.h>
 #include <unordered_map>
 
 namespace mofka {
@@ -57,10 +58,10 @@ Validator Validator::FromMetadata(const Metadata& metadata) {
     auto type_str = std::string{type.GetString()};
     auto it = validatorFactories.find(type_str);
     if(it == validatorFactories.end()) {
-        throw Exception(
+        throw Exception(fmt::format(
             "Cannor create Validator from Metadata: "
             "unknown Validator type \"{}\"",
-            type_str);
+            type_str));
     }
     return (it->second)(metadata);
 }

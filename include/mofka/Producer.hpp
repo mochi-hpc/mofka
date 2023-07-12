@@ -21,6 +21,7 @@
 namespace mofka {
 
 class TopicHandle;
+class ActiveBatchQueue;
 class ProducerImpl;
 
 /**
@@ -39,6 +40,13 @@ struct BatchSize {
      * to adapt the batch size to the use-case and workload.
      */
     static BatchSize Adaptive();
+
+    inline bool operator<(const BatchSize& other) const { return value < other.value; }
+    inline bool operator>(const BatchSize& other) const { return value > other.value; }
+    inline bool operator<=(const BatchSize& other) const { return value <= other.value; }
+    inline bool operator>=(const BatchSize& other) const { return value >= other.value; }
+    inline bool operator==(const BatchSize& other) const { return value == other.value; }
+    inline bool operator!=(const BatchSize& other) const { return value != other.value; }
 };
 
 /**
@@ -47,6 +55,7 @@ struct BatchSize {
 class Producer {
 
     friend class TopicHandle;
+    friend class ActiveBatchQueue;
 
     public:
 

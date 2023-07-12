@@ -8,12 +8,17 @@
 
 #include <thallium.hpp>
 #include <mutex>
+#include <queue>
 #include "mofka/EventID.hpp"
 #include "mofka/Metadata.hpp"
 #include "mofka/Archive.hpp"
 #include "mofka/Serializer.hpp"
 #include "mofka/Data.hpp"
 #include "mofka/Future.hpp"
+#include "mofka/Producer.hpp"
+#include "ThreadPoolImpl.hpp"
+#include "ProducerImpl.hpp"
+#include "Promise.hpp"
 #include "DataImpl.hpp"
 #include <vector>
 #include <cstdint>
@@ -58,15 +63,15 @@ class BatchImpl {
     std::vector<Data::Segment> m_data_segments;   /* list of data segments */
     size_t                     m_total_data_size; /* sum of sizes in the m_data_segments */
 
-    using FutureEventID = thallium::eventual<EventID>;
-
-    std::vector<std::weak_ptr<FutureEventID>> m_futures; /* futures associated with each event */
+    std::vector<Promise<EventID>> m_promises; /* promise associated with each event */
 
     public:
 
-    Future<EventID> push(const Metadata& metadata,
-              const Serializer& serializer,
-              const Data& data) {
+    void push(
+            const Metadata& metadata,
+            const Serializer& serializer,
+            const Data& data,
+            Promise<EventID> promise) {
         size_t meta_size = 0;
         BatchOutputArchive archive(meta_size, m_meta_buffer);
         serializer.serialize(archive, metadata);
@@ -79,16 +84,7 @@ class BatchImpl {
         }
         m_data_sizes.push_back(data_size);
         m_total_data_size += data_size;
-
-        auto future_impl = std::make_shared<FutureEventID>();
-        m_futures.push_back(future_impl);
-        auto wait_fn = [future_impl]() mutable -> EventID {
-            return future_impl->wait();
-        };
-        auto test_fn = [future_impl]() mutable -> bool {
-            return future_impl->test();
-        };
-        return {std::move(wait_fn), std::move(test_fn)};
+        m_promises.push_back(std::move(promise));
     }
 
     thallium::bulk expose(thallium::engine engine) {
@@ -117,6 +113,70 @@ class BatchImpl {
     auto lock() const {
         return std::unique_lock<decltype(m_mtx)>{m_mtx};
     }
+};
+
+class ActiveBatchQueue {
+
+    public:
+
+    ActiveBatchQueue(ThreadPool thread_pool)
+    : m_thread_pool{std::move(thread_pool)} {
+        start();
+    }
+
+    ~ActiveBatchQueue() {
+        stop();
+    }
+
+    void push(
+            const Metadata& metadata,
+            const Serializer& serializer,
+            const Data& data,
+            Promise<EventID> promise) {
+        // TODO
+        promise.setValue(0);
+    }
+
+    void stop() {
+        if(!m_running) return;
+        {
+            std::unique_lock<thallium::mutex> guard{m_mutex};
+            m_need_stop = true;
+        }
+        m_cv.notify_one();
+        m_terminated.wait();
+        m_terminated.reset();
+    }
+
+    void start() {
+        if(m_running) return;
+        m_thread_pool.self->pushWork([this]() { loop(); });
+    }
+
+    private:
+
+    void loop() {
+        m_running = true;
+        std::unique_lock<thallium::mutex> guard{m_mutex};
+        while(!m_need_stop || !m_batch_queue.empty()) {
+            m_cv.wait(guard, [this]() {
+                return m_need_stop || !m_batch_queue.empty();
+            });
+            // TODO check if we can process a batch
+        }
+        m_running = false;
+        m_terminated.set_value();
+    }
+
+    ThreadPool                             m_thread_pool;
+    std::queue<std::shared_ptr<BatchImpl>> m_batch_queue;
+    thallium::managed<thallium::thread>    m_sender_ult;
+    bool                                   m_need_stop = false;
+    std::atomic<bool>                      m_running = false;
+    thallium::mutex                        m_mutex;
+    thallium::condition_variable           m_cv;
+    thallium::eventual<void>               m_terminated;
+
 };
 
 }

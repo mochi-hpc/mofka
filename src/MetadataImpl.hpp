@@ -10,6 +10,7 @@
 #include "mofka/Json.hpp"
 #include "mofka/Metadata.hpp"
 #include "RapidJsonUtil.hpp"
+#include <fmt/format.h>
 
 namespace mofka {
 

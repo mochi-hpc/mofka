@@ -38,7 +38,7 @@ set (mofka-vers "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}")
 # client library
 add_library (mofka-client ${client-src-files})
 target_link_libraries (mofka-client
-    PUBLIC thallium PkgConfig::uuid rapidjson fmt::fmt bedrock-client PRIVATE spdlog::spdlog coverage_config)
+    PUBLIC thallium PkgConfig::uuid rapidjson bedrock-client PRIVATE spdlog::spdlog fmt::fmt coverage_config)
 target_include_directories (mofka-client PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (mofka-client BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)

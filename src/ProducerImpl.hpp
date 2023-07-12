@@ -28,8 +28,8 @@ class ProducerImpl {
 
     std::unordered_map<
         PartitionTargetInfo,
-        std::queue<std::shared_ptr<BatchImpl>>> m_pending_batches;
-    thallium::mutex                             m_pending_batches_mtx;
+        std::shared_ptr<ActiveBatchQueue>> m_batch_queues;
+    thallium::mutex                        m_batch_queues_mtx;
 
     ProducerImpl(std::string_view name,
                  BatchSize batch_size,
@@ -37,7 +37,7 @@ class ProducerImpl {
                  std::shared_ptr<TopicHandleImpl> topic)
     : m_name(name)
     , m_batch_size(batch_size)
-    , m_thread_pool(std::move(thread_pool))
+    , m_thread_pool(thread_pool)
     , m_topic(std::move(topic)) {}
 
 };
