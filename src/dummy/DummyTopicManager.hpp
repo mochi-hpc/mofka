@@ -76,19 +76,14 @@ class DummyTopicManager : public mofka::TopicManager {
     virtual Metadata getSerializerMetadata() const override;
 
     /**
-     * @brief Prints Hello World.
+     * @brief Receives a batch.
      */
-    void sayHello() override;
-
-    /**
-     * @brief Compute the sum of two integers.
-     *
-     * @param x first integer
-     * @param y second integer
-     *
-     * @return a RequestResult containing the result.
-     */
-    mofka::RequestResult<int32_t> computeSum(int32_t x, int32_t y) override;
+    mofka::RequestResult<EventID> receiveBatch(
+            const std::string& producer_name,
+            size_t num_events,
+            size_t remote_bulk_size,
+            size_t data_offset,
+            thallium::bulk remote_bulk) override;
 
     /**
      * @brief Destroys the underlying topic.

@@ -7,6 +7,7 @@
 #define MOFKA_PARTITION_TARGET_INFO_IMPL_H
 
 #include "mofka/TargetSelector.hpp"
+#include <thallium.hpp>
 
 namespace mofka {
 
@@ -14,14 +15,14 @@ class PartitionTargetInfoImpl {
 
     public:
 
-    PartitionTargetInfoImpl(UUID uuid, std::string address, uint16_t provider_id)
+    PartitionTargetInfoImpl(UUID uuid, thallium::provider_handle ph)
     : m_uuid(uuid)
-    , m_address(std::move(address))
-    , m_provider_id(provider_id) {}
+    , m_ph(std::move(ph))
+    , m_addr(m_ph) {}
 
-    UUID        m_uuid;
-    std::string m_address;
-    uint16_t    m_provider_id;
+    UUID                      m_uuid;
+    thallium::provider_handle m_ph;
+    std::string               m_addr;
 };
 
 }

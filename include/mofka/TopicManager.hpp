@@ -9,6 +9,7 @@
 #include <mofka/RequestResult.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Json.hpp>
+#include <mofka/EventID.hpp>
 #include <thallium.hpp>
 #include <unordered_map>
 #include <string_view>
@@ -78,19 +79,30 @@ class TopicManager {
     virtual Metadata getSerializerMetadata() const = 0;
 
     /**
-     * @brief Prints Hello World.
-     */
-    virtual void sayHello() = 0;
-
-    /**
-     * @brief Compute the sum of two integers.
+     * @brief Receive a batch of events from a sender.
      *
-     * @param x first integer
-     * @param y second integer
+     * @param producer_name Name of the producer.
+     * @param num_events Number of events sent.
+     * @param remote_bulk_size Total size of the remote_bulk.
+     * @param data_offset Offset at which the data part
+     *                    of the events start in the remote_bulk.
+     * @param remote_bulk Bulk handle to the remote metadata+data.
+     *
+     * The remote_bulk is formatted to expose the metadata and data
+     * as follows. If N is the number of events, then:
+     * - the first N*sizeof(size_t) bytes contain metadata sizes;
+     * - the next S bytes (sum of the above sizes) contain the metadata;
+     * - the next N*sizeof(size_t) bytes contain data sizes;
+     * - the next D bytes (sum of the above sizes) contain the data.
      *
      * @return a RequestResult containing the result.
      */
-    virtual RequestResult<int32_t> computeSum(int32_t x, int32_t y) = 0;
+    virtual RequestResult<EventID> receiveBatch(
+        const std::string& producer_name,
+        size_t num_events,
+        size_t remote_bulk_size,
+        size_t data_offset,
+        thallium::bulk remote_bulk) = 0;
 
     /**
      * @brief Destroys the underlying topic.

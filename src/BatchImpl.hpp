@@ -9,6 +9,7 @@
 #include <thallium.hpp>
 #include <mutex>
 #include <queue>
+#include "mofka/RequestResult.hpp"
 #include "mofka/EventID.hpp"
 #include "mofka/Metadata.hpp"
 #include "mofka/Archive.hpp"
@@ -16,6 +17,7 @@
 #include "mofka/Data.hpp"
 #include "mofka/Future.hpp"
 #include "mofka/Producer.hpp"
+#include "PartitionTargetInfoImpl.hpp"
 #include "ThreadPoolImpl.hpp"
 #include "ProducerImpl.hpp"
 #include "Promise.hpp"
@@ -73,6 +75,12 @@ class BatchImpl {
         }
     }
 
+    void setPromises(Exception ex) {
+        for(auto& promise : m_promises) {
+            promise.setException(std::move(ex));
+        }
+    }
+
     void push(
             const Metadata& metadata,
             const Serializer& serializer,
@@ -115,14 +123,29 @@ class BatchImpl {
     size_t totalSize() const {
         return m_total_data_size;
     }
+
+    size_t dataOffset() const {
+        return m_meta_sizes.size()*sizeof(m_meta_sizes[0])
+             + m_meta_buffer.size()*sizeof(m_meta_buffer[0]);
+    }
 };
 
 class ActiveBatchQueue {
 
     public:
 
-    ActiveBatchQueue(ThreadPool thread_pool, BatchSize batch_size)
-    : m_thread_pool{std::move(thread_pool)}
+    ActiveBatchQueue(
+        std::string topic_name,
+        std::string producer_name,
+        std::shared_ptr<ClientImpl> client,
+        std::shared_ptr<PartitionTargetInfoImpl> target,
+        ThreadPool thread_pool,
+        BatchSize batch_size)
+    : m_topic_name(std::move(topic_name))
+    , m_producer_name(std::move(producer_name))
+    , m_client(std::move(client))
+    , m_target(std::move(target))
+    , m_thread_pool{std::move(thread_pool)}
     , m_batch_size{batch_size} {
         start();
     }
@@ -201,8 +224,7 @@ class ActiveBatchQueue {
             auto batch = m_batch_queue.front();
             m_batch_queue.pop();
             guard.unlock();
-            // TODO send the batch and get the resuling event ID
-            batch->setPromises(0); // TODO modify this
+            sendBatch(batch);
             guard.lock();
             m_request_flush = false;
         }
@@ -210,16 +232,50 @@ class ActiveBatchQueue {
         m_terminated.set_value();
     }
 
-    ThreadPool                             m_thread_pool;
-    BatchSize                              m_batch_size;
-    std::queue<std::shared_ptr<BatchImpl>> m_batch_queue;
-    thallium::managed<thallium::thread>    m_sender_ult;
-    bool                                   m_need_stop = false;
-    bool                                   m_request_flush = false;
-    std::atomic<bool>                      m_running = false;
-    thallium::mutex                        m_mutex;
-    thallium::condition_variable           m_cv;
-    thallium::eventual<void>               m_terminated;
+    void sendBatch(const std::shared_ptr<BatchImpl>& batch) {
+        thallium::bulk content;
+        try {
+            content = batch->expose(m_client->m_engine);
+        } catch(const std::exception& ex) {
+            batch->setPromises(
+                Exception{fmt::format(
+                    "Unexpected error when registering batch for RDMA: {}", ex.what())});
+            return;
+        }
+        try {
+            auto ph = m_target->m_ph;
+            auto rpc = m_client->m_send_batch;
+            RequestResult<EventID> result = rpc.on(ph)(
+                m_topic_name,
+                m_producer_name,
+                batch->count(),
+                batch->totalSize(),
+                batch->dataOffset(),
+                content);
+            if(result.success())
+                batch->setPromises(result.value());
+            else
+                batch->setPromises(Exception{result.error()});
+        } catch(const std::exception& ex) {
+            batch->setPromises(
+                Exception{fmt::format("Unexpected error when sending batch: {}", ex.what())});
+        }
+    }
+
+    std::string                              m_topic_name;
+    std::string                              m_producer_name;
+    std::shared_ptr<ClientImpl>              m_client;
+    std::shared_ptr<PartitionTargetInfoImpl> m_target;
+    ThreadPool                               m_thread_pool;
+    BatchSize                                m_batch_size;
+    std::queue<std::shared_ptr<BatchImpl>>   m_batch_queue;
+    thallium::managed<thallium::thread>      m_sender_ult;
+    bool                                     m_need_stop = false;
+    bool                                     m_request_flush = false;
+    std::atomic<bool>                        m_running = false;
+    thallium::mutex                          m_mutex;
+    thallium::condition_variable             m_cv;
+    thallium::eventual<void>                 m_terminated;
 
 };
 

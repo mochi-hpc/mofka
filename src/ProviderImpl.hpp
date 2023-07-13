@@ -77,7 +77,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     AutoDeregisteringRPC m_create_topic;
     AutoDeregisteringRPC m_open_topic;
     // RPCs for TopicManagers
-    AutoDeregisteringRPC m_compute_sum;
+    AutoDeregisteringRPC m_send_batch;
     // TopicManagers
     std::unordered_map<UUID, std::shared_ptr<TopicManager>>        m_topics_by_uuid;
     std::unordered_map<std::string, std::shared_ptr<TopicManager>> m_topics_by_name;
@@ -89,7 +89,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_pool(pool)
     , m_create_topic(define("mofka_create_topic", &ProviderImpl::createTopic, pool))
     , m_open_topic(define("mofka_open_topic", &ProviderImpl::openTopic, pool))
-    , m_compute_sum(define("mofka_compute_sum",  &ProviderImpl::computeSum, pool))
+    , m_send_batch(define("mofka_send_batch",  &ProviderImpl::receiveBatch, pool))
     {
         spdlog::trace("[mofka:{0}] Registered provider with id {0}", id());
     }
@@ -181,15 +181,19 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Code successfully executed on topic {}", id(), topic_name);
     }
 
-    void computeSum(const tl::request& req,
-                    const std::string& topic_name,
-                    int32_t x, int32_t y) {
-        spdlog::trace("[mofka:{}] Received sayHello request for topic {}", id(), topic_name);
-        RequestResult<int32_t> result;
+    void receiveBatch(const tl::request& req,
+                      const std::string& topic_name,
+                      const std::string& producer_name,
+                      size_t count,
+                      size_t total_size,
+                      size_t data_offset,
+                      tl::bulk content) {
+        spdlog::trace("[mofka:{}] Received receiveBatch request for topic {}", id(), topic_name);
+        RequestResult<EventID> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
-        result = topic->computeSum(x, y);
-        spdlog::trace("[mofka:{}] Successfully executed computeSum on topic {}", id(), topic_name);
+        result = topic->receiveBatch(producer_name, count, total_size, data_offset, content);
+        spdlog::trace("[mofka:{}] Successfully executed receiveBatch on topic {}", id(), topic_name);
     }
 
 };

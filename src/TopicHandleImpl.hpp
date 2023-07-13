@@ -43,8 +43,7 @@ class TopicHandleImpl {
         for(const auto& p : mofka_phs) {
             auto target_info = std::make_shared<PartitionTargetInfoImpl>(
                 UUID::from_string("00000000-0000-0000-0000-000000000000"), // TODO change to actual UUID
-                static_cast<std::string>(p),
-                p.provider_id()
+                p
             );
             targets.push_back(target_info);
         }

@@ -22,6 +22,7 @@ class __MofkaTargetSelectorRegistration;
 namespace mofka {
 
 class PartitionTargetInfoImpl;
+class Producer;
 class TopicHandleImpl;
 
 /**
@@ -90,6 +91,7 @@ class PartitionTargetInfo {
 
     friend class std::hash<PartitionTargetInfo>;
     friend class TopicHandleImpl;
+    friend class Producer;
 };
 
 /**

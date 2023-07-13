@@ -23,14 +23,14 @@ class ClientImpl {
     tl::engine           m_engine;
     tl::remote_procedure m_create_topic;
     tl::remote_procedure m_open_topic;
-    tl::remote_procedure m_compute_sum;
+    tl::remote_procedure m_send_batch;
     bedrock::Client      m_bedrock_client;
 
     ClientImpl(const tl::engine& engine)
     : m_engine(engine)
     , m_create_topic(m_engine.define("mofka_create_topic"))
     , m_open_topic(m_engine.define("mofka_open_topic"))
-    , m_compute_sum(m_engine.define("mofka_compute_sum"))
+    , m_send_batch(m_engine.define("mofka_send_batch"))
     , m_bedrock_client(m_engine)
     {}
 };

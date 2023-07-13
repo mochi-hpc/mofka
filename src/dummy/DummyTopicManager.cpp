@@ -22,13 +22,14 @@ Metadata DummyTopicManager::getTargetSelectorMetadata() const {
     return m_selector;
 }
 
-void DummyTopicManager::sayHello() {
-    std::cout << "Hello World" << std::endl;
-}
-
-RequestResult<int32_t> DummyTopicManager::computeSum(int32_t x, int32_t y) {
-    RequestResult<int32_t> result;
-    result.value() = x + y;
+RequestResult<EventID> DummyTopicManager::receiveBatch(
+        const std::string& producer_name,
+        size_t num_events,
+        size_t remote_bulk_size,
+        size_t data_offset,
+        thallium::bulk remote_bulk) {
+    RequestResult<EventID> result;
+    result.value() = 0;
     return result;
 }
 
