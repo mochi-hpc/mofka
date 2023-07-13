@@ -192,7 +192,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         RequestResult<EventID> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
-        result = topic->receiveBatch(producer_name, count, total_size, data_offset, content);
+        result = topic->receiveBatch(req.get_endpoint(), producer_name, count, total_size, data_offset, content);
         spdlog::trace("[mofka:{}] Successfully executed receiveBatch on topic {}", id(), topic_name);
     }
 

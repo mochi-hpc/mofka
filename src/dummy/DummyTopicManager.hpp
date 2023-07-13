@@ -10,6 +10,21 @@
 
 namespace mofka {
 
+struct DummyEvent {
+    std::string metadata;
+    std::string data;
+
+    DummyEvent(const char* md, size_t metadata_size,
+               const char* d, size_t data_size)
+    : metadata{md, metadata_size}
+    , data{d, data_size} {}
+
+    DummyEvent(const DummyEvent&) = default;
+    DummyEvent(DummyEvent&&) = default;
+    DummyEvent& operator=(const DummyEvent&) = default;
+    DummyEvent& operator=(DummyEvent&&) = default;
+};
+
 /**
  * Dummy implementation of a mofka TopicManager.
  */
@@ -20,6 +35,9 @@ class DummyTopicManager : public mofka::TopicManager {
     Metadata m_selector;
     Metadata m_serializer;
 
+    thallium::engine        m_engine;
+    std::vector<DummyEvent> m_events;
+
     public:
 
     /**
@@ -29,11 +47,13 @@ class DummyTopicManager : public mofka::TopicManager {
         const Metadata& config,
         const Metadata& validator,
         const Metadata& selector,
-        const Metadata& serializer)
+        const Metadata& serializer,
+        thallium::engine engine)
     : m_config(config)
     , m_validator(validator)
     , m_selector(selector)
-    , m_serializer(serializer) {}
+    , m_serializer(serializer)
+    , m_engine(engine) {}
 
     /**
      * @brief Move-constructor.
@@ -79,6 +99,7 @@ class DummyTopicManager : public mofka::TopicManager {
      * @brief Receives a batch.
      */
     mofka::RequestResult<EventID> receiveBatch(
+            const thallium::endpoint& sender,
             const std::string& producer_name,
             size_t num_events,
             size_t remote_bulk_size,

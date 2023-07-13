@@ -58,7 +58,6 @@ class BatchImpl {
 
     std::vector<size_t>        m_meta_sizes;      /* size of each serialized metadata object */
     std::vector<char>          m_meta_buffer;     /* packed serialized metadata objects */
-    std::vector<size_t>        m_data_offsets;    /* offset at which the data for each metata starts */
     std::vector<size_t>        m_data_sizes;      /* size of the data associated with each metadata */
     std::vector<Data::Segment> m_data_segments;   /* list of data segments */
     size_t                     m_total_data_size; /* sum of sizes in the m_data_segments */
@@ -90,7 +89,6 @@ class BatchImpl {
         BatchOutputArchive archive(meta_size, m_meta_buffer);
         serializer.serialize(archive, metadata);
         m_meta_sizes.push_back(meta_size);
-        m_data_offsets.push_back(m_total_data_size);
         size_t data_size = 0;
         for(const auto& seg : data.self->m_segments) {
             m_data_segments.push_back(seg);
@@ -104,10 +102,9 @@ class BatchImpl {
     thallium::bulk expose(thallium::engine engine) {
         if(count() == 0) return thallium::bulk{};
         std::vector<std::pair<void *, size_t>> segments;
-        segments.reserve(4 + m_data_segments.size());
+        segments.reserve(3 + m_data_segments.size());
         segments.emplace_back(m_meta_sizes.data(), m_meta_sizes.size()*sizeof(m_meta_sizes[0]));
         segments.emplace_back(m_meta_buffer.data(), m_meta_buffer.size()*sizeof(m_meta_buffer[0]));
-        segments.emplace_back(m_data_offsets.data(), m_data_offsets.size()*sizeof(m_data_offsets[0]));
         segments.emplace_back(m_data_sizes.data(), m_data_sizes.size()*sizeof(m_data_sizes[0]));
         for(const auto& seg : m_data_segments) {
             if(!seg.size) continue;
@@ -121,7 +118,8 @@ class BatchImpl {
     }
 
     size_t totalSize() const {
-        return m_total_data_size;
+        return count()*2*sizeof(size_t) + m_meta_buffer.size()
+             + m_total_data_size;
     }
 
     size_t dataOffset() const {

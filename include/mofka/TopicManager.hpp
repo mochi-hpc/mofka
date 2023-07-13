@@ -98,6 +98,7 @@ class TopicManager {
      * @return a RequestResult containing the result.
      */
     virtual RequestResult<EventID> receiveBatch(
+        const thallium::endpoint& sender,
         const std::string& producer_name,
         size_t num_events,
         size_t remote_bulk_size,
