@@ -44,7 +44,11 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
     /* Step 1: create a future/promise pair for this operation */
     Future<EventID> future;
     Promise<EventID> promise;
-    std::tie(future, promise) = Promise<EventID>::CreateFutureAndPromise();
+    // if the batch size is not adapte, wait() calls on futures should trigger a flush
+    auto on_wait = [producer=*this]() mutable { producer.flush(); };
+    std::tie(future, promise) = self->m_batch_size != BatchSize::Adaptive() ?
+        Promise<EventID>::CreateFutureAndPromise(std::move(on_wait))
+        : Promise<EventID>::CreateFutureAndPromise();
     /* Step 2: create a ULT that will validate, select the target, and serialize */
     auto ult = [this,
                 promise=std::move(promise),
@@ -73,11 +77,41 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
         } catch(const Exception& ex) {
             promise.setException(ex);
         }
+        /* Step 2.6: decrease the number of posted ULTs */
+        bool notify_no_posted_ults = false;
+        {
+            std::lock_guard<thallium::mutex> guard_posted_ults{self->m_num_posted_ults_mtx};
+            self->m_num_posted_ults -= 1;
+            if(self->m_num_posted_ults == 0) notify_no_posted_ults = true;
+        }
+        if(notify_no_posted_ults) {
+            self->m_num_posted_ults_cv.notify_all();
+        }
     };
+    /* Step 3: increase the number of posted ULTs */
+    {
+        std::lock_guard<thallium::mutex> guard{self->m_num_posted_ults_mtx};
+        self->m_num_posted_ults += 1;
+    }
     /* Step 3: submit the ULT */
     self->m_thread_pool.self->pushWork(std::move(ult));
     /* Step 4: return the future */
     return future;
+}
+
+void Producer::flush() {
+    {
+        std::unique_lock<thallium::mutex> guard_posted_ults{self->m_num_posted_ults_mtx};
+        self->m_num_posted_ults_cv.wait(
+            guard_posted_ults,
+            [this]() { return self->m_num_posted_ults == 0; });
+    }
+    {
+        std::lock_guard<thallium::mutex> guard{self->m_batch_queues_mtx};
+        for(auto& p : self->m_batch_queues) {
+            p.second->flush();
+        }
+    }
 }
 
 BatchSize BatchSize::Adaptive() {

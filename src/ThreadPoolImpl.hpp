@@ -32,11 +32,9 @@ class ThreadPoolImpl {
     }
 
     ~ThreadPoolImpl() {
-        std::cerr << "~ThreadPoolImpl begin" << std::endl;
         for(auto& x : m_managed_xstreams) {
             x->join();
         }
-        std::cerr << "~ThreadPoolImpl end" << std::endl;
     }
 
     template<typename Function>

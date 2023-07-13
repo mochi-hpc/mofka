@@ -29,13 +29,19 @@ TEST_CASE("Event producer test", "[event-producer]") {
         auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"dummy\"}"};
         topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
-        auto producer = topic.producer("myproducer");
+
+        auto thread_count = GENERATE(as<mofka::ThreadCount>{}, 0, 1, 2);
+        auto batch_size   = GENERATE(mofka::BatchSize::Adaptive(), mofka::BatchSize::Adaptive());
+
+        auto producer = topic.producer(
+            "myproducer", batch_size, thread_count);
         REQUIRE(static_cast<bool>(producer));
 
         SECTION("Push events into the topic using the producer") {
             auto future = producer.push(
                 mofka::Metadata("{\"name\":\"matthieu\"}"),
                 mofka::Data{nullptr, 0});
+            producer.flush();
             future.wait();
         }
     }

@@ -35,16 +35,21 @@ struct Promise {
             state->set_value(std::move(ex));
     }
 
-    static inline std::pair<Future<Type>, Promise<Type>> CreateFutureAndPromise() {
+    static inline std::pair<Future<Type>, Promise<Type>> CreateFutureAndPromise(
+        std::function<void()> on_wait = std::function<void()>{},
+        std::function<void(bool)> on_test = std::function<void(bool)>{}) {
         auto state = std::make_shared<State>();
-        auto wait_fn = [state]() mutable -> EventID {
+        auto wait_fn = [state, on_wait=std::move(on_wait)]() mutable -> EventID {
+            if(on_wait) on_wait();
             auto v = state->wait();
             if(std::holds_alternative<Exception>(v))
                 throw std::get<Exception>(v);
             return std::get<EventID>(v);
         };
-        auto complete_fn = [state]() mutable -> bool {
-            return state->test();
+        auto complete_fn = [state, on_test=std::move(on_test)]() mutable -> bool {
+            auto is_ready = state->test();
+            if(on_test) on_test(is_ready);
+            return is_ready;
         };
         return std::make_pair(
             Future<Type>{std::move(wait_fn), std::move(complete_fn)},

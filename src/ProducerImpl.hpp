@@ -31,6 +31,10 @@ class ProducerImpl {
         std::shared_ptr<ActiveBatchQueue>> m_batch_queues;
     thallium::mutex                        m_batch_queues_mtx;
 
+    size_t                       m_num_posted_ults = 0;
+    thallium::mutex              m_num_posted_ults_mtx;
+    thallium::condition_variable m_num_posted_ults_cv;
+
     ProducerImpl(std::string_view name,
                  BatchSize batch_size,
                  ThreadPool thread_pool,

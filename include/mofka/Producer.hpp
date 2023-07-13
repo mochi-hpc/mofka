@@ -126,6 +126,11 @@ class Producer {
      */
     Future<EventID> push(Metadata metadata, Data data = Data{}) const;
 
+    /**
+     * @brief Block until all the pending events have been sent.
+     */
+    void flush();
+
     private:
 
     /**

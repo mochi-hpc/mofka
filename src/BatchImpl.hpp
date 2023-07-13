@@ -171,27 +171,40 @@ class ActiveBatchQueue {
         m_thread_pool.self->pushWork([this]() { loop(); });
     }
 
+    void flush() {
+        if(!m_running) return;
+        {
+            std::unique_lock<thallium::mutex> guard{m_mutex};
+            m_request_flush = true;
+        }
+        m_cv.notify_one();
+    }
+
     private:
 
     void loop() {
-        const auto adaptive = m_batch_size == BatchSize::Adaptive();
         m_running = true;
         std::unique_lock<thallium::mutex> guard{m_mutex};
         while(!m_need_stop || !m_batch_queue.empty()) {
             m_cv.wait(guard, [this]() {
-                return m_need_stop || !m_batch_queue.empty();
-            });
-            if(m_batch_queue.empty()) continue;
-            do {
+                if(m_need_stop || m_request_flush)        return true;
+                if(m_batch_queue.empty())                 return false;
+                if(m_batch_size == BatchSize::Adaptive()) return true;
                 auto batch = m_batch_queue.front();
-                if(!adaptive && !m_need_stop && batch->count() != m_batch_size.value)
-                    break;
-                m_batch_queue.pop();
-                guard.unlock();
-                // TODO send the batch and get the resuling event ID
-                batch->setPromises(0); // TODO modify this
-                guard.lock();
-            } while(m_need_stop);
+                if(batch->count() == m_batch_size.value)  return true;
+                return false;
+            });
+            if(m_batch_queue.empty()) {
+                m_request_flush = false;
+                continue;
+            }
+            auto batch = m_batch_queue.front();
+            m_batch_queue.pop();
+            guard.unlock();
+            // TODO send the batch and get the resuling event ID
+            batch->setPromises(0); // TODO modify this
+            guard.lock();
+            m_request_flush = false;
         }
         m_running = false;
         m_terminated.set_value();
@@ -202,6 +215,7 @@ class ActiveBatchQueue {
     std::queue<std::shared_ptr<BatchImpl>> m_batch_queue;
     thallium::managed<thallium::thread>    m_sender_ult;
     bool                                   m_need_stop = false;
+    bool                                   m_request_flush = false;
     std::atomic<bool>                      m_running = false;
     thallium::mutex                        m_mutex;
     thallium::condition_variable           m_cv;
