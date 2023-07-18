@@ -73,17 +73,19 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     public:
 
     tl::engine           m_engine;
+    rapidjson::Document  m_config;
+    UUID                 m_uuid;
     tl::pool             m_pool;
     AutoDeregisteringRPC m_create_topic;
     AutoDeregisteringRPC m_open_topic;
     // RPCs for TopicManagers
     AutoDeregisteringRPC m_send_batch;
     // TopicManagers
-    std::unordered_map<UUID, std::shared_ptr<TopicManager>>        m_topics_by_uuid;
     std::unordered_map<std::string, std::shared_ptr<TopicManager>> m_topics_by_name;
     tl::mutex m_topics_mtx;
 
-    ProviderImpl(const tl::engine& engine, uint16_t provider_id, const tl::pool& pool)
+    ProviderImpl(const tl::engine& engine, uint16_t provider_id,
+                 const rapidjson::Value& config, const tl::pool& pool)
     : tl::provider<ProviderImpl>(engine, provider_id)
     , m_engine(engine)
     , m_pool(pool)
@@ -91,7 +93,17 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_open_topic(define("mofka_open_topic", &ProviderImpl::openTopic, pool))
     , m_send_batch(define("mofka_send_batch",  &ProviderImpl::receiveBatch, pool))
     {
-        spdlog::trace("[mofka:{0}] Registered provider with id {0}", id());
+        m_config.CopyFrom(config, m_config.GetAllocator(), true);
+        if(m_config.HasMember("uuid") && m_config["uuid"].IsString()) {
+            m_uuid = UUID::from_string(m_config["uuid"].GetString());
+        } else {
+            m_uuid = UUID::generate();
+        }
+        auto uuid = m_uuid.to_string();
+        rapidjson::Value uuid_value;
+        uuid_value.SetString(uuid.c_str(), uuid.size(), m_config.GetAllocator());
+        m_config.AddMember("uuid", std::move(uuid_value), m_config.GetAllocator());
+        spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), uuid);
     }
 
     void createTopic(const tl::request& req,

@@ -20,7 +20,8 @@ class MofkaFactory : public bedrock::AbstractServiceFactory {
         rapidjson::Document config;
         rapidjson::ParseResult ok = config.Parse(args.config.c_str());
         if(!ok) {
-            // TODO print error
+            spdlog::error("Error parsing configuration for Mofka provider: {} ({})",
+                          rapidjson::GetParseError_En(ok.Code()), ok.Offset());
             return nullptr;
         }
         auto provider = new mofka::Provider(

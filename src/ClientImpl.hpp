@@ -6,6 +6,7 @@
 #ifndef MOFKA_CLIENT_IMPL_H
 #define MOFKA_CLIENT_IMPL_H
 
+#include "mofka/TargetSelector.hpp"
 #include <bedrock/Client.hpp>
 #include <thallium.hpp>
 #include <thallium/serialization/stl/unordered_set.hpp>
@@ -23,6 +24,7 @@ class ClientImpl {
     tl::engine           m_engine;
     tl::remote_procedure m_create_topic;
     tl::remote_procedure m_open_topic;
+    tl::remote_procedure m_get_uuid;
     tl::remote_procedure m_send_batch;
     bedrock::Client      m_bedrock_client;
 
@@ -30,9 +32,14 @@ class ClientImpl {
     : m_engine(engine)
     , m_create_topic(m_engine.define("mofka_create_topic"))
     , m_open_topic(m_engine.define("mofka_open_topic"))
+    , m_get_uuid(m_engine.define("mofka_get_provider_uuid"))
     , m_send_batch(m_engine.define("mofka_send_batch"))
     , m_bedrock_client(m_engine)
     {}
+
+    static std::vector<PartitionTargetInfo> discoverMofkaTargets(
+            const tl::engine& engine,
+            const bedrock::ServiceGroupHandle bsgh);
 };
 
 }

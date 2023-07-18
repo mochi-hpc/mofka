@@ -12,9 +12,8 @@
 namespace mofka {
 
 Provider::Provider(const tl::engine& engine, uint16_t provider_id, const rapidjson::Value& config, const thallium::pool& p)
-: self(std::make_shared<ProviderImpl>(engine, provider_id, p)) {
+: self(std::make_shared<ProviderImpl>(engine, provider_id, config, p)) {
     self->get_engine().push_finalize_callback(this, [p=this]() { p->self.reset(); });
-    (void)config;
 }
 
 Provider::Provider(Provider&& other) {
@@ -30,9 +29,7 @@ Provider::~Provider() {
 }
 
 const rapidjson::Value& Provider::getConfig() const {
-    // TODO
-    static rapidjson::Value config;
-    return config;
+    return self->m_config;
 }
 
 Provider::operator bool() const {

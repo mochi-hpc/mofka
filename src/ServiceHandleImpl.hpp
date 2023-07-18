@@ -19,15 +19,15 @@ class ServiceHandleImpl {
 
     std::shared_ptr<ClientImpl>      m_client;
     bedrock::ServiceGroupHandle      m_bsgh;
-    std::vector<tl::provider_handle> m_mofka_phs;
+    std::vector<PartitionTargetInfo> m_mofka_targets;
 
     ServiceHandleImpl(
         std::shared_ptr<ClientImpl> client,
         bedrock::ServiceGroupHandle bsgh,
-        std::vector<tl::provider_handle> mofka_phs)
+        std::vector<PartitionTargetInfo> targets)
     : m_client(std::move(client))
     , m_bsgh(std::move(bsgh))
-    , m_mofka_phs(std::move(mofka_phs)) {}
+    , m_mofka_targets(std::move(targets)) {}
 };
 
 }

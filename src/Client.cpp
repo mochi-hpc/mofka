@@ -13,6 +13,8 @@
 #include "TopicHandleImpl.hpp"
 
 #include <thallium/serialization/stl/string.hpp>
+#include <utility>
+#include <tuple>
 
 namespace mofka {
 
@@ -26,13 +28,14 @@ const thallium::engine& Client::engine() const {
     return self->m_engine;
 }
 
-static std::vector<tl::provider_handle> discoverMofkaProviders(
-        const tl::engine& engine, const bedrock::ServiceGroupHandle bsgh) {
+std::vector<PartitionTargetInfo> ClientImpl::discoverMofkaTargets(
+        const tl::engine& engine,
+        const bedrock::ServiceGroupHandle bsgh) {
     std::string configs;
     bsgh.getConfig(&configs);
     rapidjson::Document doc;
     doc.Parse(configs.c_str(), configs.size());
-    std::vector<tl::provider_handle> mofka_phs;
+    std::vector<PartitionTargetInfo> mofka_targets;
     for(auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
         const auto& address = it->name.GetString();
         const auto endpoint = engine.lookup(address);
@@ -41,17 +44,20 @@ static std::vector<tl::provider_handle> discoverMofkaProviders(
         for(auto& provider : providers.GetArray()) {
             if(provider["type"] != "mofka") continue;
             uint16_t provider_id = provider["provider_id"].GetInt();
-            mofka_phs.emplace_back(endpoint, provider_id);
+            auto uuid = UUID::from_string(provider["config"]["uuid"].GetString());
+            auto target_impl = std::make_shared<PartitionTargetInfoImpl>(
+                uuid, tl::provider_handle(endpoint, provider_id));
+            mofka_targets.emplace_back(PartitionTargetInfo(target_impl));
         }
     }
-    return mofka_phs;
+    return mofka_targets;
 }
 
 ServiceHandle Client::connect(SSGFileName ssgfile) const {
     if(!self) throw Exception("Uninitialized ServiceHandle instance");
     try {
         auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(std::string{ssgfile});
-        auto mofka_phs = discoverMofkaProviders(self->m_engine, bsgh);
+        auto mofka_phs = ClientImpl::discoverMofkaTargets(self->m_engine, bsgh);
         auto service_handle_impl = std::make_shared<ServiceHandleImpl>(
             self, std::move(bsgh), std::move(mofka_phs));
         return ServiceHandle(std::move(service_handle_impl));
@@ -64,9 +70,9 @@ ServiceHandle Client::connect(SSGGroupID gid) const {
     if(!self) throw Exception("Uninitialized ServiceHandle instance");
     try {
         auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(gid.value);
-        auto mofka_phs = discoverMofkaProviders(self->m_engine, bsgh);
+        auto mofka_targets = ClientImpl::discoverMofkaTargets(self->m_engine, bsgh);
         auto service_handle_impl = std::make_shared<ServiceHandleImpl>(
-            self, std::move(bsgh), std::move(mofka_phs));
+            self, std::move(bsgh), std::move(mofka_targets));
         return ServiceHandle(std::move(service_handle_impl));
     } catch(const std::exception& ex) {
         throw Exception(ex.what());

@@ -24,6 +24,8 @@ namespace mofka {
 class PartitionTargetInfoImpl;
 class Producer;
 class TopicHandleImpl;
+class ClientImpl;
+class ServiceHandle;
 
 /**
  * @brief The PartitionTargetInfo structure holds information about
@@ -91,7 +93,9 @@ class PartitionTargetInfo {
 
     friend class std::hash<PartitionTargetInfo>;
     friend class TopicHandleImpl;
+    friend class ClientImpl;
     friend class Producer;
+    friend class ServiceHandle;
 };
 
 /**

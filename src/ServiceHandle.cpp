@@ -29,8 +29,9 @@ TopicHandle ServiceHandle::createTopic(
         Validator validator,
         TargetSelector selector,
         Serializer serializer) {
-    const auto hash = std::hash<decltype(name)>()(name);
-    const auto ph   = self->m_mofka_phs[hash % self->m_mofka_phs.size()];
+    const auto hash   = std::hash<decltype(name)>()(name);
+    const auto target = self->m_mofka_targets[hash % self->m_mofka_targets.size()];
+    const auto ph = target.self->m_ph;
     using ResultType = std::tuple<Metadata, Metadata, Metadata>;
     RequestResult<ResultType> response =
         self->m_client->m_create_topic.on(ph)(
@@ -58,7 +59,8 @@ TopicHandle ServiceHandle::createTopic(
 
 TopicHandle ServiceHandle::openTopic(std::string_view name) {
     const auto hash = std::hash<decltype(name)>()(name);
-    const auto ph   = self->m_mofka_phs[hash % self->m_mofka_phs.size()];
+    const auto target = self->m_mofka_targets[hash % self->m_mofka_targets.size()];
+    const auto ph = target.self->m_ph;
     using ResultType = std::tuple<Metadata, Metadata, Metadata>;
     RequestResult<ResultType> response =
         self->m_client->m_open_topic.on(ph)(std::string{name});
