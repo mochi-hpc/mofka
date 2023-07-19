@@ -13,7 +13,7 @@
 #include <stdexcept>
 
 /**
- * @brief Helper class to register validator types into the validator factory.
+ * @brief Helper class to register Serializer types into the Serializer factory.
  */
 template<typename SerializerType>
 class __MofkaSerializerRegistration;

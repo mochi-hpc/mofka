@@ -15,6 +15,7 @@
 #include <mofka/Producer.hpp>
 #include <mofka/Consumer.hpp>
 #include <mofka/DataBroker.hpp>
+#include <mofka/DataSelector.hpp>
 #include <memory>
 #include <unordered_set>
 
@@ -110,7 +111,8 @@ class TopicHandle {
         return makeConsumer(name,
             GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
-            GetArg<DataBroker>(std::forward<Options>(opts)...));
+            GetArg<DataBroker>(std::forward<Options>(opts)...),
+            GetArgOrDefault(DataSelector{}, std::forward<Options>(opts)...));
     }
 
 
@@ -148,13 +150,15 @@ class TopicHandle {
      * @param batch_size Batch size.
      * @param thread_pool Thread pool.
      * @param data_broker Data broker.
+     * @param data_selector Data selector.
      *
      * @return Consumer instance.
      */
     Consumer makeConsumer(std::string_view name,
                           BatchSize batch_size,
                           ThreadPool thread_pool,
-                          DataBroker data_broker) const;
+                          DataBroker data_broker,
+                          DataSelector data_selector) const;
 
 };
 

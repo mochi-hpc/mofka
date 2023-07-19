@@ -15,7 +15,6 @@ set (client-src-files
      TargetSelector.cpp
      PartitionTargetInfo.cpp
      Validator.cpp
-     DataBroker.cpp
      ThreadPool.cpp
      AsyncRequest.cpp)
 
