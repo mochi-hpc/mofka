@@ -40,4 +40,31 @@ ThreadPool Consumer::threadPool() const {
     return self->m_thread_pool;
 }
 
+DataBroker Consumer::dataBroker() const {
+    return self->m_data_broker;
+}
+
+DataSelector Consumer::dataSelector() const {
+    return self->m_data_selector;
+}
+
+Future<Event> Consumer::pull() const {
+    // TODO
+}
+
+void Consumer::process(EventProcessor processor,
+                       ThreadPool threadPool,
+                       NumEvents maxEvents) const {
+
+    // TODO
+}
+
+void Consumer::operator|(EventProcessor processor) const && {
+    process(processor, self->m_thread_pool, NumEvents::Infinity());
+}
+
+NumEvents NumEvents::Infinity() {
+    return NumEvents{std::numeric_limits<size_t>::max()};
+}
+
 }
