@@ -8,10 +8,13 @@
 
 #include <thallium.hpp>
 #include <rapidjson/document.h>
+#include <mofka/ArgsUtil.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/AsyncRequest.hpp>
 #include <mofka/Producer.hpp>
+#include <mofka/Consumer.hpp>
+#include <mofka/DataBroker.hpp>
 #include <memory>
 #include <unordered_set>
 
@@ -28,6 +31,7 @@ class TopicHandle {
 
     friend class ServiceHandle;
     friend class Producer;
+    friend class Consumer;
 
     public:
 
@@ -77,18 +81,38 @@ class TopicHandle {
     operator bool() const;
 
     /**
-     * @brief Creates a Producer object with the specified name
-     * and options. If specified, the name will be added to each
-     * event's metadata.
-     *
-     * @param name Name of the producer.
-     * @param options Options.
+     * @brief Creates a Producer object with the specified options.
+     * This function allows providing the options in any order,
+     * and ommit non-mandatory options. See TopicHandle::makeProducer
+     * for the documentation on all the options.
      *
      * @return a Producer object.
      */
-    Producer producer(std::string_view name = "",
-                      BatchSize batch_size = BatchSize::Adaptive(),
-                      ThreadPool thread_pool = ThreadPool{}) const;
+    template<typename ... Options>
+    Producer producer(Options&&... opts) const {
+        return makeProducer(
+            GetArgOrDefault(std::string_view{""}, std::forward<Options>(opts)...),
+            GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
+            GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...));
+    }
+
+    /**
+     * @brief Creates a Consumer object with the specified options.
+     *
+     * This function allows providing the options in any order,
+     * and ommit non-mandatory options. See TopicHandle::makeConsumer
+     * for the documentation on all the options.
+     *
+     * @return a Consumer object.
+     */
+    template<typename ... Options>
+    Consumer consumer(std::string_view name, Options&&... opts) const {
+        return makeConsumer(name,
+            GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
+            GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
+            GetArg<DataBroker>(std::forward<Options>(opts)...));
+    }
+
 
     private:
 
@@ -101,6 +125,37 @@ class TopicHandle {
     TopicHandle(const std::shared_ptr<TopicHandleImpl>& impl);
 
     std::shared_ptr<TopicHandleImpl> self;
+
+    /**
+     * @brief Create a Producer object from the full
+     * list of optional arguments.
+     *
+     * @param name Name of the Producer.
+     * @param batch_size Batch size.
+     * @param thread_pool Thread pool.
+     *
+     * @return Producer instance.
+     */
+    Producer makeProducer(std::string_view name,
+                          BatchSize batch_size,
+                          ThreadPool thread_pool) const;
+
+    /**
+     * @brief Create a Consumer object from the full
+     * list of optional and mandatory arguments.
+     *
+     * @param name Name of the Consumer.
+     * @param batch_size Batch size.
+     * @param thread_pool Thread pool.
+     * @param data_broker Data broker.
+     *
+     * @return Consumer instance.
+     */
+    Consumer makeConsumer(std::string_view name,
+                          BatchSize batch_size,
+                          ThreadPool thread_pool,
+                          DataBroker data_broker) const;
+
 };
 
 }

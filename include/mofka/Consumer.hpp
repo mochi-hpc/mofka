@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_PRODUCER_HPP
-#define MOFKA_PRODUCER_HPP
+#ifndef MOFKA_CONSUMER_HPP
+#define MOFKA_CONSUMER_HPP
 
 #include <thallium.hpp>
 #include <rapidjson/document.h>
@@ -23,12 +23,12 @@ namespace mofka {
 
 class TopicHandle;
 class ActiveBatchQueue;
-class ProducerImpl;
+class ConsumerImpl;
 
 /**
- * @brief A Producer is an object that can emmit events into a its topic.
+ * @brief A Consumer is an object that can emmit events into a its topic.
  */
-class Producer {
+class Consumer {
 
     friend class TopicHandle;
     friend class ActiveBatchQueue;
@@ -36,34 +36,34 @@ class Producer {
     public:
 
     /**
-     * @brief Constructor. The resulting Producer handle will be invalid.
+     * @brief Constructor. The resulting Consumer handle will be invalid.
      */
-    Producer();
+    Consumer();
 
     /**
      * @brief Copy-constructor.
      */
-    Producer(const Producer&);
+    Consumer(const Consumer&);
 
     /**
      * @brief Move-constructor.
      */
-    Producer(Producer&&);
+    Consumer(Consumer&&);
 
     /**
      * @brief Copy-assignment operator.
      */
-    Producer& operator=(const Producer&);
+    Consumer& operator=(const Consumer&);
 
     /**
      * @brief Move-assignment operator.
      */
-    Producer& operator=(Producer&&);
+    Consumer& operator=(Consumer&&);
 
     /**
      * @brief Destructor.
      */
-    ~Producer();
+    ~Consumer();
 
     /**
      * @brief Returns the name of the producer.
@@ -72,12 +72,12 @@ class Producer {
 
     /**
      * @brief Returns a copy of the options provided when
-     * the Producer was created.
+     * the Consumer was created.
      */
     BatchSize batchSize() const;
 
     /**
-     * @brief Returns the ThreadPool associated with the Producer.
+     * @brief Returns the ThreadPool associated with the Consumer.
      */
     ThreadPool threadPool() const;
 
@@ -87,37 +87,21 @@ class Producer {
     TopicHandle topic() const;
 
     /**
-     * @brief Checks if the Producer instance is valid.
+     * @brief Checks if the Consumer instance is valid.
      */
     operator bool() const;
-
-    /**
-     * @brief Pushes an event into the producer's underlying topic,
-     * returning a Future that can be awaited.
-     *
-     * @param metadata Metadata of the event.
-     * @param data Optional data to attach to the event.
-     *
-     * @return a Future<EventID> tracking the asynchronous operation.
-     */
-    Future<EventID> push(Metadata metadata, Data data = Data{}) const;
-
-    /**
-     * @brief Block until all the pending events have been sent.
-     */
-    void flush();
 
     private:
 
     /**
      * @brief Constructor is private. Use a Client object
-     * to create a Producer instance.
+     * to create a Consumer instance.
      *
      * @param impl Pointer to implementation.
      */
-    Producer(const std::shared_ptr<ProducerImpl>& impl);
+    Consumer(const std::shared_ptr<ConsumerImpl>& impl);
 
-    std::shared_ptr<ProducerImpl> self;
+    std::shared_ptr<ConsumerImpl> self;
 };
 
 }

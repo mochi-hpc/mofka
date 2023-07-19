@@ -68,6 +68,12 @@ class Data {
     ~Data();
 
     /**
+     * @brief Returns the list of memory segments
+     * this Data object refers to.
+     */
+    const std::vector<Segment>& segments() const;
+
+    /**
      * @brief Checks if the Data instance is valid.
      */
     operator bool() const;

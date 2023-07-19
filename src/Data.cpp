@@ -19,4 +19,8 @@ Data::Data(const void* ptr, size_t size)
 Data::Data(std::vector<Segment> segments)
 : self(std::make_shared<DataImpl>(std::move(segments))) {}
 
+const std::vector<Data::Segment>& Data::segments() const {
+    return self->m_segments;
+}
+
 }

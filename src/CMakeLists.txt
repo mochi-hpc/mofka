@@ -8,12 +8,14 @@ set (client-src-files
      ServiceHandle.cpp
      TopicHandle.cpp
      Producer.cpp
+     Consumer.cpp
      Data.cpp
      Metadata.cpp
      Serializer.cpp
      TargetSelector.cpp
      PartitionTargetInfo.cpp
      Validator.cpp
+     DataBroker.cpp
      ThreadPool.cpp
      AsyncRequest.cpp)
 
