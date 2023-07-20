@@ -27,6 +27,7 @@ class ConsumerImpl {
     DataBroker                       m_data_broker;
     DataSelector                     m_data_selector;
     EventProcessor                   m_event_processor;
+    std::vector<PartitionTargetInfo> m_targets;
     std::shared_ptr<TopicHandleImpl> m_topic;
 
     /* The futures/promises queue works as follows:
@@ -55,12 +56,14 @@ class ConsumerImpl {
                  ThreadPool thread_pool,
                  DataBroker broker,
                  DataSelector selector,
+                 std::vector<PartitionTargetInfo> targets,
                  std::shared_ptr<TopicHandleImpl> topic)
     : m_name(name)
     , m_batch_size(batch_size)
     , m_thread_pool(std::move(thread_pool))
     , m_data_broker(std::move(broker))
     , m_data_selector(std::move(selector))
+    , m_targets(std::move(targets))
     , m_topic(std::move(topic)) {}
 
 };

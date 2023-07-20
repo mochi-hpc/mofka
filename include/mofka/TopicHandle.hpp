@@ -77,11 +77,6 @@ class TopicHandle {
     ServiceHandle service() const;
 
     /**
-     * @brief Checks if the TopicHandle instance is valid.
-     */
-    operator bool() const;
-
-    /**
      * @brief Creates a Producer object with the specified options.
      * This function allows providing the options in any order,
      * and ommit non-mandatory options. See TopicHandle::makeProducer
@@ -112,9 +107,19 @@ class TopicHandle {
             GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
             GetArg<DataBroker>(std::forward<Options>(opts)...),
-            GetArgOrDefault(DataSelector{}, std::forward<Options>(opts)...));
+            GetArgOrDefault(DataSelector{}, std::forward<Options>(opts)...),
+            GetArgOrDefault(targets(), std::forward<Options>(opts)...));
     }
 
+    /**
+     * @brief Returns the list of PartitionTargetInfo of the underlying topic.
+     */
+    const std::vector<PartitionTargetInfo>& targets() const;
+
+    /**
+     * @brief Checks if the TopicHandle instance is valid.
+     */
+    operator bool() const;
 
     private:
 
@@ -158,7 +163,8 @@ class TopicHandle {
                           BatchSize batch_size,
                           ThreadPool thread_pool,
                           DataBroker data_broker,
-                          DataSelector data_selector) const;
+                          DataSelector data_selector,
+                          const std::vector<PartitionTargetInfo>& targets) const;
 
 };
 

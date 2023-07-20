@@ -41,10 +41,15 @@ Consumer TopicHandle::makeConsumer(
         BatchSize batch_size,
         ThreadPool thread_pool,
         DataBroker data_broker,
-        DataSelector data_selector) const {
+        DataSelector data_selector,
+        const std::vector<PartitionTargetInfo>& targets) const {
     return std::make_shared<ConsumerImpl>(
             name, batch_size, thread_pool,
-            data_broker, data_selector, self);
+            data_broker, data_selector, targets, self);
+}
+
+const std::vector<PartitionTargetInfo>& TopicHandle::targets() const {
+    return self->m_service->m_mofka_targets;
 }
 
 }
