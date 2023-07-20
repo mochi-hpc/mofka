@@ -11,7 +11,7 @@
 
 namespace mofka {
 
-PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(Event);
+PIMPL_DEFINE_COMMON_FUNCTIONS(Event);
 
 const Metadata& Event::metadata() const {
     return self->m_metadata;

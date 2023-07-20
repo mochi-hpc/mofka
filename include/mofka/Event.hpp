@@ -28,6 +28,11 @@ class Event {
     public:
 
     /**
+     * @brief Constructor leading to an invalid Event.
+     */
+    Event();
+
+    /**
      * @brief Move-constructor.
      */
     Event(Event&&);

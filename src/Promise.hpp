@@ -39,12 +39,12 @@ struct Promise {
         std::function<void()> on_wait = std::function<void()>{},
         std::function<void(bool)> on_test = std::function<void(bool)>{}) {
         auto state = std::make_shared<State>();
-        auto wait_fn = [state, on_wait=std::move(on_wait)]() mutable -> EventID {
+        auto wait_fn = [state, on_wait=std::move(on_wait)]() mutable -> Type {
             if(on_wait) on_wait();
             auto v = state->wait();
             if(std::holds_alternative<Exception>(v))
                 throw std::get<Exception>(v);
-            return std::get<EventID>(v);
+            return std::get<Type>(v);
         };
         auto complete_fn = [state, on_test=std::move(on_test)]() mutable -> bool {
             auto is_ready = state->test();

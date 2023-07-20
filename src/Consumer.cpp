@@ -49,7 +49,23 @@ DataSelector Consumer::dataSelector() const {
 }
 
 Future<Event> Consumer::pull() const {
-    // TODO
+    Future<Event> future;
+    std::unique_lock<thallium::mutex> guard{self->m_futures_mtx};
+    if(self->m_futures_credit || self->m_futures.empty()) {
+        // the queue of futures is empty or the futures
+        // already in the queue have been created by
+        // previous calls to pull() that haven't completed
+        Promise<Event> promise;
+        std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
+        self->m_futures.emplace_back(std::move(promise), future);
+        self->m_futures_credit = true;
+    } else {
+        // the queue of futures has futures already
+        // created by the consumer
+        Future<Event> future = std::move(self->m_futures.back().second);
+        self->m_futures.pop_back();
+    }
+    return future;
 }
 
 void Consumer::process(EventProcessor processor,

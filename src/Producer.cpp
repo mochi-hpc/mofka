@@ -44,7 +44,7 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
     /* Step 1: create a future/promise pair for this operation */
     Future<EventID> future;
     Promise<EventID> promise;
-    // if the batch size is not adapte, wait() calls on futures should trigger a flush
+    // if the batch size is not adaptive, wait() calls on futures should trigger a flush
     auto on_wait = [producer=*this]() mutable { producer.flush(); };
     std::tie(future, promise) = self->m_batch_size != BatchSize::Adaptive() ?
         Promise<EventID>::CreateFutureAndPromise(std::move(on_wait))
