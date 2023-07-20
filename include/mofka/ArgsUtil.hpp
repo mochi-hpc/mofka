@@ -33,7 +33,8 @@ decltype(auto) GetArgOrDefault(Expected&& exp, T1&& arg1, Ts&&... args) {
 
 template<typename Expected>
 decltype(auto) GetArg() {
-    static_assert(!std::is_same_v<void,Expected>, "Could not find mandatory argument of Expected type");
+    static_assert(std::is_same_v<void,Expected>, "Could not find mandatory argument of Expected type");
+    return Expected{};
 }
 
 template<typename Expected, typename T1, typename ... Ts>
@@ -44,7 +45,7 @@ decltype(auto) GetArg(T1&& arg1, Ts&&... args) {
         if constexpr (std::is_constructible_v<Expected, T1>) {
             return Expected(arg1);
         } else {
-            return GetArg(std::forward<Ts>(args)...);
+            return GetArg<Expected>(std::forward<Ts>(args)...);
         }
     }
 }

@@ -106,7 +106,7 @@ class TopicHandle {
         return makeConsumer(name,
             GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
-            GetArg<DataBroker>(std::forward<Options>(opts)...),
+            GetArgOrDefault(DataBroker{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataSelector{}, std::forward<Options>(opts)...),
             GetArgOrDefault(targets(), std::forward<Options>(opts)...));
     }

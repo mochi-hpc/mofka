@@ -51,6 +51,12 @@ class ConsumerImpl {
     bool                                                 m_futures_credit;
     thallium::mutex                                      m_futures_mtx;
 
+    /**
+     * Vector of eventuals that will be set on completion of the
+     * ULTs that pull events from each target.
+     */
+    std::vector<thallium::eventual<void>> m_pulling_ult_completed;
+
     ConsumerImpl(std::string_view name,
                  BatchSize batch_size,
                  ThreadPool thread_pool,
@@ -64,8 +70,21 @@ class ConsumerImpl {
     , m_data_broker(std::move(broker))
     , m_data_selector(std::move(selector))
     , m_targets(std::move(targets))
-    , m_topic(std::move(topic)) {}
+    , m_topic(std::move(topic)) {
+        start();
+    }
 
+    ~ConsumerImpl() {
+        join();
+    }
+
+    private:
+
+    void start();
+    void join();
+    void pullFrom(
+        const PartitionTargetInfo& target,
+        thallium::eventual<void>& ev);
 };
 
 }

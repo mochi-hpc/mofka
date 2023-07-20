@@ -16,6 +16,7 @@ namespace mofka {
 class Producer;
 class ActiveBatchQueue;
 class ThreadPoolImpl;
+class ConsumerImpl;
 
 /**
  * @brief Strongly typped size_t meant to represent the number of
@@ -91,6 +92,7 @@ class ThreadPool {
 
     friend class Producer;
     friend class ActiveBatchQueue;
+    friend class ConsumerImpl;
 };
 
 }

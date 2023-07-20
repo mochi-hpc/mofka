@@ -83,4 +83,28 @@ NumEvents NumEvents::Infinity() {
     return NumEvents{std::numeric_limits<size_t>::max()};
 }
 
+void ConsumerImpl::start() {
+    // for each target, submit a ULT that pulls from that target
+    auto n = m_targets.size();
+    m_pulling_ult_completed.resize(n);
+    for(size_t i=0; i < n; ++i) {
+        m_thread_pool.self->pushWork(
+            [this, i](){
+                pullFrom(m_targets[i], m_pulling_ult_completed[i]);
+        });
+    }
+}
+
+void ConsumerImpl::join() {
+    // wait for the ULTs to complete
+    for(auto& ev : m_pulling_ult_completed)
+        ev.wait();
+}
+
+void ConsumerImpl::pullFrom(const PartitionTargetInfo& target,
+                            thallium::eventual<void>& ev) {
+    // TODO
+    ev.set_value();
+}
+
 }
