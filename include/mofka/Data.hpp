@@ -81,8 +81,7 @@ class Data {
     private:
 
     /**
-     * @brief Constructor is private. Use one of the static functions
-     * to create a valid Data object.
+     * @brief Constructor is private.
      *
      * @param impl Pointer to implementation.
      */

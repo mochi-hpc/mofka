@@ -8,6 +8,7 @@
 
 #include <mofka/Metadata.hpp>
 #include <mofka/Data.hpp>
+#include <mofka/DataDescriptor.hpp>
 #include <functional>
 #include <exception>
 #include <stdexcept>
@@ -16,11 +17,11 @@ namespace mofka {
 
 /**
  * @brief DataBroker is the type of a function that takes the
- * Metadata of an event as well as the size of the associated data,
- * and returns a Data object indicating where in memory the data
+ * Metadata of an event as well as the DataDescriptor of the associated
+ * data, and returns a Data object indicating where in memory the data
  * of the event should be placed by the Consumer.
  */
-using DataBroker = std::function<Data(const Metadata&, size_t)>;
+using DataBroker = std::function<Data(const Metadata&, const DataDescriptor&)>;
 
 }
 

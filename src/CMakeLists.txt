@@ -10,6 +10,7 @@ set (client-src-files
      Producer.cpp
      Consumer.cpp
      Data.cpp
+     DataDescriptor.cpp
      Metadata.cpp
      Serializer.cpp
      TargetSelector.cpp
