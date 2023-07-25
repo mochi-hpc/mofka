@@ -31,7 +31,6 @@ RequestResult<EventID> DummyTopicManager::receiveBatch(
         thallium::bulk remote_bulk) {
     RequestResult<EventID> result;
 
-    std::cerr << "XXX " << num_events << " " << remote_bulk_size << " " << data_offset << std::endl;
     std::vector<char> buffer(remote_bulk_size);
     auto local_bulk = m_engine.expose(
         {{buffer.data(), buffer.size()}},

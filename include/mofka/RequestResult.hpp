@@ -88,8 +88,10 @@ class RequestResult {
     template<typename Archive>
     void serialize(Archive& a) {
         a & m_success;
-        a & m_error;
-        a & m_value;
+        if(m_success)
+            a & m_value;
+        else
+            a & m_error;
     }
 
     private:
@@ -184,7 +186,48 @@ class RequestResult<bool> {
     template<typename Archive>
     void serialize(Archive& a) {
         a & m_success;
-        a & m_error;
+        if(!m_success)
+            a & m_error;
+    }
+
+    private:
+
+    bool        m_success = true;
+    std::string m_error   = "";
+};
+
+template<>
+class RequestResult<void> {
+
+    public:
+
+    RequestResult() = default;
+    RequestResult(RequestResult&&) = default;
+    RequestResult(const RequestResult&) = default;
+    RequestResult& operator=(RequestResult&&) = default;
+    RequestResult& operator=(const RequestResult&) = default;
+
+    bool& success() {
+        return m_success;
+    }
+
+    const bool& success() const {
+        return m_success;
+    }
+
+    std::string& error() {
+        return m_error;
+    }
+
+    const std::string& error() const {
+        return m_error;
+    }
+
+    template<typename Archive>
+    void serialize(Archive& a) {
+        a & m_success;
+        if(!m_success)
+            a & m_error;
     }
 
     private:

@@ -26,6 +26,7 @@ class Producer;
 class TopicHandleImpl;
 class ClientImpl;
 class ServiceHandle;
+class ConsumerImpl;
 
 /**
  * @brief The PartitionTargetInfo structure holds information about
@@ -96,6 +97,7 @@ class PartitionTargetInfo {
     friend class ClientImpl;
     friend class Producer;
     friend class ServiceHandle;
+    friend class ConsumerImpl;
 };
 
 /**

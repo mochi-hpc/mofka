@@ -22,7 +22,11 @@
 
 namespace mofka {
 
-PIMPL_DEFINE_COMMON_FUNCTIONS(Producer);
+PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DTOR(Producer);
+
+Producer::~Producer() {
+    flush();
+}
 
 const std::string& Producer::name() const {
     return self->m_name;
