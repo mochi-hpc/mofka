@@ -33,4 +33,8 @@ bool ConsumerHandle::feed(
     return false;
 }
 
+void ConsumerHandleImpl::stop() {
+    // TODO
+}
+
 }

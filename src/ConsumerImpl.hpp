@@ -22,6 +22,7 @@ class ConsumerImpl {
     public:
 
     std::string                      m_name;
+    UUID                             m_uuid;
     BatchSize                        m_batch_size;
     ThreadPool                       m_thread_pool;
     DataBroker                       m_data_broker;
@@ -65,6 +66,7 @@ class ConsumerImpl {
                  std::vector<PartitionTargetInfo> targets,
                  std::shared_ptr<TopicHandleImpl> topic)
     : m_name(name)
+    , m_uuid(UUID::generate())
     , m_batch_size(batch_size)
     , m_thread_pool(std::move(thread_pool))
     , m_data_broker(std::move(broker))

@@ -17,6 +17,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <unordered_map>
 #include <tuple>
 
 #define FIND_TOPIC_BY_NAME(__var__, __name__) \
@@ -83,9 +84,13 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     AutoDeregisteringRPC m_send_batch;
     AutoDeregisteringRPC m_pull_events;
     AutoDeregisteringRPC m_ack_event;
+    AutoDeregisteringRPC m_remove_consumer;
     // TopicManagers
     std::unordered_map<std::string, std::shared_ptr<TopicManager>> m_topics_by_name;
     tl::mutex m_topics_mtx;
+    // Active consumers
+    std::unordered_map<UUID, std::shared_ptr<ConsumerHandleImpl>>  m_consumers;
+    tl::mutex                                                      m_consumers_mtx;
 
     ProviderImpl(const tl::engine& engine, uint16_t provider_id,
                  const rapidjson::Value& config, const tl::pool& pool)
@@ -97,6 +102,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_send_batch(define("mofka_send_batch",  &ProviderImpl::receiveBatch, pool))
     , m_pull_events(define("mofka_pull_events", &ProviderImpl::pullEvents, pool))
     , m_ack_event(define("mofka_ack_event", &ProviderImpl::acknowledge, pool))
+    , m_remove_consumer(define("mofka_remove_consumer", &ProviderImpl::removeConsumer, pool))
     {
         m_config.CopyFrom(config, m_config.GetAllocator(), true);
         if(m_config.HasMember("uuid") && m_config["uuid"].IsString()) {
@@ -215,7 +221,8 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
     void pullEvents(const tl::request& req,
                     const std::string& topic_name,
-                    intptr_t consumer_id,
+                    intptr_t consumer_ctx,
+                    const UUID& consumer_id,
                     const std::string& consumer_name,
                     size_t count,
                     size_t batch_size) {
@@ -224,8 +231,16 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
-            consumer_id, consumer_name, count);
+            consumer_ctx, consumer_name, count);
+        {
+            auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
+            m_consumers.emplace(consumer_id, consumer_handle_impl);
+        }
         result = topic->feedConsumer(consumer_handle_impl, BatchSize{batch_size});
+        {
+            auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
+            m_consumers.erase(consumer_id);
+        }
         spdlog::trace("[mofka:{}] Successfully executed pullEvents on topic {}", id(), topic_name);
     }
 
@@ -239,6 +254,25 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->acknowledge(consumer_name, eventID);
         spdlog::trace("[mofka:{}] Successfully executed acknowledge on topic {}", id(), topic_name);
+    }
+
+    void removeConsumer(const tl::request& req,
+                        const UUID& consumer_id) {
+        spdlog::trace("[mofka:{}] Received removeConsumer request", id());
+        RequestResult<void> result;
+        AutoResponse<decltype(result)> ensureResponse(req, result);
+        std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
+        {
+            auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
+            auto it = m_consumers.find(consumer_id);
+            if(it != m_consumers.end()) {
+                consumer_handle_impl = it->second;
+                m_consumers.erase(it);
+            }
+        }
+        if(consumer_handle_impl)
+            consumer_handle_impl->stop();
+        spdlog::trace("[mofka:{}] Successfully executed removeConsumer", id());
     }
 
 };

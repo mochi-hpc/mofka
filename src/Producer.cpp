@@ -110,6 +110,7 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
 }
 
 void Producer::flush() {
+    if(!self) return;
     {
         std::unique_lock<thallium::mutex> guard_posted_ults{self->m_num_posted_ults_mtx};
         self->m_num_posted_ults_cv.wait(

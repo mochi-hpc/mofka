@@ -105,9 +105,13 @@ void ConsumerImpl::pullFrom(const PartitionTargetInfo& target,
                             thallium::eventual<void>& ev) {
     auto& rpc = m_topic->m_service->m_client->m_pull_events;
     auto& ph = target.self->m_ph;
-    auto consumer_id = reinterpret_cast<intptr_t>(this);
+    auto consumer_ctx = reinterpret_cast<intptr_t>(this);
     RequestResult<void> result =
-        rpc.on(ph)(m_topic->m_name, consumer_id, m_name, 0, 0);
+        rpc.on(ph)(m_topic->m_name,
+                   consumer_ctx,
+                   m_uuid,
+                   m_name,
+                   0, 0);
     // TODO use max_item, batch_size (and some more options)
     ev.set_value();
 }
