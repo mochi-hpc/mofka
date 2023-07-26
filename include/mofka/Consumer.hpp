@@ -26,7 +26,6 @@
 namespace mofka {
 
 class TopicHandle;
-class ActiveBatchQueue;
 class ConsumerImpl;
 
 /**
@@ -35,7 +34,6 @@ class ConsumerImpl;
 class Consumer {
 
     friend class TopicHandle;
-    friend class ActiveBatchQueue;
 
     public:
 

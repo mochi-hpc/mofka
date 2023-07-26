@@ -9,7 +9,9 @@
 #include <mofka/RequestResult.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Json.hpp>
+#include <mofka/BatchSize.hpp>
 #include <mofka/EventID.hpp>
+#include <mofka/ConsumerHandle.hpp>
 #include <thallium.hpp>
 #include <unordered_map>
 #include <string_view>
@@ -104,6 +106,32 @@ class TopicManager {
         size_t remote_bulk_size,
         size_t data_offset,
         thallium::bulk remote_bulk) = 0;
+
+    /**
+     * @brief Attach a ConsumerHandle to the topic, i.e. make the
+     * TopicManager feed the ConsumerHandle batches of events.
+     *
+     * The feedConsumer function should keep feeding the ConsumerHandle
+     * with events (blocking if there is no new events yet) until its
+     * feed() function returns false.
+     *
+     * Multiple ConsumderHandle may be fed in parallel. The TopicManager
+     * is responsible for feeding each event only once.
+     *
+     * @param consumerHandle ConsumerHandle to feed event batches.
+     * @param bathSize batch size requested by the consumer.
+     */
+    virtual RequestResult<void> feedConsumer(
+        ConsumerHandle consumerHandle,
+        BatchSize batchSize) = 0;
+
+    /**
+     * @brief Acknowledge that the specified consumer has consumed
+     * events up to and including the specified event ID.
+     */
+    virtual RequestResult<void> acknowledge(
+        std::string_view consumer_name,
+        EventID event_id) = 0;
 
     /**
      * @brief Destroys the underlying topic.

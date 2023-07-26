@@ -107,8 +107,8 @@ void ConsumerImpl::pullFrom(const PartitionTargetInfo& target,
     auto& ph = target.self->m_ph;
     auto consumer_id = reinterpret_cast<intptr_t>(this);
     RequestResult<void> result =
-        rpc.on(ph)(consumer_id, m_topic->m_name, m_name, 0);
-    // TODO use max_item, batch_size, and some more options
+        rpc.on(ph)(m_topic->m_name, consumer_id, m_name, 0, 0);
+    // TODO use max_item, batch_size (and some more options)
     ev.set_value();
 }
 

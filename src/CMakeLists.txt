@@ -9,6 +9,7 @@ set (client-src-files
      TopicHandle.cpp
      Producer.cpp
      Consumer.cpp
+     ConsumerHandle.cpp
      Data.cpp
      DataDescriptor.cpp
      Metadata.cpp

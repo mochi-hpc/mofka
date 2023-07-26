@@ -7,6 +7,7 @@
 #define MOFKA_PROVIDER_IMPL_H
 
 #include "mofka/TopicManager.hpp"
+#include "ConsumerHandleImpl.hpp"
 #include "mofka/UUID.hpp"
 #include "MetadataImpl.hpp"
 
@@ -81,6 +82,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     // RPCs for TopicManagers
     AutoDeregisteringRPC m_send_batch;
     AutoDeregisteringRPC m_pull_events;
+    AutoDeregisteringRPC m_ack_event;
     // TopicManagers
     std::unordered_map<std::string, std::shared_ptr<TopicManager>> m_topics_by_name;
     tl::mutex m_topics_mtx;
@@ -94,6 +96,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_open_topic(define("mofka_open_topic", &ProviderImpl::openTopic, pool))
     , m_send_batch(define("mofka_send_batch",  &ProviderImpl::receiveBatch, pool))
     , m_pull_events(define("mofka_pull_events", &ProviderImpl::pullEvents, pool))
+    , m_ack_event(define("mofka_ack_event", &ProviderImpl::acknowledge, pool))
     {
         m_config.CopyFrom(config, m_config.GetAllocator(), true);
         if(m_config.HasMember("uuid") && m_config["uuid"].IsString()) {
@@ -211,15 +214,31 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     }
 
     void pullEvents(const tl::request& req,
-                    intptr_t consumer_id,
                     const std::string& topic_name,
+                    intptr_t consumer_id,
                     const std::string& consumer_name,
-                    size_t count) {
+                    size_t count,
+                    size_t batch_size) {
         spdlog::trace("[mofka:{}] Received pullEvents request for topic {}", id(), topic_name);
         RequestResult<void> result;
-        // TODO
-        req.respond(result);
+        AutoResponse<decltype(result)> ensureResponse(req, result);
+        FIND_TOPIC_BY_NAME(topic, topic_name);
+        auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
+            consumer_id, consumer_name, count);
+        result = topic->feedConsumer(consumer_handle_impl, BatchSize{batch_size});
         spdlog::trace("[mofka:{}] Successfully executed pullEvents on topic {}", id(), topic_name);
+    }
+
+    void acknowledge(const tl::request& req,
+                     const std::string& topic_name,
+                     const std::string& consumer_name,
+                     EventID eventID) {
+        spdlog::trace("[mofka:{}] Received acknoweldge request for topic {}", id(), topic_name);
+        RequestResult<void> result;
+        AutoResponse<decltype(result)> ensureResponse(req, result);
+        FIND_TOPIC_BY_NAME(topic, topic_name);
+        result = topic->acknowledge(consumer_name, eventID);
+        spdlog::trace("[mofka:{}] Successfully executed acknowledge on topic {}", id(), topic_name);
     }
 
 };

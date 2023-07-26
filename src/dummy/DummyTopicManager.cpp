@@ -29,6 +29,7 @@ RequestResult<EventID> DummyTopicManager::receiveBatch(
         size_t remote_bulk_size,
         size_t data_offset,
         thallium::bulk remote_bulk) {
+    (void)producer_name;
     RequestResult<EventID> result;
 
     std::vector<char> buffer(remote_bulk_size);
@@ -51,6 +52,27 @@ RequestResult<EventID> DummyTopicManager::receiveBatch(
     }
 
     result.value() = first_id;
+    return result;
+}
+
+RequestResult<void> DummyTopicManager::feedConsumer(
+    ConsumerHandle consumerHandle,
+    BatchSize batchSize) {
+    RequestResult<void> result;
+    // TODO
+    std::cout << "DummyTopicManager::feedConsumer" << std::endl;
+    (void)consumerHandle;
+    (void)batchSize;
+    return result;
+}
+
+RequestResult<void> DummyTopicManager::acknowledge(
+    std::string_view consumer_name,
+    EventID event_id) {
+    RequestResult<void> result;
+    (void)event_id;
+    (void)consumer_name;
+    // TODO
     return result;
 }
 

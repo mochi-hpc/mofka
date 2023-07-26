@@ -98,13 +98,27 @@ class DummyTopicManager : public mofka::TopicManager {
     /**
      * @brief Receives a batch.
      */
-    mofka::RequestResult<EventID> receiveBatch(
+    RequestResult<EventID> receiveBatch(
             const thallium::endpoint& sender,
             const std::string& producer_name,
             size_t num_events,
             size_t remote_bulk_size,
             size_t data_offset,
             thallium::bulk remote_bulk) override;
+
+    /**
+     * @see TopicManager::feedConsumer.
+     */
+    RequestResult<void> feedConsumer(
+            ConsumerHandle consumerHandle,
+            BatchSize batchSize) override;
+
+    /**
+     * @see TopicManager::acknowledge.
+     */
+    RequestResult<void> acknowledge(
+          std::string_view consumer_name,
+          EventID event_id) override;
 
     /**
      * @brief Destroys the underlying topic.
