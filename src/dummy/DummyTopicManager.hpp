@@ -10,21 +10,6 @@
 
 namespace mofka {
 
-struct DummyEvent {
-    std::string metadata;
-    std::string data;
-
-    DummyEvent(const char* md, size_t metadata_size,
-               const char* d, size_t data_size)
-    : metadata{md, metadata_size}
-    , data{d, data_size} {}
-
-    DummyEvent(const DummyEvent&) = default;
-    DummyEvent(DummyEvent&&) = default;
-    DummyEvent& operator=(const DummyEvent&) = default;
-    DummyEvent& operator=(DummyEvent&&) = default;
-};
-
 /**
  * Dummy implementation of a mofka TopicManager.
  */
@@ -36,7 +21,18 @@ class DummyTopicManager : public mofka::TopicManager {
     Metadata m_serializer;
 
     thallium::engine        m_engine;
-    std::vector<DummyEvent> m_events;
+
+    std::vector<char>       m_events_metadata;
+    std::vector<size_t>     m_events_metadata_offsets;
+    std::vector<size_t>     m_events_metadata_sizes;
+    std::vector<char>       m_events_data;
+    std::vector<size_t>     m_events_data_offsets;
+    std::vector<size_t>     m_events_data_sizes;
+    thallium::mutex         m_events_mtx;
+
+    /* mapping from a consumer name to the last acknowledged eventID */
+    std::unordered_map<std::string, EventID> m_last_ack;
+    thallium::mutex                          m_last_ack_mtx;
 
     public:
 
@@ -102,9 +98,8 @@ class DummyTopicManager : public mofka::TopicManager {
             const thallium::endpoint& sender,
             const std::string& producer_name,
             size_t num_events,
-            size_t remote_bulk_size,
-            size_t data_offset,
-            thallium::bulk remote_bulk) override;
+            const BulkRef& metadata_bulk,
+            const BulkRef& data_bulk) override;
 
     /**
      * @see TopicManager::feedConsumer.

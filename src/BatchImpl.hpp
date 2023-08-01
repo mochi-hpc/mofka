@@ -9,6 +9,7 @@
 #include <thallium.hpp>
 #include <mutex>
 #include <queue>
+#include "mofka/BulkRef.hpp"
 #include "mofka/RequestResult.hpp"
 #include "mofka/EventID.hpp"
 #include "mofka/Metadata.hpp"
@@ -99,12 +100,19 @@ class BatchImpl {
         m_promises.push_back(std::move(promise));
     }
 
-    thallium::bulk expose(thallium::engine engine) {
+    thallium::bulk exposeMetadata(thallium::engine engine) {
         if(count() == 0) return thallium::bulk{};
         std::vector<std::pair<void *, size_t>> segments;
-        segments.reserve(3 + m_data_segments.size());
+        segments.reserve(2);
         segments.emplace_back(m_meta_sizes.data(), m_meta_sizes.size()*sizeof(m_meta_sizes[0]));
         segments.emplace_back(m_meta_buffer.data(), m_meta_buffer.size()*sizeof(m_meta_buffer[0]));
+        return engine.expose(segments, thallium::bulk_mode::read_only);
+    }
+
+    thallium::bulk exposeData(thallium::engine engine) {
+        if(count() == 0) return thallium::bulk{};
+        std::vector<std::pair<void *, size_t>> segments;
+        segments.reserve(1 + m_data_segments.size());
         segments.emplace_back(m_data_sizes.data(), m_data_sizes.size()*sizeof(m_data_sizes[0]));
         for(const auto& seg : m_data_segments) {
             if(!seg.size) continue;
@@ -117,14 +125,12 @@ class BatchImpl {
         return m_meta_sizes.size();
     }
 
-    size_t totalSize() const {
-        return count()*2*sizeof(size_t) + m_meta_buffer.size()
-             + m_total_data_size;
+    size_t metadataBulkSize() const {
+        return count()*sizeof(size_t) + m_meta_buffer.size();
     }
 
-    size_t dataOffset() const {
-        return m_meta_sizes.size()*sizeof(m_meta_sizes[0])
-             + m_meta_buffer.size()*sizeof(m_meta_buffer[0]);
+    size_t dataBulkSize() const {
+        return count()*sizeof(size_t) + m_total_data_size;
     }
 };
 
@@ -231,9 +237,10 @@ class ActiveBatchQueue {
     }
 
     void sendBatch(const std::shared_ptr<BatchImpl>& batch) {
-        thallium::bulk content;
+        thallium::bulk metadata_content, data_content;
         try {
-            content = batch->expose(m_client->m_engine);
+            metadata_content = batch->exposeMetadata(m_client->m_engine);
+            data_content = batch->exposeData(m_client->m_engine);
         } catch(const std::exception& ex) {
             batch->setPromises(
                 Exception{fmt::format(
@@ -243,13 +250,13 @@ class ActiveBatchQueue {
         try {
             auto ph = m_target->m_ph;
             auto rpc = m_client->m_send_batch;
+            auto self_addr = static_cast<std::string>(m_client->m_engine.self());
             RequestResult<EventID> result = rpc.on(ph)(
                 m_topic_name,
                 m_producer_name,
                 batch->count(),
-                batch->totalSize(),
-                batch->dataOffset(),
-                content);
+                BulkRef{metadata_content, 0, batch->metadataBulkSize(), self_addr},
+                BulkRef{data_content, 0, batch->dataBulkSize(), self_addr});
             if(result.success())
                 batch->setPromises(result.value());
             else

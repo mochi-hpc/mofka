@@ -85,17 +85,17 @@ class TopicManager {
      *
      * @param producer_name Name of the producer.
      * @param num_events Number of events sent.
-     * @param remote_bulk_size Total size of the remote_bulk.
-     * @param data_offset Offset at which the data part
-     *                    of the events start in the remote_bulk.
-     * @param remote_bulk Bulk handle to the remote metadata+data.
+     * @param metadata_bulk_size Total size of the bulk handle holding metadata and sizes.
+     * @param metadata_bulk_offset Offset at which to start in the bulk handle.
+     * @param metadata_bulk Bulk handle holding metadata sizes and metadata.
+     * @param data_bulk_size Total size of the bulk handle holding data and sizes.
+     * @param data_bulk_offset Offset at which to start in the bulk handle.
+     * @param data_bulk Bulk handle holding data sizes and metadata.
      *
-     * The remote_bulk is formatted to expose the metadata and data
+     * The bulk handles are formatted to expose the metadata and data
      * as follows. If N is the number of events, then:
-     * - the first N*sizeof(size_t) bytes contain metadata sizes;
-     * - the next S bytes (sum of the above sizes) contain the metadata;
-     * - the next N*sizeof(size_t) bytes contain data sizes;
-     * - the next D bytes (sum of the above sizes) contain the data.
+     * - the first N*sizeof(size_t) bytes contain metadata/data sizes;
+     * - the next S bytes (sum of the above sizes) contain the metadata/data content.
      *
      * @return a RequestResult containing the result.
      */
@@ -103,9 +103,8 @@ class TopicManager {
         const thallium::endpoint& sender,
         const std::string& producer_name,
         size_t num_events,
-        size_t remote_bulk_size,
-        size_t data_offset,
-        thallium::bulk remote_bulk) = 0;
+        const BulkRef& metadata_bulk,
+        const BulkRef& data_bulk) = 0;
 
     /**
      * @brief Attach a ConsumerHandle to the topic, i.e. make the

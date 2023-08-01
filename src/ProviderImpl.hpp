@@ -208,14 +208,14 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                       const std::string& topic_name,
                       const std::string& producer_name,
                       size_t count,
-                      size_t total_size,
-                      size_t data_offset,
-                      tl::bulk content) {
+                      const BulkRef& metadata,
+                      const BulkRef& data) {
         spdlog::trace("[mofka:{}] Received receiveBatch request for topic {}", id(), topic_name);
         RequestResult<EventID> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
-        result = topic->receiveBatch(req.get_endpoint(), producer_name, count, total_size, data_offset, content);
+        result = topic->receiveBatch(
+            req.get_endpoint(), producer_name, count, metadata, data);
         spdlog::trace("[mofka:{}] Successfully executed receiveBatch on topic {}", id(), topic_name);
     }
 
