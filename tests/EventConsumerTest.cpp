@@ -19,7 +19,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
     auto gid = server.getSSGManager().getGroup("mofka_group")->getHandle<uint64_t>();
     auto engine = server.getMargoManager().getThalliumEngine();
 
-    SECTION("Initialize a Client and a ServiceHandle and create/open a topic") {
+    SECTION("Producer/consumer") {
         auto client = mofka::Client{engine};
         REQUIRE(static_cast<bool>(client));
         auto sh = client.connect(mofka::SSGGroupID{gid});
@@ -30,7 +30,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
 
-        SECTION("Create a producer and produce a bunch of events") {
+        {
             auto producer = topic.producer();
             REQUIRE(static_cast<bool>(producer));
             for(unsigned i=0; i < 100; ++i) {
@@ -41,7 +41,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
             }
         }
 
-        SECTION("Create a consumer and pull events from it") {
+        {
             auto consumer = topic.consumer("myconsumer");
             REQUIRE(static_cast<bool>(consumer));
         }

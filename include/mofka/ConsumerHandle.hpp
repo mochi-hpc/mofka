@@ -80,6 +80,11 @@ class ConsumerHandle {
               const BulkRef& data_desc);
 
     /**
+     * @brief Check if we should stop feeding the ConsumerHandle.
+     */
+    bool shouldStop() const;
+
+    /**
      * @brief Checks if the ConsumerHandle instance is valid.
      */
     operator bool() const;

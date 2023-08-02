@@ -18,6 +18,10 @@ const std::string& ConsumerHandle::name() const {
     return self->m_consumer_name;
 }
 
+bool ConsumerHandle::shouldStop() const {
+    return self->m_should_stop;
+}
+
 bool ConsumerHandle::feed(
     size_t count,
     const BulkRef &metadata_sizes,
@@ -30,11 +34,12 @@ bool ConsumerHandle::feed(
     (void)metadata;
     (void)data_desc_sizes;
     (void)data_desc;
-    return false;
+    std::cerr << "FEED" << std::endl;
+    return self->m_should_stop;
 }
 
 void ConsumerHandleImpl::stop() {
-    // TODO
+    m_should_stop = true;
 }
 
 }

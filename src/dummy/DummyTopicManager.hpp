@@ -15,24 +15,29 @@ namespace mofka {
  */
 class DummyTopicManager : public mofka::TopicManager {
 
+    struct OffsetSize {
+        size_t offset;
+        size_t size;
+    };
+
     Metadata m_config;
     Metadata m_validator;
     Metadata m_selector;
     Metadata m_serializer;
 
-    thallium::engine        m_engine;
+    thallium::engine m_engine;
 
-    std::vector<char>       m_events_metadata;
-    std::vector<size_t>     m_events_metadata_offsets;
-    std::vector<size_t>     m_events_metadata_sizes;
-    std::vector<char>       m_events_data;
-    std::vector<size_t>     m_events_data_offsets;
-    std::vector<size_t>     m_events_data_sizes;
-    thallium::mutex         m_events_mtx;
+    std::vector<char>            m_events_metadata;
+    std::vector<size_t>          m_events_metadata_offsets;
+    std::vector<size_t>          m_events_metadata_sizes;
+    std::vector<char>            m_events_data;
+    std::vector<size_t>          m_events_data_offsets;
+    std::vector<size_t>          m_events_data_sizes;
+    thallium::mutex              m_events_mtx;
+    thallium::condition_variable m_events_cv;
 
-    /* mapping from a consumer name to the last acknowledged eventID */
-    std::unordered_map<std::string, EventID> m_last_ack;
-    thallium::mutex                          m_last_ack_mtx;
+    std::unordered_map<std::string, EventID> m_consumer_cursor;
+    thallium::mutex                          m_consumer_cursor_mtx;
 
     public:
 
@@ -100,6 +105,11 @@ class DummyTopicManager : public mofka::TopicManager {
             size_t num_events,
             const BulkRef& metadata_bulk,
             const BulkRef& data_bulk) override;
+
+    /**
+     * @brief Wake up the TopicManager's blocked ConsumerHandles.
+     */
+    void wakeUp() override;
 
     /**
      * @see TopicManager::feedConsumer.

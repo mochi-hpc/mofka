@@ -107,6 +107,12 @@ class TopicManager {
         const BulkRef& data_bulk) = 0;
 
     /**
+     * @brief This function is used to wake up the topic manager to make
+     * if check again the shouldStop() function of blocked ConsumerHandles.
+     */
+    virtual void wakeUp() = 0;
+
+    /**
      * @brief Attach a ConsumerHandle to the topic, i.e. make the
      * TopicManager feed the ConsumerHandle batches of events.
      *

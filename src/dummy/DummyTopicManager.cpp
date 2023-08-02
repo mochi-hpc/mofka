@@ -32,7 +32,6 @@ RequestResult<EventID> DummyTopicManager::receiveBatch(
 {
     (void)producer_name;
     RequestResult<EventID> result;
-
     EventID first_id;
     // transfer the metadata
     {
@@ -97,9 +96,13 @@ RequestResult<EventID> DummyTopicManager::receiveBatch(
             data_offset += m_events_data_sizes[i];
         }
     }
-    m_last_ack_cv.notify_all();
+    m_events_cv.notify_all();
     result.value() = first_id;
     return result;
+}
+
+void DummyTopicManager::wakeUp() {
+    m_events_cv.notify_all();
 }
 
 RequestResult<void> DummyTopicManager::feedConsumer(
@@ -107,36 +110,75 @@ RequestResult<void> DummyTopicManager::feedConsumer(
     BatchSize batchSize) {
     RequestResult<void> result;
 
+    if(batchSize.value == 0)
+        batchSize = BatchSize::Adaptive();
     EventID first_id;
     {
-        auto g = std::unique_lock<thallium::mutex>{m_last_ack_mtx};
-        first_id = m_last_ack[consumerHandle.name()];
+        auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
+        first_id = m_consumer_cursor[consumerHandle.name()];
     }
 
+    auto self_addr = static_cast<std::string>(m_engine.self());
     {
         auto g = std::unique_lock<thallium::mutex>{m_events_mtx};
-        // find the number of events we can send
-        size_t max_available_events = m_events_metadata_sizes.size() - first_id;
-        size_t num_events_to_send =
-            batchSize.value == 0 ? max_available_events
-            : std::min(batchSize.value, max_available_events);
-        // TODO wait for events if there is none
+        while(true) {
+            size_t num_events_to_send;
+            bool should_stop = false;
+            while(true) {
+                // find the number of events we can send
+                size_t max_available_events = m_events_metadata_sizes.size() - first_id;
+                num_events_to_send = std::min(batchSize.value, max_available_events);
+                should_stop = consumerHandle.shouldStop();
+                if(num_events_to_send != 0 || should_stop) break;
+                m_events_cv.wait(g);
+            }
+            if(should_stop) break;
 
-        // find the range of metadata sizes
-        const auto metadata_sizes_ptr = m_events_metadata_sizes.data() + first_id;
-        // find the metadata content
-        const auto metadata_ptr = m_events_metadata.data() + m_events_metadata_offsets[first_id];
-        const auto metadata_size = std::accumulate(
-            metadata_sizes_ptr, metadata_sizes_ptr + num_events_to_send, (size_t)0);
-        // create a BulkRef for the metadata
-        auto metadata_bulk = m_engine.expose(
-            {{metadata_sizes_ptr, num_events_to_send*sizeof(size_t)},
-             {metadata_ptr, metadata_size}}, thallium::bulk_mode::read_only);
-        auto metadata = BulkRef{
-            metadata_bulk, 0, num_events_to_send*sizeof(size_t) + metadata_size, m_engine.self()
-        };
+            // find the range of metadata sizes
+            const auto metadata_sizes_ptr = m_events_metadata_sizes.data() + first_id;
+            // find the metadata content
+            const auto metadata_ptr = m_events_metadata.data() + m_events_metadata_offsets[first_id];
+            const auto metadata_size = std::accumulate(
+                    metadata_sizes_ptr, metadata_sizes_ptr + num_events_to_send, (size_t)0);
+            // create the BulkRefs for the metadata
+            auto metadata_bulk = m_engine.expose(
+                    {{metadata_sizes_ptr, num_events_to_send*sizeof(size_t)},
+                    {metadata_ptr, metadata_size}}, thallium::bulk_mode::read_only);
+            auto metadata_size_bulk_ref = BulkRef{
+                metadata_bulk, 0, num_events_to_send*sizeof(size_t), self_addr
+            };
+            auto metadata_bulk_ref = BulkRef{
+                metadata_bulk, num_events_to_send*sizeof(size_t), metadata_size, self_addr
+            };
 
-        // TODO create a BulkRef for data descriptors
+            std::vector<OffsetSize> data_descriptors(num_events_to_send);
+            std::vector<size_t>     data_descriptors_sizes(num_events_to_send, sizeof(OffsetSize));
+            for(size_t i = 0; i < num_events_to_send; ++i) {
+                data_descriptors[i].offset = m_events_data_offsets[first_id + i];
+                data_descriptors[i].size   = m_events_data_sizes[first_id + i];
+            }
+            auto data_descriptors_bulk = m_engine.expose(
+                    {{data_descriptors_sizes.data(), data_descriptors_sizes.size()*sizeof(size_t)},
+                    {data_descriptors.data(), data_descriptors.size()*sizeof(OffsetSize)}},
+                    thallium::bulk_mode::read_only);
+            // create the BulkRefs for the data descriptors
+            auto data_desc_size_bulk_ref = BulkRef{
+                data_descriptors_bulk, 0, num_events_to_send*sizeof(size_t), self_addr
+            };
+            auto data_desc_bulk_ref = BulkRef{
+                data_descriptors_bulk, num_events_to_send*sizeof(size_t), num_events_to_send*sizeof(OffsetSize), self_addr
+            };
+            // feed consumer
+            bool c = consumerHandle.feed(
+                    num_events_to_send,
+                    metadata_size_bulk_ref,
+                    metadata_bulk_ref,
+                    data_desc_size_bulk_ref,
+                    data_desc_bulk_ref);
+            should_stop = !c;
+            if(should_stop)
+                break;
+        }
     }
 
     return result;
@@ -146,16 +188,16 @@ RequestResult<void> DummyTopicManager::acknowledge(
     std::string_view consumer_name,
     EventID event_id) {
     RequestResult<void> result;
-    (void)event_id;
-    (void)consumer_name;
-    // TODO
+    auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
+    std::string consumer_name_str{consumer_name.data(), consumer_name.size()};
+    m_consumer_cursor[consumer_name_str] = event_id + 1;
     return result;
 }
 
 RequestResult<bool> DummyTopicManager::destroy() {
     RequestResult<bool> result;
+    // TODO wait for all the consumers to be done consuming
     result.value() = true;
-    // or result.success() = true
     return result;
 }
 

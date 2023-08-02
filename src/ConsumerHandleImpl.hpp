@@ -20,6 +20,7 @@ class ConsumerHandleImpl {
     const intptr_t    m_consumer_ctx;
     const std::string m_consumer_name;
     const size_t      m_max_events;
+    std::atomic<bool> m_should_stop = false;
 
     size_t m_sent_events = 0;
 
