@@ -249,7 +249,7 @@ class ActiveBatchQueue {
         }
         try {
             auto ph = m_target->m_ph;
-            auto rpc = m_client->m_send_batch;
+            auto rpc = m_client->m_producer_send_batch;
             auto self_addr = static_cast<std::string>(m_client->m_engine.self());
             RequestResult<EventID> result = rpc.on(ph)(
                 m_topic_name,

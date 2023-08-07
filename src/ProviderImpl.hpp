@@ -81,10 +81,10 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     AutoDeregisteringRPC m_create_topic;
     AutoDeregisteringRPC m_open_topic;
     // RPCs for TopicManagers
-    AutoDeregisteringRPC m_send_batch;
-    AutoDeregisteringRPC m_pull_events;
-    AutoDeregisteringRPC m_ack_event;
-    AutoDeregisteringRPC m_remove_consumer;
+    AutoDeregisteringRPC m_producer_send_batch;
+    AutoDeregisteringRPC m_consumer_request_events;
+    AutoDeregisteringRPC m_consumer_ack_event;
+    AutoDeregisteringRPC m_consumer_remove_consumer;
     // TopicManagers
     std::unordered_map<std::string, std::shared_ptr<TopicManager>> m_topics_by_name;
     tl::mutex m_topics_mtx;
@@ -100,10 +100,10 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_pool(pool)
     , m_create_topic(define("mofka_create_topic", &ProviderImpl::createTopic, pool))
     , m_open_topic(define("mofka_open_topic", &ProviderImpl::openTopic, pool))
-    , m_send_batch(define("mofka_send_batch",  &ProviderImpl::receiveBatch, pool))
-    , m_pull_events(define("mofka_pull_events", &ProviderImpl::pullEvents, pool))
-    , m_ack_event(define("mofka_ack_event", &ProviderImpl::acknowledge, pool))
-    , m_remove_consumer(define("mofka_remove_consumer", &ProviderImpl::removeConsumer, pool))
+    , m_producer_send_batch(define("mofka_producer_send_batch",  &ProviderImpl::receiveBatch, pool))
+    , m_consumer_request_events(define("mofka_consumer_request_events", &ProviderImpl::requestEvents, pool))
+    , m_consumer_ack_event(define("mofka_consumer_ack_event", &ProviderImpl::acknowledge, pool))
+    , m_consumer_remove_consumer(define("mofka_consumer_remove_consumer", &ProviderImpl::removeConsumer, pool))
     {
         m_config.CopyFrom(config, m_config.GetAllocator(), true);
         if(m_config.HasMember("uuid") && m_config["uuid"].IsString()) {
@@ -220,14 +220,14 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Successfully executed receiveBatch on topic {}", id(), topic_name);
     }
 
-    void pullEvents(const tl::request& req,
-                    const std::string& topic_name,
-                    intptr_t consumer_ctx,
-                    const UUID& consumer_id,
-                    const std::string& consumer_name,
-                    size_t count,
-                    size_t batch_size) {
-        spdlog::trace("[mofka:{}] Received pullEvents request for topic {}", id(), topic_name);
+    void requestEvents(const tl::request& req,
+                       const std::string& topic_name,
+                       intptr_t consumer_ctx,
+                       const UUID& consumer_id,
+                       const std::string& consumer_name,
+                       size_t count,
+                       size_t batch_size) {
+        spdlog::trace("[mofka:{}] Received requestEvents request for topic {}", id(), topic_name);
         RequestResult<void> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
@@ -243,7 +243,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             m_consumers.erase(consumer_id);
         }
-        spdlog::trace("[mofka:{}] Successfully executed pullEvents on topic {}", id(), topic_name);
+        spdlog::trace("[mofka:{}] Successfully executed requestEvents on topic {}", id(), topic_name);
     }
 
     void acknowledge(const tl::request& req,

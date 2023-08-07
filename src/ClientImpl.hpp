@@ -25,18 +25,18 @@ class ClientImpl {
     tl::remote_procedure m_create_topic;
     tl::remote_procedure m_open_topic;
     tl::remote_procedure m_get_uuid;
-    tl::remote_procedure m_send_batch;
-    tl::remote_procedure m_pull_events;
-    tl::remote_procedure m_remove_consumer;
+    tl::remote_procedure m_producer_send_batch;
+    tl::remote_procedure m_consumer_request_events;
+    tl::remote_procedure m_consumer_remove_consumer;
     bedrock::Client      m_bedrock_client;
 
     ClientImpl(const tl::engine& engine)
     : m_engine(engine)
     , m_create_topic(m_engine.define("mofka_create_topic"))
     , m_open_topic(m_engine.define("mofka_open_topic"))
-    , m_send_batch(m_engine.define("mofka_send_batch"))
-    , m_pull_events(m_engine.define("mofka_pull_events"))
-    , m_remove_consumer(m_engine.define("mofka_remove_consumer"))
+    , m_producer_send_batch(m_engine.define("mofka_producer_send_batch"))
+    , m_consumer_request_events(m_engine.define("mofka_consumer_request_events"))
+    , m_consumer_remove_consumer(m_engine.define("mofka_consumer_remove_consumer"))
     , m_bedrock_client(m_engine)
     {}
 

@@ -97,7 +97,7 @@ void ConsumerImpl::start() {
 
 void ConsumerImpl::join() {
     // send a message to all the targets requesting to disconnect
-    auto& rpc = m_topic->m_service->m_client->m_remove_consumer;
+    auto& rpc = m_topic->m_service->m_client->m_consumer_remove_consumer;
     for(auto& target : m_targets) {
         auto& ph = target.self->m_ph;
         rpc.on(ph)(m_uuid);
@@ -109,7 +109,7 @@ void ConsumerImpl::join() {
 
 void ConsumerImpl::pullFrom(const PartitionTargetInfo& target,
                             thallium::eventual<void>& ev) {
-    auto& rpc = m_topic->m_service->m_client->m_pull_events;
+    auto& rpc = m_topic->m_service->m_client->m_consumer_request_events;
     auto& ph = target.self->m_ph;
     auto consumer_ctx = reinterpret_cast<intptr_t>(this);
     RequestResult<void> result =
