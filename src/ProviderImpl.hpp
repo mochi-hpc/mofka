@@ -85,6 +85,8 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     AutoDeregisteringRPC m_consumer_request_events;
     AutoDeregisteringRPC m_consumer_ack_event;
     AutoDeregisteringRPC m_consumer_remove_consumer;
+    /* RPC for Consumers */
+    thallium::remote_procedure m_consumer_recv_batch;
     // TopicManagers
     std::unordered_map<std::string, std::shared_ptr<TopicManager>> m_topics_by_name;
     tl::mutex m_topics_mtx;
@@ -104,6 +106,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_consumer_request_events(define("mofka_consumer_request_events", &ProviderImpl::requestEvents, pool))
     , m_consumer_ack_event(define("mofka_consumer_ack_event", &ProviderImpl::acknowledge, pool))
     , m_consumer_remove_consumer(define("mofka_consumer_remove_consumer", &ProviderImpl::removeConsumer, pool))
+    , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch"))
     {
         m_config.CopyFrom(config, m_config.GetAllocator(), true);
         if(m_config.HasMember("uuid") && m_config["uuid"].IsString()) {
@@ -232,7 +235,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
-            consumer_ctx, consumer_name, count, topic);
+            consumer_ctx, consumer_name, count, topic, req.get_endpoint(), m_consumer_recv_batch);
         {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             m_consumers.emplace(consumer_id, consumer_handle_impl);

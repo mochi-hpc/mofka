@@ -11,6 +11,7 @@
 #include "PimplUtil.hpp"
 #include "ClientImpl.hpp"
 #include "TopicHandleImpl.hpp"
+#include "ConsumerImpl.hpp"
 
 #include <thallium/serialization/stl/string.hpp>
 #include <utility>
@@ -84,6 +85,12 @@ const rapidjson::Value& Client::getConfig() const {
     // TODO
     static rapidjson::Value config;
     return config;
+}
+
+void ClientImpl::forwardBatchToConsumer(const thallium::request& req) {
+    RequestResult<void> result;
+
+    req.respond(result);
 }
 
 }
