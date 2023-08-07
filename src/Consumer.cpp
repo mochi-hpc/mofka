@@ -96,6 +96,12 @@ void ConsumerImpl::start() {
 }
 
 void ConsumerImpl::join() {
+    // send a message to all the targets requesting to disconnect
+    auto& rpc = m_topic->m_service->m_client->m_remove_consumer;
+    for(auto& target : m_targets) {
+        auto& ph = target.self->m_ph;
+        rpc.on(ph)(m_uuid);
+    }
     // wait for the ULTs to complete
     for(auto& ev : m_pulling_ult_completed)
         ev.wait();

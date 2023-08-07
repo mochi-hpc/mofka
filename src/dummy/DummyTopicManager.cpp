@@ -121,7 +121,7 @@ RequestResult<void> DummyTopicManager::feedConsumer(
     auto self_addr = static_cast<std::string>(m_engine.self());
     {
         auto g = std::unique_lock<thallium::mutex>{m_events_mtx};
-        while(true) {
+        while(!consumerHandle.shouldStop()) {
             size_t num_events_to_send;
             bool should_stop = false;
             while(true) {
@@ -169,15 +169,14 @@ RequestResult<void> DummyTopicManager::feedConsumer(
                 data_descriptors_bulk, num_events_to_send*sizeof(size_t), num_events_to_send*sizeof(OffsetSize), self_addr
             };
             // feed consumer
-            bool c = consumerHandle.feed(
+            consumerHandle.feed(
                     num_events_to_send,
                     metadata_size_bulk_ref,
                     metadata_bulk_ref,
                     data_desc_size_bulk_ref,
                     data_desc_bulk_ref);
-            should_stop = !c;
-            if(should_stop)
-                break;
+
+            first_id += num_events_to_send;
         }
     }
 

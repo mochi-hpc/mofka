@@ -91,6 +91,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     // Active consumers
     std::unordered_map<UUID, std::shared_ptr<ConsumerHandleImpl>>  m_consumers;
     tl::mutex                                                      m_consumers_mtx;
+    tl::condition_variable                                         m_consumers_cv;
 
     ProviderImpl(const tl::engine& engine, uint16_t provider_id,
                  const rapidjson::Value& config, const tl::pool& pool)
@@ -231,11 +232,12 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
-            consumer_ctx, consumer_name, count);
+            consumer_ctx, consumer_name, count, topic);
         {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             m_consumers.emplace(consumer_id, consumer_handle_impl);
         }
+        m_consumers_cv.notify_all();
         result = topic->feedConsumer(consumer_handle_impl, BatchSize{batch_size});
         {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
@@ -262,16 +264,17 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         RequestResult<void> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
-        {
+        while(!consumer_handle_impl) {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             auto it = m_consumers.find(consumer_id);
             if(it != m_consumers.end()) {
                 consumer_handle_impl = it->second;
                 m_consumers.erase(it);
             }
+            if(!consumer_handle_impl)
+                m_consumers_cv.wait(g);
         }
-        if(consumer_handle_impl)
-            consumer_handle_impl->stop();
+        consumer_handle_impl->stop();
         spdlog::trace("[mofka:{}] Successfully executed removeConsumer", id());
     }
 

@@ -44,6 +44,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         {
             auto consumer = topic.consumer("myconsumer");
             REQUIRE(static_cast<bool>(consumer));
+            thallium::thread::sleep(engine, 1000);
         }
     }
 

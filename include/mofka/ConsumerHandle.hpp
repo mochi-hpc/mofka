@@ -62,18 +62,14 @@ class ConsumerHandle {
 
     /**
      * @brief Feed a batch of events to the ConsumerHandle.
-     * This
      *
      * @param count Number of events.
      * @param metadata_sizes Bulk wrapping the metadata sizes (count*size_t).
      * @param metadata Bulk wrapping the metadata.
      * @param data_desc_sizes Bulk wrapping data descriptor sizes (count*size_t).
      * @param data_desc Bulk wrapping data descriptors.
-     *
-     * @return true if the TopicManager should continue feeding this
-     * ConsumerHandle, false if it should stop.
      */
-    bool feed(size_t count,
+    void feed(size_t count,
               const BulkRef& metadata_sizes,
               const BulkRef& metadata,
               const BulkRef& data_desc_sizes,
