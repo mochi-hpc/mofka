@@ -44,6 +44,7 @@ Consumer TopicHandle::makeConsumer(
         DataSelector data_selector,
         const std::vector<PartitionTargetInfo>& targets) const {
     return std::make_shared<ConsumerImpl>(
+            self->m_service->m_client->m_engine,
             name, batch_size, thread_pool,
             data_broker, data_selector, targets, self);
 }

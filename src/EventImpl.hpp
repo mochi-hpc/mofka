@@ -14,6 +14,11 @@ class EventImpl {
 
     public:
 
+    EventImpl(PartitionTargetInfo target,
+              EventID id)
+    : m_target(std::move(target))
+    , m_id(std::move(id)) {}
+
     EventImpl(Metadata metadata,
               Data data,
               PartitionTargetInfo target,

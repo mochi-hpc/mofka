@@ -15,12 +15,24 @@ namespace mofka {
 
 PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(DataDescriptor);
 
+DataDescriptor::DataDescriptor()
+: self(std::make_shared<DataDescriptorImpl>()) {}
+
 DataDescriptor DataDescriptor::Null() {
     return std::make_shared<DataDescriptorImpl>();
 }
 
+DataDescriptor DataDescriptor::From(std::string_view location, size_t size) {
+    return std::make_shared<DataDescriptorImpl>(
+            std::string{location.data(), location.size()}, size);
+}
+
 size_t DataDescriptor::size() const {
     return self->m_size;
+}
+
+const std::string& DataDescriptor::location() const {
+    return self->m_location;
 }
 
 DataDescriptor DataDescriptor::makeStridedView(
@@ -97,6 +109,14 @@ DataDescriptor DataDescriptor::makeUnstructuredView(
         return makeSubView(u.segments[0].first, u.segments[0].second);
     newDesc->m_size = view_size;
     return newDesc;
+}
+
+void DataDescriptor::load(Archive &ar) {
+    self->load(ar);
+}
+
+void DataDescriptor::save(Archive& ar) const {
+    self->save(ar);
 }
 
 }

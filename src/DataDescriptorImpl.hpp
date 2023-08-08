@@ -120,6 +120,12 @@ class DataDescriptorImpl {
         }
     }
 
+    DataDescriptorImpl() = default;
+
+    DataDescriptorImpl(std::string location, size_t size)
+    : m_location(std::move(location))
+    , m_size(size) {}
+
     std::string            m_location; /* implementation defined data location */
     std::vector<Selection> m_views;    /* stack of selections on top of the data */
     size_t                 m_size = 0; /* size of the data */

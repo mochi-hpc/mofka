@@ -17,10 +17,15 @@
 
 namespace mofka {
 
+class ClientImpl;
+
 class ConsumerImpl {
+
+    friend class ClientImpl;
 
     public:
 
+    thallium::engine                 m_engine;
     std::string                      m_name;
     UUID                             m_uuid;
     BatchSize                        m_batch_size;
@@ -41,7 +46,7 @@ class ConsumerImpl {
      * append a new promise/future pair at the back of the queue.
      *
      * If m_future_credit is false, it means the future in the queue
-     * have been created by the consumer before th user had a chance
+     * have been created by the consumer before the user had a chance
      * to call pull(). Hence if the consumer needs to issue a new
      * operation, it will push a new promise/future pair at the back
      * of the queue. If the user calls pull(), it will use the future
@@ -58,14 +63,16 @@ class ConsumerImpl {
      */
     std::vector<thallium::eventual<void>> m_pulling_ult_completed;
 
-    ConsumerImpl(std::string_view name,
+    ConsumerImpl(thallium::engine engine,
+                 std::string_view name,
                  BatchSize batch_size,
                  ThreadPool thread_pool,
                  DataBroker broker,
                  DataSelector selector,
                  std::vector<PartitionTargetInfo> targets,
                  std::shared_ptr<TopicHandleImpl> topic)
-    : m_name(name)
+    : m_engine(std::move(engine))
+    , m_name(name)
     , m_uuid(UUID::generate())
     , m_batch_size(batch_size)
     , m_thread_pool(std::move(thread_pool))
@@ -83,10 +90,19 @@ class ConsumerImpl {
     private:
 
     void start();
+
     void join();
+
     void pullFrom(
         const PartitionTargetInfo& target,
         thallium::eventual<void>& ev);
+
+    void recvBatch(
+        size_t count,
+        const BulkRef &metadata_sizes,
+        const BulkRef &metadata,
+        const BulkRef &data_desc_sizes,
+        const BulkRef &data_desc);
 };
 
 }

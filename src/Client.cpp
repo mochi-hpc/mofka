@@ -96,7 +96,8 @@ void ClientImpl::forwardBatchToConsumer(
         const BulkRef &data_desc_sizes,
         const BulkRef &data_desc) {
     RequestResult<void> result;
-
+    ConsumerImpl* consumer_impl = reinterpret_cast<ConsumerImpl*>(consumer_ctx);
+    consumer_impl->recvBatch(count, metadata_sizes, metadata, data_desc_sizes, data_desc);
     req.respond(result);
 }
 

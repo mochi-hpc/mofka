@@ -7,7 +7,9 @@
 #define MOFKA_DATA_DESCRIPTOR_HPP
 
 #include <mofka/Exception.hpp>
+#include <mofka/Archive.hpp>
 #include <memory>
+#include <string_view>
 #include <map>
 
 namespace mofka {
@@ -27,6 +29,21 @@ class DataDescriptor {
      * @brief Creates a NULL DataDescriptor.
      */
     static DataDescriptor Null();
+
+    /**
+     * @brief Create an implementation-dependent DataDescriptor.
+     *
+     * @param location Implementation-dependent representation of the data location.
+     * @param size Size of the underlying data.
+     *
+     * @return a DataDescriptor.
+     */
+    static DataDescriptor From(std::string_view location, size_t size);
+
+    /**
+     * @brief Constructor (equivalent to a Null DataDescriptor).
+     */
+    DataDescriptor();
 
     /**
      * @brief Copy-constructor.
@@ -57,6 +74,12 @@ class DataDescriptor {
      * @brief Return the size of the underlying data in bytes.
      */
     size_t size() const;
+
+    /**
+     * @brief Returns the root location (interpretable by the
+     * TopicManager that created this DataDescriptor).
+     */
+    const std::string& location() const;
 
     /**
      * @brief Create a DataDescriptor representing a subset of
@@ -147,6 +170,20 @@ class DataDescriptor {
      */
     DataDescriptor makeUnstructuredView(
         const std::map<size_t, size_t>& segments) const;
+
+    /**
+     * @brief Load the DataDescriptor from an Archive.
+     *
+     * @param ar Archive.
+     */
+    void load(Archive& ar);
+
+    /**
+     * @brief Serialize the DataDescriptor into an Archive.
+     *
+     * @param ar Archive.
+     */
+    void save(Archive& ar) const;
 
     /**
      * @brief Checks if the Data instance is valid.

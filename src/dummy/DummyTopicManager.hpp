@@ -16,8 +16,18 @@ namespace mofka {
 class DummyTopicManager : public mofka::TopicManager {
 
     struct OffsetSize {
+
         size_t offset;
         size_t size;
+
+        std::string_view toString() const {
+            return std::string_view{reinterpret_cast<const char*>(this), sizeof(*this)};
+        }
+
+        void fromString(std::string_view str) {
+            std::memcpy(&offset, str.data(), sizeof(offset));
+            std::memcpy(&size, str.data() + sizeof(offset), sizeof(size));
+        }
     };
 
     Metadata m_config;
@@ -33,6 +43,9 @@ class DummyTopicManager : public mofka::TopicManager {
     std::vector<char>            m_events_data;
     std::vector<size_t>          m_events_data_offsets;
     std::vector<size_t>          m_events_data_sizes;
+    std::vector<char>            m_events_data_desc;
+    std::vector<size_t>          m_events_data_desc_offsets;
+    std::vector<size_t>          m_events_data_desc_sizes;
     thallium::mutex              m_events_mtx;
     thallium::condition_variable m_events_cv;
 

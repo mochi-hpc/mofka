@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_PRODUCER_BATCH_IMPL_H
-#define MOFKA_PRODUCER_BATCH_IMPL_H
+#ifndef MOFKA_CONSUMER_BATCH_IMPL_H
+#define MOFKA_CONSUMER_BATCH_IMPL_H
 
 #include <thallium.hpp>
 #include <mutex>
@@ -17,11 +17,10 @@
 #include "mofka/Serializer.hpp"
 #include "mofka/Data.hpp"
 #include "mofka/Future.hpp"
-#include "mofka/Producer.hpp"
-#include "mofka/BufferWrapperArchive.hpp"
+#include "mofka/Consumer.hpp"
 #include "PartitionTargetInfoImpl.hpp"
 #include "ThreadPoolImpl.hpp"
-#include "ProducerImpl.hpp"
+#include "ConsumerImpl.hpp"
 #include "Promise.hpp"
 #include "DataImpl.hpp"
 #include <vector>
@@ -29,91 +28,82 @@
 
 namespace mofka {
 
-class ProducerBatchImpl {
+class ConsumerImpl;
 
-    std::vector<size_t>        m_meta_sizes;      /* size of each serialized metadata object */
-    std::vector<char>          m_meta_buffer;     /* packed serialized metadata objects */
-    std::vector<size_t>        m_data_sizes;      /* size of the data associated with each metadata */
-    std::vector<Data::Segment> m_data_segments;   /* list of data segments */
-    size_t                     m_total_data_size; /* sum of sizes in the m_data_segments */
+class ConsumerBatchImpl {
 
-    std::vector<Promise<EventID>> m_promises; /* promise associated with each event */
+    friend class ConsumerImpl;
+
+    thallium::engine    m_engine;
+    std::vector<size_t> m_meta_sizes;       /* size of each serialized metadata object */
+    std::vector<char>   m_meta_buffer;      /* packed serialized metadata objects */
+    std::vector<size_t> m_data_desc_sizes;  /* size of the data descriptors associated with each metadata */
+    std::vector<char>   m_data_desc_buffer; /* packed data descriptors */
 
     public:
 
-    void setPromises(EventID firstID) {
-        auto id = firstID;
-        for(auto& promise : m_promises) {
-            promise.setValue(id);
-            ++id;
-        }
-    }
+    ConsumerBatchImpl(thallium::engine engine, size_t count, size_t metadata_size, size_t data_desc_size)
+    : m_engine(std::move(engine))
+    , m_meta_sizes(count)
+    , m_meta_buffer(metadata_size)
+    , m_data_desc_sizes(count)
+    , m_data_desc_buffer(data_desc_size) {}
 
-    void setPromises(Exception ex) {
-        for(auto& promise : m_promises) {
-            promise.setException(std::move(ex));
-        }
-    }
+    ConsumerBatchImpl(ConsumerBatchImpl&&) = default;
+    ConsumerBatchImpl(const ConsumerBatchImpl&) = delete;
+    ConsumerBatchImpl& operator=(ConsumerBatchImpl&&) = default;
+    ConsumerBatchImpl& operator=(const ConsumerBatchImpl&) = default;
+    ~ConsumerBatchImpl() = default;
 
-    void push(
-            const Metadata& metadata,
-            const Serializer& serializer,
-            const Data& data,
-            Promise<EventID> promise) {
-        size_t meta_buffer_size = m_meta_buffer.size();
-        BufferWrapperOutputArchive archive(m_meta_buffer);
-        serializer.serialize(archive, metadata);
-        size_t meta_size = m_meta_buffer.size() - meta_buffer_size;
-        m_meta_sizes.push_back(meta_size);
-        size_t data_size = 0;
-        for(const auto& seg : data.self->m_segments) {
-            m_data_segments.push_back(seg);
-            data_size += seg.size;
-        }
-        m_data_sizes.push_back(data_size);
-        m_total_data_size += data_size;
-        m_promises.push_back(std::move(promise));
-    }
-
-    thallium::bulk exposeMetadata(thallium::engine engine) {
-        if(count() == 0) return thallium::bulk{};
-        std::vector<std::pair<void *, size_t>> segments;
-        segments.reserve(2);
-        segments.emplace_back(m_meta_sizes.data(), m_meta_sizes.size()*sizeof(m_meta_sizes[0]));
-        segments.emplace_back(m_meta_buffer.data(), m_meta_buffer.size()*sizeof(m_meta_buffer[0]));
-        return engine.expose(segments, thallium::bulk_mode::read_only);
-    }
-
-    thallium::bulk exposeData(thallium::engine engine) {
-        if(count() == 0) return thallium::bulk{};
-        std::vector<std::pair<void *, size_t>> segments;
-        segments.reserve(1 + m_data_segments.size());
-        segments.emplace_back(m_data_sizes.data(), m_data_sizes.size()*sizeof(m_data_sizes[0]));
-        for(const auto& seg : m_data_segments) {
-            if(!seg.size) continue;
-            segments.emplace_back(const_cast<void*>(seg.ptr), seg.size);
-        }
-        return engine.expose(segments, thallium::bulk_mode::read_only);
+    void pullFrom(const BulkRef& remote_meta_sizes,
+                  const BulkRef& remote_meta_buffer,
+                  const BulkRef& remote_desc_sizes,
+                  const BulkRef& remote_desc_buffer) {
+        std::vector<std::pair<void*, size_t>> segments = {
+            {m_meta_sizes.data(), m_meta_sizes.size()*sizeof(m_meta_sizes[0])},
+            {m_meta_buffer.data(), m_meta_buffer.size()*sizeof(m_meta_buffer[0])},
+            {m_data_desc_sizes.data(), m_data_desc_sizes.size()*sizeof(m_data_desc_sizes[0])},
+            {m_data_desc_buffer.data(), m_data_desc_buffer.size()*sizeof(m_data_desc_buffer[0])}
+        };
+        auto local_bulk = m_engine.expose(segments, thallium::bulk_mode::write_only);
+        size_t offset = 0;
+        auto pull_bulk_ref = [](thallium::bulk& local,
+                                size_t offset,
+                                thallium::endpoint& ep,
+                                const BulkRef& remote) {
+            if(remote.size == 0) return;
+            local(offset, remote.size) << remote.handle.on(ep)(remote.offset, remote.size);
+        };
+        // transfer metadata sizes
+        thallium::endpoint remote_ep = m_engine.lookup(remote_meta_sizes.address);
+        pull_bulk_ref(local_bulk, offset, remote_ep, remote_meta_sizes);
+        offset += segments[0].second;
+        // transfer metadata
+        if(remote_meta_buffer.address != remote_meta_sizes.address)
+            remote_ep = m_engine.lookup(remote_meta_buffer.address);
+        pull_bulk_ref(local_bulk, offset, remote_ep, remote_meta_buffer);
+        offset += segments[1].second;
+        // transfer data descriptor sizes
+        if(remote_desc_sizes.address != remote_meta_buffer.address)
+            remote_ep = m_engine.lookup(remote_desc_sizes.address);
+        pull_bulk_ref(local_bulk, offset, remote_ep, remote_desc_sizes);
+        offset += segments[2].second;
+        // transfer data descriptors
+        if(remote_desc_buffer.address != remote_desc_sizes.address)
+            remote_ep = m_engine.lookup(remote_desc_buffer.address);
+        pull_bulk_ref(local_bulk, offset, remote_ep, remote_desc_buffer);
     }
 
     size_t count() const {
         return m_meta_sizes.size();
     }
-
-    size_t metadataBulkSize() const {
-        return count()*sizeof(size_t) + m_meta_buffer.size();
-    }
-
-    size_t dataBulkSize() const {
-        return count()*sizeof(size_t) + m_total_data_size;
-    }
 };
 
-class ActiveProducerBatchQueue {
+class ActiveConsumerBatchQueue {
 
     public:
-
-    ActiveProducerBatchQueue(
+#if 0
+    ActiveConsumerBatchQueue(
         std::string topic_name,
         std::string producer_name,
         std::shared_ptr<ClientImpl> client,
@@ -129,7 +119,7 @@ class ActiveProducerBatchQueue {
         start();
     }
 
-    ~ActiveProducerBatchQueue() {
+    ~ActiveConsumerBatchQueue() {
         stop();
     }
 
@@ -144,10 +134,10 @@ class ActiveProducerBatchQueue {
             need_notification = adaptive;
             std::unique_lock<thallium::mutex> guard{m_mutex};
             if(m_batch_queue.empty())
-                m_batch_queue.push(std::make_shared<ProducerBatchImpl>());
+                m_batch_queue.push(std::make_shared<ConsumerBatchImpl>());
             auto last_batch = m_batch_queue.back();
             if(!adaptive && last_batch->count() == m_batch_size.value) {
-                m_batch_queue.push(std::make_shared<ProducerBatchImpl>());
+                m_batch_queue.push(std::make_shared<ConsumerBatchImpl>());
                 last_batch = m_batch_queue.back();
                 need_notification = true;
             }
@@ -211,7 +201,7 @@ class ActiveProducerBatchQueue {
         m_terminated.set_value();
     }
 
-    void sendBatch(const std::shared_ptr<ProducerBatchImpl>& batch) {
+    void sendBatch(const std::shared_ptr<ConsumerBatchImpl>& batch) {
         thallium::bulk metadata_content, data_content;
         try {
             metadata_content = batch->exposeMetadata(m_client->m_engine);
@@ -248,7 +238,7 @@ class ActiveProducerBatchQueue {
     std::shared_ptr<PartitionTargetInfoImpl>       m_target;
     ThreadPool                                     m_thread_pool;
     BatchSize                                      m_batch_size;
-    std::queue<std::shared_ptr<ProducerBatchImpl>> m_batch_queue;
+    std::queue<std::shared_ptr<ConsumerBatchImpl>> m_batch_queue;
     thallium::managed<thallium::thread>            m_sender_ult;
     bool                                           m_need_stop = false;
     bool                                           m_request_flush = false;
@@ -256,7 +246,7 @@ class ActiveProducerBatchQueue {
     thallium::mutex                                m_mutex;
     thallium::condition_variable                   m_cv;
     thallium::eventual<void>                       m_terminated;
-
+#endif
 };
 
 }
