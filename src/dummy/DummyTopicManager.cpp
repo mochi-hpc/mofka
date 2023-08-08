@@ -193,6 +193,7 @@ RequestResult<void> DummyTopicManager::feedConsumer(
             // feed consumer
             consumerHandle.feed(
                     num_events_to_send,
+                    first_id,
                     metadata_size_bulk_ref,
                     metadata_bulk_ref,
                     data_desc_size_bulk_ref,

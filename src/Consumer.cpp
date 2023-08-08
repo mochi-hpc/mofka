@@ -124,6 +124,7 @@ void ConsumerImpl::pullFrom(const PartitionTargetInfo& target,
 }
 
 void ConsumerImpl::recvBatch(size_t count,
+                             EventID startID,
                              const BulkRef &metadata_sizes,
                              const BulkRef &metadata,
                              const BulkRef &data_desc_sizes,

@@ -7,6 +7,7 @@
 #define MOFKA_CONSUMER_HANDLE_HPP
 
 #include <mofka/BulkRef.hpp>
+#include <mofka/EventID.hpp>
 #include <thallium.hpp>
 #include <memory>
 
@@ -64,12 +65,14 @@ class ConsumerHandle {
      * @brief Feed a batch of events to the ConsumerHandle.
      *
      * @param count Number of events.
+     * @param firstID ID of the first event in the batch.
      * @param metadata_sizes Bulk wrapping the metadata sizes (count*size_t).
      * @param metadata Bulk wrapping the metadata.
      * @param data_desc_sizes Bulk wrapping data descriptor sizes (count*size_t).
      * @param data_desc Bulk wrapping data descriptors.
      */
     void feed(size_t count,
+              EventID firstID,
               const BulkRef& metadata_sizes,
               const BulkRef& metadata,
               const BulkRef& data_desc_sizes,

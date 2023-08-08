@@ -9,6 +9,7 @@
 #include "mofka/TargetSelector.hpp"
 #include "mofka/RequestResult.hpp"
 #include "mofka/BulkRef.hpp"
+#include "mofka/EventID.hpp"
 #include <bedrock/Client.hpp>
 #include <thallium.hpp>
 #include <thallium/serialization/stl/unordered_set.hpp>
@@ -50,6 +51,7 @@ class ClientImpl {
             const thallium::request& req,
             intptr_t consumer_ctx,
             size_t count,
+            EventID firstID,
             const BulkRef &metadata_sizes,
             const BulkRef &metadata,
             const BulkRef &data_desc_sizes,

@@ -25,6 +25,7 @@ bool ConsumerHandle::shouldStop() const {
 
 void ConsumerHandle::feed(
     size_t count,
+    EventID firstID,
     const BulkRef &metadata_sizes,
     const BulkRef &metadata,
     const BulkRef &data_desc_sizes,
@@ -34,6 +35,7 @@ void ConsumerHandle::feed(
         self->m_send_batch.on(self->m_consumer_endpoint)(
             self->m_consumer_ctx,
             count,
+            firstID,
             metadata_sizes,
             metadata,
             data_desc_sizes,

@@ -99,6 +99,7 @@ class ConsumerImpl {
 
     void recvBatch(
         size_t count,
+        EventID firstID,
         const BulkRef &metadata_sizes,
         const BulkRef &metadata,
         const BulkRef &data_desc_sizes,

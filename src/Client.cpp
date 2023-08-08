@@ -91,13 +91,14 @@ void ClientImpl::forwardBatchToConsumer(
         const thallium::request& req,
         intptr_t consumer_ctx,
         size_t count,
+        EventID firstID,
         const BulkRef &metadata_sizes,
         const BulkRef &metadata,
         const BulkRef &data_desc_sizes,
         const BulkRef &data_desc) {
     RequestResult<void> result;
     ConsumerImpl* consumer_impl = reinterpret_cast<ConsumerImpl*>(consumer_ctx);
-    consumer_impl->recvBatch(count, metadata_sizes, metadata, data_desc_sizes, data_desc);
+    consumer_impl->recvBatch(count, firstID, metadata_sizes, metadata, data_desc_sizes, data_desc);
     req.respond(result);
 }
 
