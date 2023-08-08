@@ -13,7 +13,7 @@
 namespace mofka {
 
 class DataImpl;
-class BatchImpl;
+class ProducerBatchImpl;
 
 /**
  * @brief A Data is an object that encapsulates the data of an event.
@@ -89,7 +89,7 @@ class Data {
 
     std::shared_ptr<DataImpl> self;
 
-    friend class BatchImpl;
+    friend class ProducerBatchImpl;
 };
 
 }

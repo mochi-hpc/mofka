@@ -7,6 +7,7 @@
 #define MOFKA_BULK_REF_HPP
 
 #include <thallium.hpp>
+#include <thallium/serialization/stl/string.hpp>
 #include <memory>
 #include <vector>
 

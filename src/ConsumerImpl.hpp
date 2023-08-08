@@ -9,7 +9,7 @@
 #include <thallium.hpp>
 #include "TopicHandleImpl.hpp"
 #include "PartitionTargetInfoImpl.hpp"
-#include "BatchImpl.hpp"
+#include "ProducerImpl.hpp"
 #include "mofka/Consumer.hpp"
 #include "mofka/UUID.hpp"
 #include <string_view>

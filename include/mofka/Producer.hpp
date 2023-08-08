@@ -22,7 +22,7 @@
 namespace mofka {
 
 class TopicHandle;
-class ActiveBatchQueue;
+class ActiveProducerBatchQueue;
 class ProducerImpl;
 
 /**
@@ -31,7 +31,7 @@ class ProducerImpl;
 class Producer {
 
     friend class TopicHandle;
-    friend class ActiveBatchQueue;
+    friend class ActiveProducerBatchQueue;
 
     public:
 

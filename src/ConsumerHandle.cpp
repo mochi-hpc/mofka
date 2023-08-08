@@ -5,6 +5,7 @@
  */
 #include "ConsumerHandleImpl.hpp"
 #include "PimplUtil.hpp"
+#include <spdlog/spdlog.h>
 #include <limits>
 
 namespace mofka {
@@ -29,13 +30,17 @@ void ConsumerHandle::feed(
     const BulkRef &data_desc_sizes,
     const BulkRef &data_desc)
 {
-    (void)count;
-    (void)metadata_sizes;
-    (void)metadata;
-    (void)data_desc_sizes;
-    (void)data_desc;
-    std::cerr << "FEED" << std::endl;
-    thallium::thread::yield();
+    try {
+        self->m_send_batch.on(self->m_consumer_endpoint)(
+            self->m_consumer_ctx,
+            count,
+            metadata_sizes,
+            metadata,
+            data_desc_sizes,
+            data_desc);
+    } catch(const std::exception& ex) {
+        spdlog::warn("Exception throw will sending batch to consumer: {}", ex.what());
+    }
 }
 
 void ConsumerHandleImpl::stop() {

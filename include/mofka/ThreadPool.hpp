@@ -14,7 +14,7 @@
 namespace mofka {
 
 class Producer;
-class ActiveBatchQueue;
+class ActiveProducerBatchQueue;
 class ThreadPoolImpl;
 class ConsumerImpl;
 
@@ -91,7 +91,7 @@ class ThreadPool {
     std::shared_ptr<ThreadPoolImpl> self;
 
     friend class Producer;
-    friend class ActiveBatchQueue;
+    friend class ActiveProducerBatchQueue;
     friend class ConsumerImpl;
 };
 

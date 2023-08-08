@@ -87,7 +87,14 @@ const rapidjson::Value& Client::getConfig() const {
     return config;
 }
 
-void ClientImpl::forwardBatchToConsumer(const thallium::request& req) {
+void ClientImpl::forwardBatchToConsumer(
+        const thallium::request& req,
+        intptr_t consumer_ctx,
+        size_t count,
+        const BulkRef &metadata_sizes,
+        const BulkRef &metadata,
+        const BulkRef &data_desc_sizes,
+        const BulkRef &data_desc) {
     RequestResult<void> result;
 
     req.respond(result);

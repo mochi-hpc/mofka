@@ -65,12 +65,12 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
             /* Step 2.2: select the target for this metadata */
             auto target = topic->m_selector.selectTargetFor(metadata);
             /* Step 2.3: find/create the ActiveBatchQueue to send to */
-            std::shared_ptr<ActiveBatchQueue> queue;
+            std::shared_ptr<ActiveProducerBatchQueue> queue;
             {
                 std::lock_guard<thallium::mutex> guard{self->m_batch_queues_mtx};
                 auto& queue_ptr = self->m_batch_queues[target];
                 if(!queue_ptr) {
-                    queue_ptr.reset(new ActiveBatchQueue{
+                    queue_ptr.reset(new ActiveProducerBatchQueue{
                         self->m_topic->m_name,
                         self->m_name,
                         self->m_topic->m_service->m_client,

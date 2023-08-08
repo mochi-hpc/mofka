@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_BATCH_IMPL_H
-#define MOFKA_BATCH_IMPL_H
+#ifndef MOFKA_PRODUCER_BATCH_IMPL_H
+#define MOFKA_PRODUCER_BATCH_IMPL_H
 
 #include <thallium.hpp>
 #include <mutex>
@@ -28,7 +28,7 @@
 
 namespace mofka {
 
-class BatchImpl {
+class ProducerBatchImpl {
 
     struct BatchOutputArchive : public Archive {
 
@@ -134,11 +134,11 @@ class BatchImpl {
     }
 };
 
-class ActiveBatchQueue {
+class ActiveProducerBatchQueue {
 
     public:
 
-    ActiveBatchQueue(
+    ActiveProducerBatchQueue(
         std::string topic_name,
         std::string producer_name,
         std::shared_ptr<ClientImpl> client,
@@ -154,7 +154,7 @@ class ActiveBatchQueue {
         start();
     }
 
-    ~ActiveBatchQueue() {
+    ~ActiveProducerBatchQueue() {
         stop();
     }
 
@@ -169,10 +169,10 @@ class ActiveBatchQueue {
             need_notification = adaptive;
             std::unique_lock<thallium::mutex> guard{m_mutex};
             if(m_batch_queue.empty())
-                m_batch_queue.push(std::make_shared<BatchImpl>());
+                m_batch_queue.push(std::make_shared<ProducerBatchImpl>());
             auto last_batch = m_batch_queue.back();
             if(!adaptive && last_batch->count() == m_batch_size.value) {
-                m_batch_queue.push(std::make_shared<BatchImpl>());
+                m_batch_queue.push(std::make_shared<ProducerBatchImpl>());
                 last_batch = m_batch_queue.back();
                 need_notification = true;
             }
@@ -236,7 +236,7 @@ class ActiveBatchQueue {
         m_terminated.set_value();
     }
 
-    void sendBatch(const std::shared_ptr<BatchImpl>& batch) {
+    void sendBatch(const std::shared_ptr<ProducerBatchImpl>& batch) {
         thallium::bulk metadata_content, data_content;
         try {
             metadata_content = batch->exposeMetadata(m_client->m_engine);
@@ -267,20 +267,20 @@ class ActiveBatchQueue {
         }
     }
 
-    std::string                              m_topic_name;
-    std::string                              m_producer_name;
-    std::shared_ptr<ClientImpl>              m_client;
-    std::shared_ptr<PartitionTargetInfoImpl> m_target;
-    ThreadPool                               m_thread_pool;
-    BatchSize                                m_batch_size;
-    std::queue<std::shared_ptr<BatchImpl>>   m_batch_queue;
-    thallium::managed<thallium::thread>      m_sender_ult;
-    bool                                     m_need_stop = false;
-    bool                                     m_request_flush = false;
-    std::atomic<bool>                        m_running = false;
-    thallium::mutex                          m_mutex;
-    thallium::condition_variable             m_cv;
-    thallium::eventual<void>                 m_terminated;
+    std::string                                    m_topic_name;
+    std::string                                    m_producer_name;
+    std::shared_ptr<ClientImpl>                    m_client;
+    std::shared_ptr<PartitionTargetInfoImpl>       m_target;
+    ThreadPool                                     m_thread_pool;
+    BatchSize                                      m_batch_size;
+    std::queue<std::shared_ptr<ProducerBatchImpl>> m_batch_queue;
+    thallium::managed<thallium::thread>            m_sender_ult;
+    bool                                           m_need_stop = false;
+    bool                                           m_request_flush = false;
+    std::atomic<bool>                              m_running = false;
+    thallium::mutex                                m_mutex;
+    thallium::condition_variable                   m_cv;
+    thallium::eventual<void>                       m_terminated;
 
 };
 

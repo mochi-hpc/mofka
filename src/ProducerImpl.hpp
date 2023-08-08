@@ -9,7 +9,7 @@
 #include <thallium.hpp>
 #include "TopicHandleImpl.hpp"
 #include "PartitionTargetInfoImpl.hpp"
-#include "BatchImpl.hpp"
+#include "ProducerBatchImpl.hpp"
 #include "mofka/Producer.hpp"
 #include "mofka/UUID.hpp"
 #include <string_view>
@@ -28,8 +28,8 @@ class ProducerImpl {
 
     std::unordered_map<
         PartitionTargetInfo,
-        std::shared_ptr<ActiveBatchQueue>> m_batch_queues;
-    thallium::mutex                        m_batch_queues_mtx;
+        std::shared_ptr<ActiveProducerBatchQueue>> m_batch_queues;
+    thallium::mutex                                m_batch_queues_mtx;
 
     size_t                       m_num_posted_ults = 0;
     thallium::mutex              m_num_posted_ults_mtx;
