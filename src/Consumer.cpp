@@ -139,7 +139,7 @@ void ConsumerImpl::recvBatch(size_t count,
     size_t data_desc_offset = 0;
 
     for(size_t i = 0; i < count; ++i) {
-        auto ult = [&batch, i, metadata_offset, data_desc_offset, &serializer, &ults_completed]() {
+        auto ult = [&batch, i, startID, metadata_offset, data_desc_offset, &serializer, &ults_completed]() {
             // deserialize the metadata
             Metadata metadata;
             BufferWrapperInputArchive metadata_archive{
@@ -157,7 +157,7 @@ void ConsumerImpl::recvBatch(size_t count,
             // TODO
             ults_completed.set(nullptr);
         };
-        m_thread_pool.self->pushWork(std::move(ult));
+        m_thread_pool.self->pushWork(std::move(ult), startID+i);
         metadata_offset  += batch->m_meta_sizes[i];
         data_desc_offset += batch->m_data_desc_sizes[i];
     }

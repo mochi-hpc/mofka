@@ -99,12 +99,14 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
         }
     };
     /* Step 3: increase the number of posted ULTs */
+    uint64_t priority = 0;
     {
         std::lock_guard<thallium::mutex> guard{self->m_num_posted_ults_mtx};
         self->m_num_posted_ults += 1;
+        priority = self->m_num_posted_ults;
     }
     /* Step 3: submit the ULT */
-    self->m_thread_pool.self->pushWork(std::move(ult));
+    self->m_thread_pool.self->pushWork(std::move(ult), priority);
     /* Step 4: return the future */
     return future;
 }
