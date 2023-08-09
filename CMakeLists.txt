@@ -3,9 +3,10 @@
 cmake_minimum_required (VERSION 3.8)
 project (mofka C CXX)
 set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
 enable_testing ()
 
-add_definitions (-Wextra -Wall -Wpedantic -std=c++17)
+add_definitions (-Wextra -Wall -Wpedantic)
 
 add_library (coverage_config INTERFACE)
 
