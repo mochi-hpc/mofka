@@ -103,7 +103,8 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
     {
         std::lock_guard<thallium::mutex> guard{self->m_num_posted_ults_mtx};
         self->m_num_posted_ults += 1;
-        priority = self->m_num_posted_ults;
+        priority = self->m_num_produced_events;
+        self->m_num_produced_events += 1;
     }
     /* Step 3: submit the ULT */
     self->m_thread_pool.self->pushWork(std::move(ult), priority);

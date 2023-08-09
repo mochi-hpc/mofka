@@ -35,6 +35,8 @@ class ProducerImpl {
     thallium::mutex              m_num_posted_ults_mtx;
     thallium::condition_variable m_num_posted_ults_cv;
 
+    size_t m_num_produced_events = 0;
+
     ProducerImpl(std::string_view name,
                  BatchSize batch_size,
                  ThreadPool thread_pool,
