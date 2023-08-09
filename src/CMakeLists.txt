@@ -19,7 +19,8 @@ set (client-src-files
      Validator.cpp
      ThreadPool.cpp
      Event.cpp
-     AsyncRequest.cpp)
+     AsyncRequest.cpp
+     PrioPool.cpp)
 
 set (admin-src-files
      Admin.cpp)
