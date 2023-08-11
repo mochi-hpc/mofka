@@ -226,6 +226,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void requestEvents(const tl::request& req,
                        const std::string& topic_name,
                        intptr_t consumer_ctx,
+                       size_t target_info_index,
                        const UUID& consumer_id,
                        const std::string& consumer_name,
                        size_t count,
@@ -235,7 +236,10 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
-            consumer_ctx, consumer_name, count, topic, req.get_endpoint(), m_consumer_recv_batch);
+            consumer_ctx, target_info_index,
+            consumer_name, count, topic,
+            req.get_endpoint(),
+            m_consumer_recv_batch);
         {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             m_consumers.emplace(consumer_id, consumer_handle_impl);

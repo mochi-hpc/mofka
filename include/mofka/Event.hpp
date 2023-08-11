@@ -17,6 +17,7 @@
 namespace mofka {
 
 class EventImpl;
+class ConsumerImpl;
 
 /**
  * @brief An Event object encapsultes Metadata and Event, as well
@@ -24,6 +25,8 @@ class EventImpl;
  * enables consumers to acknowledge the event.
  */
 class Event {
+
+    friend class ConsumerImpl;
 
     public:
 

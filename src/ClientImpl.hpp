@@ -50,6 +50,7 @@ class ClientImpl {
     static void forwardBatchToConsumer(
             const thallium::request& req,
             intptr_t consumer_ctx,
+            size_t target_info_index,
             size_t count,
             EventID firstID,
             const BulkRef &metadata_sizes,

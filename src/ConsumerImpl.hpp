@@ -94,10 +94,11 @@ class ConsumerImpl {
     void join();
 
     void pullFrom(
-        const PartitionTargetInfo& target,
+        size_t target_info_index,
         thallium::eventual<void>& ev);
 
     void recvBatch(
+        size_t target_info_index,
         size_t count,
         EventID firstID,
         const BulkRef &metadata_sizes,

@@ -19,6 +19,7 @@ class ConsumerHandleImpl {
     public:
 
     const intptr_t                      m_consumer_ctx;
+    const size_t                        m_target_info_index;
     const std::string                   m_consumer_name;
     const size_t                        m_max_events;
     const std::shared_ptr<TopicManager> m_topic_manager;
@@ -30,12 +31,14 @@ class ConsumerHandleImpl {
 
     ConsumerHandleImpl(
         intptr_t ctx,
+        size_t target_info_index,
         std::string_view name,
         size_t max,
         std::shared_ptr<TopicManager> topic_manager,
         thallium::endpoint endpoint,
         thallium::remote_procedure rpc)
     : m_consumer_ctx(ctx)
+    , m_target_info_index(target_info_index)
     , m_consumer_name(name.data(), name.size())
     , m_max_events(max)
     , m_topic_manager(std::move(topic_manager))

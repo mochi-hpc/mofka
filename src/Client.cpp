@@ -90,6 +90,7 @@ const rapidjson::Value& Client::getConfig() const {
 void ClientImpl::forwardBatchToConsumer(
         const thallium::request& req,
         intptr_t consumer_ctx,
+        size_t target_info_index,
         size_t count,
         EventID firstID,
         const BulkRef &metadata_sizes,
@@ -98,7 +99,7 @@ void ClientImpl::forwardBatchToConsumer(
         const BulkRef &data_desc) {
     RequestResult<void> result;
     ConsumerImpl* consumer_impl = reinterpret_cast<ConsumerImpl*>(consumer_ctx);
-    consumer_impl->recvBatch(count, firstID, metadata_sizes, metadata, data_desc_sizes, data_desc);
+    consumer_impl->recvBatch(target_info_index, count, firstID, metadata_sizes, metadata, data_desc_sizes, data_desc);
     req.respond(result);
 }
 
