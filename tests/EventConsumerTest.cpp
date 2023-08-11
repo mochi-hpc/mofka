@@ -44,7 +44,12 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         {
             auto consumer = topic.consumer("myconsumer");
             REQUIRE(static_cast<bool>(consumer));
-            thallium::thread::sleep(engine, 1000);
+            for(unsigned i=0; i < 100; ++i) {
+                auto event = consumer.pull().wait();
+                REQUIRE(event.id() == i);
+                auto& doc = event.metadata().json();
+                REQUIRE(doc["event_num"].GetInt64() == i);
+            }
         }
     }
 

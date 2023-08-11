@@ -64,8 +64,8 @@ Future<Event> Consumer::pull() const {
     } else {
         // the queue of futures has futures already
         // created by the consumer
-        future = std::move(self->m_futures.back().second);
-        self->m_futures.pop_back();
+        future = std::move(self->m_futures.front().second);
+        self->m_futures.pop_front();
         self->m_futures_credit = false;
     }
     return future;
@@ -148,30 +148,33 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
 
     for(size_t i = 0; i < count; ++i) {
         auto eventID = startID + i;
-        auto ult = [this, &target, &batch, i, eventID, metadata_offset, data_desc_offset, &serializer, &ults_completed]() {
-            // get a promise/future pair
-            Promise<Event> promise;
-            {
-                std::unique_lock<thallium::mutex> guard{m_futures_mtx};
-                if(!m_futures_credit || m_futures.empty()) {
-                    // the queue of futures is empty or the futures
-                    // already in the queue have been created by
-                    // previous calls to recvBatch() that haven't had
-                    // a corresponding pull() call from the user.
-                    Future<Event> future;
-                    std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
-                    m_futures.emplace_back(std::move(promise), future);
-                    m_futures_credit = false;
-                } else {
-                    // the queue of futures has futures already
-                    // created by pull() calls from the user
-                    promise = std::move(m_futures.back().first);
-                    m_futures.pop_back();
-                    m_futures_credit = true;
-                }
+        // get a promise/future pair
+        Promise<Event> promise;
+        {
+            std::unique_lock<thallium::mutex> guard{m_futures_mtx};
+            if(!m_futures_credit || m_futures.empty()) {
+                // the queue of futures is empty or the futures
+                // already in the queue have been created by
+                // previous calls to recvBatch() that haven't had
+                // a corresponding pull() call from the user.
+                Future<Event> future;
+                std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
+                m_futures.emplace_back(promise, future);
+                m_futures_credit = false;
+            } else {
+                // the queue of futures has futures already
+                // created by pull() calls from the user
+                promise = std::move(m_futures.front().first);
+                m_futures.pop_front();
+                m_futures_credit = true;
             }
-            // create new event instance
-            auto event_impl = std::make_shared<EventImpl>(target, eventID);
+        }
+        // create new event instance
+        auto event_impl = std::make_shared<EventImpl>(target, eventID);
+        // create the ULT
+        auto ult = [this, &batch, i, event_impl, promise,
+                    metadata_offset, data_desc_offset,
+                    &serializer, &ults_completed]() mutable {
             try {
                 // deserialize its metadata
                 auto& metadata  = event_impl->m_metadata;
@@ -207,7 +210,7 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
             }
             ults_completed.set(nullptr);
         };
-        m_thread_pool.self->pushWork(std::move(ult), startID+i);
+        m_thread_pool.self->pushWork(std::move(ult), eventID);
         metadata_offset  += batch->m_meta_sizes[i];
         data_desc_offset += batch->m_data_desc_sizes[i];
     }
