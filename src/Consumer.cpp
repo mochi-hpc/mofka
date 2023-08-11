@@ -149,25 +149,7 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
     for(size_t i = 0; i < count; ++i) {
         auto eventID = startID + i;
         auto ult = [this, &target, &batch, i, eventID, metadata_offset, data_desc_offset, &serializer, &ults_completed]() {
-            // create new event instance
-            auto event_impl = std::make_shared<EventImpl>(target, eventID);
-            // deserialize its metadata
-            auto& metadata  = event_impl->m_metadata;
-            BufferWrapperInputArchive metadata_archive{
-                std::string_view{
-                    batch->m_meta_buffer.data() + metadata_offset,
-                    batch->m_meta_sizes[i]}};
-            serializer.deserialize(metadata_archive, metadata);
-            // deserialize the data descriptors
-            BufferWrapperInputArchive descriptors_archive{
-                std::string_view{
-                    batch->m_data_desc_buffer.data() + data_desc_offset,
-                    batch->m_data_desc_sizes[i]}};
-            DataDescriptor descriptor;
-            descriptor.load(descriptors_archive);
-            // TODO run data selector and data broker
-
-            // set a promise/future pair
+            // get a promise/future pair
             Promise<Event> promise;
             {
                 std::unique_lock<thallium::mutex> guard{m_futures_mtx};
@@ -187,9 +169,42 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
                     m_futures.pop_back();
                     m_futures_credit = true;
                 }
-                promise.setValue(Event{event_impl});
             }
-
+            // create new event instance
+            auto event_impl = std::make_shared<EventImpl>(target, eventID);
+            try {
+                // deserialize its metadata
+                auto& metadata  = event_impl->m_metadata;
+                BufferWrapperInputArchive metadata_archive{
+                    std::string_view{
+                        batch->m_meta_buffer.data() + metadata_offset,
+                            batch->m_meta_sizes[i]}};
+                serializer.deserialize(metadata_archive, metadata);
+                // deserialize the data descriptors
+                BufferWrapperInputArchive descriptors_archive{
+                    std::string_view{
+                        batch->m_data_desc_buffer.data() + data_desc_offset,
+                            batch->m_data_desc_sizes[i]}};
+                DataDescriptor descriptor;
+                descriptor.load(descriptors_archive);
+                // run data selector
+                auto requested_descriptor = (m_data_selector && m_data_broker)
+                    ? m_data_selector(event_impl->m_metadata, descriptor)
+                    : DataDescriptor::Null();
+                Data local_data_target;
+                if(requested_descriptor.size() != 0) {
+                    // run data broker
+                    local_data_target = m_data_broker(
+                            event_impl->m_metadata, descriptor);
+                    // TODO request data
+                }
+                // set the promise
+                promise.setValue(Event{event_impl});
+            } catch(const Exception& ex) {
+                // something bad happened somewhere,
+                // pass the exception to the promise.
+                promise.setException(ex);
+            }
             ults_completed.set(nullptr);
         };
         m_thread_pool.self->pushWork(std::move(ult), startID+i);
