@@ -53,24 +53,33 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
     std::tie(future, promise) = self->m_batch_size != BatchSize::Adaptive() ?
         Promise<EventID>::CreateFutureAndPromise(std::move(on_wait))
         : Promise<EventID>::CreateFutureAndPromise();
-    /* Step 2: create a ULT that will validate, select the target, and serialize */
+    /* Step 2: get a local ID for this push operation */
+    size_t local_event_id = self->m_num_pushed_events++;
+    /* Step 3: create a ULT that will validate, select the target, and serialize */
     auto ult = [this,
+                local_event_id,
                 promise=std::move(promise),
                 metadata=std::move(metadata),
                 data=std::move(data)]() mutable {
         auto topic = self->m_topic;
+        /* Metadata validation */
         try {
-            /* Step 2.1: validate the metadata */
+            /* Step 3.1: validate the metadata */
             topic->m_validator.validate(metadata, data);
-            /* Step 2.2: select the target for this metadata */
+            /* Step 3.2: select the target for this metadata */
             auto target = topic->m_selector.selectTargetFor(metadata);
-            /* Step 2.3: find/create the ActiveBatchQueue to send to */
-            std::shared_ptr<ActiveProducerBatchQueue> queue;
             {
-                std::lock_guard<thallium::mutex> guard{self->m_batch_queues_mtx};
-                auto& queue_ptr = self->m_batch_queues[target];
-                if(!queue_ptr) {
-                    queue_ptr.reset(new ActiveProducerBatchQueue{
+                /* Step 3.3: wait for our turn pushing the event into the batch */
+                std::unique_lock<thallium::mutex> guard{self->m_batch_queues_mtx};
+                if(self->m_ordering == Ordering::Strict) {
+                    while(local_event_id != self->m_num_ready_events) {
+                        self->m_batch_queues_cv.wait(guard);
+                    }
+                }
+                /* Step 3.4: find/create the ActiveBatchQueue to send to */
+                auto& queue = self->m_batch_queues[target];
+                if(!queue) {
+                    queue.reset(new ActiveProducerBatchQueue{
                         self->m_topic->m_name,
                         self->m_name,
                         self->m_topic->m_service->m_client,
@@ -78,16 +87,24 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
                         threadPool(),
                         batchSize()});
                 }
-                queue = queue_ptr;
+                if(self->m_ordering != Ordering::Strict)
+                    guard.unlock();
+                /* Step 3.5: push the data and metadata to the batch */
+                queue->push(metadata, topic->m_serializer, data, promise);
+                /* Step 3.6: increase the number of events that are ready */
+                self->m_num_ready_events += 1;
+                /* Step 3.7: now the ActiveBatchQueue ULT will automatically
+                 * pick up the batch and send it when needed */
             }
-            /* Step 2.4: push the data and metadata to the batch */
-            queue->push(metadata, topic->m_serializer, data, promise);
-            /* Step 2.5: now the ActiveBatchQueue ULT will automatically
-             * pick up the batch and send it when needed */
         } catch(const Exception& ex) {
+            /* Increase the number of events that are ready
+             * (because it wasn't done in the normal path) */
+            self->m_num_ready_events += 1;
             promise.setException(ex);
         }
-        /* Step 2.6: decrease the number of posted ULTs */
+        /* Step 3.8: notify ULTs blocked waiting for their turn */
+        self->m_batch_queues_cv.notify_all();
+        /* Step 3.9: decrease the number of posted ULTs */
         bool notify_no_posted_ults = false;
         {
             std::lock_guard<thallium::mutex> guard_posted_ults{self->m_num_posted_ults_mtx};
@@ -98,16 +115,13 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
             self->m_num_posted_ults_cv.notify_all();
         }
     };
-    /* Step 3: increase the number of posted ULTs */
-    uint64_t priority = 0;
+    /* Step 4: increase the number of posted ULTs */
     {
         std::lock_guard<thallium::mutex> guard{self->m_num_posted_ults_mtx};
         self->m_num_posted_ults += 1;
-        priority = self->m_num_produced_events;
-        self->m_num_produced_events += 1;
     }
     /* Step 3: submit the ULT */
-    self->m_thread_pool.self->pushWork(std::move(ult), priority);
+    self->m_thread_pool.self->pushWork(std::move(ult), local_event_id);
     /* Step 4: return the future */
     return future;
 }

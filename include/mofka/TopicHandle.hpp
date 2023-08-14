@@ -16,6 +16,7 @@
 #include <mofka/Consumer.hpp>
 #include <mofka/DataBroker.hpp>
 #include <mofka/DataSelector.hpp>
+#include <mofka/Ordering.hpp>
 #include <memory>
 #include <unordered_set>
 
@@ -89,7 +90,8 @@ class TopicHandle {
         return makeProducer(
             GetArgOrDefault(std::string_view{""}, std::forward<Options>(opts)...),
             GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
-            GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...));
+            GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
+            GetArgOrDefault(defaultOrdering(), std::forward<Options>(opts)...));
     }
 
     /**
@@ -140,12 +142,14 @@ class TopicHandle {
      * @param name Name of the Producer.
      * @param batch_size Batch size.
      * @param thread_pool Thread pool.
+     * @param ordering Whether to enforce strict ordering.
      *
      * @return Producer instance.
      */
     Producer makeProducer(std::string_view name,
                           BatchSize batch_size,
-                          ThreadPool thread_pool) const;
+                          ThreadPool thread_pool,
+                          Ordering ordering) const;
 
     /**
      * @brief Create a Consumer object from the full
@@ -165,6 +169,8 @@ class TopicHandle {
                           DataBroker data_broker,
                           DataSelector data_selector,
                           const std::vector<PartitionTargetInfo>& targets) const;
+
+    static Ordering defaultOrdering();
 
 };
 

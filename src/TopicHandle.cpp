@@ -32,8 +32,9 @@ ServiceHandle TopicHandle::service() const {
 Producer TopicHandle::makeProducer(
         std::string_view name,
         BatchSize batch_size,
-        ThreadPool thread_pool) const {
-    return std::make_shared<ProducerImpl>(name, batch_size, thread_pool, self);
+        ThreadPool thread_pool,
+        Ordering ordering) const {
+    return std::make_shared<ProducerImpl>(name, batch_size, thread_pool, ordering, self);
 }
 
 Consumer TopicHandle::makeConsumer(
@@ -51,6 +52,13 @@ Consumer TopicHandle::makeConsumer(
 
 const std::vector<PartitionTargetInfo>& TopicHandle::targets() const {
     return self->m_service->m_mofka_targets;
+}
+
+Ordering TopicHandle::defaultOrdering() {
+    spdlog::warn("Ordering not specified when creating Producer. "
+                 "Ordering will be strict by default. If this was intended, "
+                 "explicitely specify the ordering as Ordering::Strict.");
+    return Ordering::Strict;
 }
 
 }

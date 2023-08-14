@@ -32,9 +32,10 @@ TEST_CASE("Event producer test", "[event-producer]") {
 
         auto thread_count = GENERATE(as<mofka::ThreadCount>{}, 0, 1, 2);
         auto batch_size   = GENERATE(mofka::BatchSize::Adaptive(), mofka::BatchSize::Adaptive());
+        auto ordering     = GENERATE(mofka::Ordering::Strict, mofka::Ordering::Loose);
 
         auto producer = topic.producer(
-            "myproducer", batch_size, thread_count);
+            "myproducer", batch_size, thread_count, ordering);
         REQUIRE(static_cast<bool>(producer));
 
         SECTION("Push events into the topic using the producer") {
