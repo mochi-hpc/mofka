@@ -170,7 +170,8 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
             }
         }
         // create new event instance
-        auto event_impl = std::make_shared<EventImpl>(target, eventID);
+        auto event_impl = std::make_shared<EventImpl>(
+            target.self, eventID, shared_from_this());
         // create the ULT
         auto ult = [this, &batch, i, event_impl, promise,
                     metadata_offset, data_desc_offset,

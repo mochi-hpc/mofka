@@ -19,7 +19,7 @@ namespace mofka {
 
 class ClientImpl;
 
-class ConsumerImpl {
+class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
 
     friend class ClientImpl;
 

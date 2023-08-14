@@ -6,6 +6,7 @@
 #include "mofka/Event.hpp"
 #include "mofka/Exception.hpp"
 
+#include "PartitionTargetInfoImpl.hpp"
 #include "EventImpl.hpp"
 #include "PimplUtil.hpp"
 
@@ -30,7 +31,11 @@ EventID Event::id() const {
 }
 
 void Event::acknowledge() const {
-    // TODO
+    auto& rpc = self->m_consumer->m_topic->m_service->m_client->m_consumer_ack_event;
+    auto& ph  = self->m_target->m_ph;
+    rpc.on(ph)(self->m_consumer->m_topic->m_name,
+               self->m_consumer->m_name,
+               self->m_id);
 }
 
 }

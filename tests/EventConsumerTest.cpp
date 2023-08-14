@@ -49,6 +49,8 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 REQUIRE(event.id() == i);
                 auto& doc = event.metadata().json();
                 REQUIRE(doc["event_num"].GetInt64() == i);
+                if(i % 5 == 0)
+                    event.acknowledge();
             }
         }
     }
