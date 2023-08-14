@@ -9,7 +9,6 @@
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
-#include <mofka/AsyncRequest.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Data.hpp>
 #include <mofka/EventID.hpp>

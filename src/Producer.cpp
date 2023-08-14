@@ -9,7 +9,6 @@
 #include "mofka/TopicHandle.hpp"
 #include "mofka/Future.hpp"
 
-#include "AsyncRequestImpl.hpp"
 #include "Promise.hpp"
 #include "ClientImpl.hpp"
 #include "ProducerImpl.hpp"

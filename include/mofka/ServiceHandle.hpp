@@ -9,7 +9,6 @@
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
-#include <mofka/AsyncRequest.hpp>
 #include <mofka/Serializer.hpp>
 #include <mofka/Validator.hpp>
 #include <mofka/TargetSelector.hpp>

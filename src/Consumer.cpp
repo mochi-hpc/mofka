@@ -10,7 +10,6 @@
 #include "mofka/Future.hpp"
 
 #include "EventImpl.hpp"
-#include "AsyncRequestImpl.hpp"
 #include "Promise.hpp"
 #include "ClientImpl.hpp"
 #include "ConsumerImpl.hpp"

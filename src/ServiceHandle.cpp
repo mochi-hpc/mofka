@@ -9,7 +9,6 @@
 #include "mofka/TopicHandle.hpp"
 
 #include "PimplUtil.hpp"
-#include "AsyncRequestImpl.hpp"
 #include "ClientImpl.hpp"
 #include "ServiceHandleImpl.hpp"
 #include "TopicHandleImpl.hpp"

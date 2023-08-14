@@ -10,7 +10,6 @@
 #include <mofka/ArgsUtil.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
-#include <mofka/AsyncRequest.hpp>
 #include <mofka/Producer.hpp>
 #include <mofka/Consumer.hpp>
 #include <mofka/DataBroker.hpp>

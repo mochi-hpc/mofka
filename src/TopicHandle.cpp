@@ -8,7 +8,6 @@
 #include "mofka/Exception.hpp"
 
 #include "PimplUtil.hpp"
-#include "AsyncRequestImpl.hpp"
 #include "ClientImpl.hpp"
 #include "TopicHandleImpl.hpp"
 #include "ProducerImpl.hpp"

@@ -9,7 +9,6 @@
 namespace mofka {
 
 class Archive;
-class AsyncRequest;
 struct BatchSize;
 struct BufferWrapperOutputArchive;
 struct BufferWrapperInputArchive;
