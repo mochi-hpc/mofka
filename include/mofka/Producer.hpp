@@ -22,7 +22,6 @@
 
 namespace mofka {
 
-class TopicHandle;
 class ActiveProducerBatchQueue;
 class ProducerImpl;
 

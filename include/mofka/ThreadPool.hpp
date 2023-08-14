@@ -15,12 +15,9 @@
 
 namespace mofka {
 
-class Producer;
 class ActiveProducerBatchQueue;
 class ThreadPoolImpl;
 class ConsumerImpl;
-class Consumer;
-class TopicHandle;
 
 /**
  * @brief Strongly typped size_t meant to represent the number of

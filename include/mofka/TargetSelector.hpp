@@ -24,12 +24,10 @@ class __MofkaTargetSelectorRegistration;
 namespace mofka {
 
 class PartitionTargetInfoImpl;
-class Producer;
 class TopicHandleImpl;
 class ClientImpl;
 class ServiceHandle;
 class ConsumerImpl;
-class Event;
 
 /**
  * @brief The PartitionTargetInfo structure holds information about

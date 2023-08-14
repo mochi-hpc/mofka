@@ -16,7 +16,6 @@ namespace mofka {
 
 class MetadataImpl;
 class ConsumerImpl;
-class Event;
 
 /**
  * @brief A Metadata is an object that encapsulates the metadata of an event.

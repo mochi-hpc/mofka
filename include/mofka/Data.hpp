@@ -16,7 +16,6 @@ namespace mofka {
 
 class DataImpl;
 class ProducerBatchImpl;
-class Event;
 class ConsumerImpl;
 
 /**

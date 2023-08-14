@@ -21,9 +21,7 @@
 
 namespace mofka {
 
-class Client;
 class ServiceHandleImpl;
-class TopicHandle;
 
 struct TopicBackendConfig : public Metadata {
 

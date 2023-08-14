@@ -23,7 +23,6 @@
 
 namespace mofka {
 
-class ServiceHandle;
 class TopicHandleImpl;
 
 /**

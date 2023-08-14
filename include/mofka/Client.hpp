@@ -18,7 +18,6 @@
 namespace mofka {
 
 class ClientImpl;
-class ServiceHandle;
 
 /**
  * @brief SSGFileName is a string_view representing the name

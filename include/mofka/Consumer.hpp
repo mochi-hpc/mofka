@@ -26,7 +26,6 @@
 
 namespace mofka {
 
-class TopicHandle;
 class ConsumerImpl;
 
 /**

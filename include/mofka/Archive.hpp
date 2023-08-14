@@ -7,6 +7,7 @@
 #define MOFKA_ARCHIVE_HPP
 
 #include <mofka/ForwardDcl.hpp>
+
 #include <cstdint>
 #include <functional>
 
