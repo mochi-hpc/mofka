@@ -6,6 +6,8 @@
 #ifndef MOFKA_EXCEPTION_HPP
 #define MOFKA_EXCEPTION_HPP
 
+#include <mofka/ForwardDcl.hpp>
+
 #include <exception>
 #include <stdexcept>
 

@@ -6,8 +6,10 @@
 #ifndef MOFKA_BUFFER_WRAPPER_ARCHIVE_HPP
 #define MOFKA_BUFFER_WRAPPER_ARCHIVE_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Archive.hpp>
 #include <mofka/Exception.hpp>
+
 #include <cstring>
 #include <string_view>
 

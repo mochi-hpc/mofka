@@ -6,8 +6,7 @@
 #ifndef MOFKA_TOPIC_HANDLE_HPP
 #define MOFKA_TOPIC_HANDLE_HPP
 
-#include <thallium.hpp>
-#include <rapidjson/document.h>
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/ArgsUtil.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
@@ -17,6 +16,9 @@
 #include <mofka/DataBroker.hpp>
 #include <mofka/DataSelector.hpp>
 #include <mofka/Ordering.hpp>
+
+#include <thallium.hpp>
+#include <rapidjson/document.h>
 #include <memory>
 #include <unordered_set>
 

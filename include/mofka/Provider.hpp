@@ -6,14 +6,14 @@
 #ifndef MOFKA_PROVIDER_HPP
 #define MOFKA_PROVIDER_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Json.hpp>
+
 #include <thallium.hpp>
 #include <memory>
 #include <string_view>
 
 namespace mofka {
-
-namespace tl = thallium;
 
 class ProviderImpl;
 
@@ -33,10 +33,10 @@ class Provider {
      * @param config JSON configuration.
      * @param pool Argobots pool to use to handle RPCs.
      */
-    Provider(const tl::engine& engine,
+    Provider(const thallium::engine& engine,
              uint16_t provider_id = 0,
              const rapidjson::Value& config = rapidjson::Value{},
-             const tl::pool& pool = tl::pool{});
+             const thallium::pool& pool = thallium::pool{});
 
     /**
      * @brief Copy-constructor is deleted.

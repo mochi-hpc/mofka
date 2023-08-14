@@ -91,7 +91,7 @@ void ConsumerImpl::start() {
     auto n = m_targets.size();
     m_pulling_ult_completed.resize(n);
     for(size_t i=0; i < n; ++i) {
-        m_thread_pool.self->pushWork(
+        m_thread_pool->pushWork(
             [this, i](){
                 pullFrom(i, m_pulling_ult_completed[i]);
         });
@@ -171,14 +171,14 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
         }
         // create new event instance
         auto event_impl = std::make_shared<EventImpl>(
-            target.self, eventID, shared_from_this());
+            eventID, target.self, shared_from_this());
         // create the ULT
         auto ult = [this, &batch, i, event_impl, promise,
                     metadata_offset, data_desc_offset,
                     &serializer, &ults_completed]() mutable {
             try {
                 // deserialize its metadata
-                auto& metadata  = event_impl->m_metadata;
+                Metadata metadata{event_impl->m_metadata};
                 BufferWrapperInputArchive metadata_archive{
                     std::string_view{
                         batch->m_meta_buffer.data() + metadata_offset,
@@ -211,7 +211,7 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
             }
             ults_completed.set(nullptr);
         };
-        m_thread_pool.self->pushWork(std::move(ult), eventID);
+        m_thread_pool->pushWork(std::move(ult), eventID);
         metadata_offset  += batch->m_meta_sizes[i];
         data_desc_offset += batch->m_data_desc_sizes[i];
     }

@@ -14,11 +14,11 @@ namespace mofka {
 
 PIMPL_DEFINE_COMMON_FUNCTIONS(Event);
 
-const Metadata& Event::metadata() const {
+Metadata Event::metadata() const {
     return self->m_metadata;
 }
 
-const Data& Event::data() const {
+Data Event::data() const {
     return self->m_data;
 }
 

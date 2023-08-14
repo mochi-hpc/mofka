@@ -6,6 +6,8 @@
 #ifndef MOFKA_ORDERING_HPP
 #define MOFKA_ORDERING_HPP
 
+#include <mofka/ForwardDcl.hpp>
+
 namespace mofka {
 
 enum class Ordering : bool {

@@ -1,6 +1,6 @@
 /*
  * (C) 2020 The University of Chicago
- * 
+ *
  * See COPYRIGHT in top-level directory.
  */
 #ifndef __MOFKA_ASYNC_REQUEST_IMPL_H

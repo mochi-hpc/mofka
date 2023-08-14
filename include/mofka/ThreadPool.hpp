@@ -6,9 +6,11 @@
 #ifndef MOFKA_THREAD_POOL_HPP
 #define MOFKA_THREAD_POOL_HPP
 
-#include <thallium.hpp>
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/Future.hpp>
+
+#include <thallium.hpp>
 #include <memory>
 
 namespace mofka {
@@ -17,6 +19,8 @@ class Producer;
 class ActiveProducerBatchQueue;
 class ThreadPoolImpl;
 class ConsumerImpl;
+class Consumer;
+class TopicHandle;
 
 /**
  * @brief Strongly typped size_t meant to represent the number of
@@ -93,6 +97,8 @@ class ThreadPool {
     friend class Producer;
     friend class ActiveProducerBatchQueue;
     friend class ConsumerImpl;
+    friend class Consumer;
+    friend class TopicHandle;
 };
 
 }

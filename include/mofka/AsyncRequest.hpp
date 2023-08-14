@@ -6,6 +6,8 @@
 #ifndef MOFKA_ASYNC_REQUEST_HPP
 #define MOFKA_ASYNC_REQUEST_HPP
 
+#include <mofka/ForwardDcl.hpp>
+
 #include <memory>
 #include <string>
 

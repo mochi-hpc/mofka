@@ -6,8 +6,10 @@
 #ifndef MOFKA_DATA_DESCRIPTOR_HPP
 #define MOFKA_DATA_DESCRIPTOR_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/Archive.hpp>
+
 #include <memory>
 #include <string_view>
 #include <map>

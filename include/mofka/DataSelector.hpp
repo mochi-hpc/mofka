@@ -6,8 +6,10 @@
 #ifndef MOFKA_DATA_SELECTOR_HPP
 #define MOFKA_DATA_SELECTOR_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/DataDescriptor.hpp>
+
 #include <functional>
 #include <exception>
 #include <stdexcept>

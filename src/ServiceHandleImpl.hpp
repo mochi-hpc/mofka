@@ -6,7 +6,9 @@
 #ifndef MOFKA_SERVICE_HANDLE_IMPL_H
 #define MOFKA_SERVICE_HANDLE_IMPL_H
 
+#include "PimplUtil.hpp"
 #include "ClientImpl.hpp"
+
 #include <bedrock/ServiceGroupHandle.hpp>
 #include <thallium.hpp>
 #include <vector>
@@ -17,7 +19,7 @@ class ServiceHandleImpl {
 
     public:
 
-    std::shared_ptr<ClientImpl>      m_client;
+    SP<ClientImpl>                   m_client;
     bedrock::ServiceGroupHandle      m_bsgh;
     std::vector<PartitionTargetInfo> m_mofka_targets;
 

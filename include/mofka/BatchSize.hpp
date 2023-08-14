@@ -6,6 +6,8 @@
 #ifndef MOFKA_BATCH_SIZE_HPP
 #define MOFKA_BATCH_SIZE_HPP
 
+#include <mofka/ForwardDcl.hpp>
+
 #include <cstdint>
 
 namespace mofka {

@@ -6,8 +6,10 @@
 #ifndef MOFKA_CONSUMER_HANDLE_HPP
 #define MOFKA_CONSUMER_HANDLE_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/BulkRef.hpp>
 #include <mofka/EventID.hpp>
+
 #include <thallium.hpp>
 #include <memory>
 

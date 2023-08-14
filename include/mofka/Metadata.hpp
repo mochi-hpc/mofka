@@ -6,13 +6,17 @@
 #ifndef MOFKA_METADATA_HPP
 #define MOFKA_METADATA_HPP
 
-#include <rapidjson/document.h>
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
+
+#include <rapidjson/document.h>
 #include <memory>
 
 namespace mofka {
 
 class MetadataImpl;
+class ConsumerImpl;
+class Event;
 
 /**
  * @brief A Metadata is an object that encapsulates the metadata of an event.
@@ -134,6 +138,9 @@ class Metadata {
 
     template<typename A>
     friend void load(A& ar, Metadata& metadata);
+
+    friend class ConsumerImpl;
+    friend class Event;
 };
 
 }

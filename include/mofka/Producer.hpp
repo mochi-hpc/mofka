@@ -6,8 +6,7 @@
 #ifndef MOFKA_PRODUCER_HPP
 #define MOFKA_PRODUCER_HPP
 
-#include <thallium.hpp>
-#include <rapidjson/document.h>
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/AsyncRequest.hpp>
@@ -17,6 +16,9 @@
 #include <mofka/Future.hpp>
 #include <mofka/ThreadPool.hpp>
 #include <mofka/BatchSize.hpp>
+
+#include <thallium.hpp>
+#include <rapidjson/document.h>
 #include <memory>
 
 namespace mofka {

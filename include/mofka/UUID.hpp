@@ -6,6 +6,8 @@
 #ifndef MOFKA_UUID_UTIL_HPP
 #define MOFKA_UUID_UTIL_HPP
 
+#include <mofka/ForwardDcl.hpp>
+
 #include <stdexcept>
 #include <uuid/uuid.h>
 #include <string>

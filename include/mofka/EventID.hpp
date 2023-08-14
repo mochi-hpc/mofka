@@ -6,6 +6,8 @@
 #ifndef MOFKA_EVENT_ID_HPP
 #define MOFKA_EVENT_ID_HPP
 
+#include <mofka/ForwardDcl.hpp>
+
 #include <cstdint>
 
 namespace mofka {

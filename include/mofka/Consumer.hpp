@@ -6,8 +6,7 @@
 #ifndef MOFKA_CONSUMER_HPP
 #define MOFKA_CONSUMER_HPP
 
-#include <thallium.hpp>
-#include <rapidjson/document.h>
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/AsyncRequest.hpp>
@@ -21,6 +20,9 @@
 #include <mofka/EventProcessor.hpp>
 #include <mofka/BatchSize.hpp>
 #include <mofka/NumEvents.hpp>
+
+#include <thallium.hpp>
+#include <rapidjson/document.h>
 #include <memory>
 
 namespace mofka {

@@ -6,9 +6,11 @@
 #ifndef MOFKA_DATA_BROKER_HPP
 #define MOFKA_DATA_BROKER_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Data.hpp>
 #include <mofka/DataDescriptor.hpp>
+
 #include <functional>
 #include <exception>
 #include <stdexcept>

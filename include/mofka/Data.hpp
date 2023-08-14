@@ -6,7 +6,9 @@
 #ifndef MOFKA_DATA_HPP
 #define MOFKA_DATA_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
+
 #include <memory>
 #include <vector>
 
@@ -14,6 +16,8 @@ namespace mofka {
 
 class DataImpl;
 class ProducerBatchImpl;
+class Event;
+class ConsumerImpl;
 
 /**
  * @brief A Data is an object that encapsulates the data of an event.
@@ -90,6 +94,8 @@ class Data {
     std::shared_ptr<DataImpl> self;
 
     friend class ProducerBatchImpl;
+    friend class Event;
+    friend class ConsumerImpl;
 };
 
 }

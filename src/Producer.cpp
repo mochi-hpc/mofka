@@ -84,7 +84,7 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
                         self->m_name,
                         self->m_topic->m_service->m_client,
                         target.self,
-                        threadPool(),
+                        self->m_thread_pool,
                         batchSize()});
                 }
                 if(self->m_ordering != Ordering::Strict)
@@ -121,7 +121,7 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
         self->m_num_posted_ults += 1;
     }
     /* Step 3: submit the ULT */
-    self->m_thread_pool.self->pushWork(std::move(ult), local_event_id);
+    self->m_thread_pool->pushWork(std::move(ult), local_event_id);
     /* Step 4: return the future */
     return future;
 }

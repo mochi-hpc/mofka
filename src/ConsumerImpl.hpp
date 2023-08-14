@@ -6,12 +6,15 @@
 #ifndef MOFKA_CONSUMER_IMPL_H
 #define MOFKA_CONSUMER_IMPL_H
 
-#include <thallium.hpp>
+#include "PimplUtil.hpp"
 #include "TopicHandleImpl.hpp"
 #include "PartitionTargetInfoImpl.hpp"
 #include "ProducerImpl.hpp"
+
 #include "mofka/Consumer.hpp"
 #include "mofka/UUID.hpp"
+
+#include <thallium.hpp>
 #include <string_view>
 #include <queue>
 
@@ -29,7 +32,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     std::string                      m_name;
     UUID                             m_uuid;
     BatchSize                        m_batch_size;
-    ThreadPool                       m_thread_pool;
+    SP<ThreadPoolImpl>               m_thread_pool;
     DataBroker                       m_data_broker;
     DataSelector                     m_data_selector;
     EventProcessor                   m_event_processor;
@@ -66,7 +69,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     ConsumerImpl(thallium::engine engine,
                  std::string_view name,
                  BatchSize batch_size,
-                 ThreadPool thread_pool,
+                 SP<ThreadPoolImpl> thread_pool,
                  DataBroker broker,
                  DataSelector selector,
                  std::vector<PartitionTargetInfo> targets,

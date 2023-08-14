@@ -6,6 +6,8 @@
 #ifndef MOFKA_PIMPL_UTIL_HPP
 #define MOFKA_PIMPL_UTIL_HPP
 
+#include <memory>
+
 #define PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(T) \
     T::T(const std::shared_ptr<T ## Impl>& impl) \
     : self(impl) {}                              \
@@ -33,5 +35,15 @@
 #define PIMPL_DEFINE_COMMON_FUNCTIONS(T)     \
     T::T() = default;                        \
     PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(T)
+
+namespace mofka {
+
+template<typename T>
+using SP = std::shared_ptr<T>;
+
+template<typename T>
+using WP = std::weak_ptr<T>;
+
+}
 
 #endif

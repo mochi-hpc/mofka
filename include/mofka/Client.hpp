@@ -6,9 +6,11 @@
 #ifndef MOFKA_CLIENT_HPP
 #define MOFKA_CLIENT_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/ServiceHandle.hpp>
 #include <mofka/UUID.hpp>
 #include <mofka/Json.hpp>
+
 #include <thallium.hpp>
 #include <memory>
 #include <string_view>

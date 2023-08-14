@@ -34,7 +34,7 @@ Producer TopicHandle::makeProducer(
         BatchSize batch_size,
         ThreadPool thread_pool,
         Ordering ordering) const {
-    return std::make_shared<ProducerImpl>(name, batch_size, thread_pool, ordering, self);
+    return std::make_shared<ProducerImpl>(name, batch_size, thread_pool.self, ordering, self);
 }
 
 Consumer TopicHandle::makeConsumer(
@@ -46,7 +46,7 @@ Consumer TopicHandle::makeConsumer(
         const std::vector<PartitionTargetInfo>& targets) const {
     return std::make_shared<ConsumerImpl>(
             self->m_service->m_client->m_engine,
-            name, batch_size, thread_pool,
+            name, batch_size, thread_pool.self,
             data_broker, data_selector, targets, self);
 }
 

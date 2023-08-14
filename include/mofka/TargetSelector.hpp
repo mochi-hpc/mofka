@@ -6,9 +6,11 @@
 #ifndef MOFKA_TARGET_SELECTOR_HPP
 #define MOFKA_TARGET_SELECTOR_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/UUID.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Exception.hpp>
+
 #include <functional>
 #include <exception>
 #include <stdexcept>

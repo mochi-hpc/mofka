@@ -6,7 +6,9 @@
 #ifndef MOFKA_EVENT_PROCESSOR_HPP
 #define MOFKA_EVENT_PROCESSOR_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Event.hpp>
+
 #include <functional>
 #include <exception>
 #include <stdexcept>

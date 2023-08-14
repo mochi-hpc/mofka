@@ -19,16 +19,16 @@ class TopicHandleImpl {
 
     public:
 
-    std::string                        m_name;
-    std::shared_ptr<ServiceHandleImpl> m_service;
-    Validator                          m_validator;
-    TargetSelector                     m_selector;
-    Serializer                         m_serializer;
+    std::string           m_name;
+    SP<ServiceHandleImpl> m_service;
+    Validator             m_validator;
+    TargetSelector        m_selector;
+    Serializer            m_serializer;
 
     TopicHandleImpl() = default;
 
     TopicHandleImpl(std::string_view name,
-                    std::shared_ptr<ServiceHandleImpl> service,
+                    SP<ServiceHandleImpl> service,
                     Validator validator,
                     TargetSelector selector,
                     Serializer serializer)

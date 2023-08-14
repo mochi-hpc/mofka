@@ -6,11 +6,13 @@
 #ifndef MOFKA_EVENT_HPP
 #define MOFKA_EVENT_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Data.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/TargetSelector.hpp>
 #include <mofka/EventID.hpp>
+
 #include <memory>
 #include <vector>
 
@@ -63,12 +65,12 @@ class Event {
     /**
      * @brief Get event Event's Metadata.
      */
-    const Metadata& metadata() const;
+    Metadata metadata() const;
 
     /**
      * @brief Get event Event's Data.
      */
-    const Data& data() const;
+    Data data() const;
 
     /**
      * @brief Returns information about the partition

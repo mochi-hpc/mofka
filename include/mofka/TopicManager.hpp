@@ -6,12 +6,14 @@
 #ifndef MOFKA_BACKEND_HPP
 #define MOFKA_BACKEND_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/RequestResult.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Json.hpp>
 #include <mofka/BatchSize.hpp>
 #include <mofka/EventID.hpp>
 #include <mofka/ConsumerHandle.hpp>
+
 #include <thallium.hpp>
 #include <unordered_map>
 #include <string_view>

@@ -6,7 +6,9 @@
 #ifndef MOFKA_FUTURE_HPP
 #define MOFKA_FUTURE_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
+
 #include <memory>
 #include <functional>
 

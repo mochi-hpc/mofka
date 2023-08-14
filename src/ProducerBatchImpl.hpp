@@ -6,9 +6,13 @@
 #ifndef MOFKA_PRODUCER_BATCH_IMPL_H
 #define MOFKA_PRODUCER_BATCH_IMPL_H
 
-#include <thallium.hpp>
-#include <mutex>
-#include <queue>
+#include "PartitionTargetInfoImpl.hpp"
+#include "ThreadPoolImpl.hpp"
+#include "ProducerImpl.hpp"
+#include "Promise.hpp"
+#include "DataImpl.hpp"
+#include "PimplUtil.hpp"
+
 #include "mofka/BulkRef.hpp"
 #include "mofka/RequestResult.hpp"
 #include "mofka/EventID.hpp"
@@ -19,11 +23,10 @@
 #include "mofka/Future.hpp"
 #include "mofka/Producer.hpp"
 #include "mofka/BufferWrapperArchive.hpp"
-#include "PartitionTargetInfoImpl.hpp"
-#include "ThreadPoolImpl.hpp"
-#include "ProducerImpl.hpp"
-#include "Promise.hpp"
-#include "DataImpl.hpp"
+
+#include <thallium.hpp>
+#include <mutex>
+#include <queue>
 #include <vector>
 #include <cstdint>
 
@@ -116,9 +119,9 @@ class ActiveProducerBatchQueue {
     ActiveProducerBatchQueue(
         std::string topic_name,
         std::string producer_name,
-        std::shared_ptr<ClientImpl> client,
-        std::shared_ptr<PartitionTargetInfoImpl> target,
-        ThreadPool thread_pool,
+        SP<ClientImpl> client,
+        SP<PartitionTargetInfoImpl> target,
+        SP<ThreadPoolImpl> thread_pool,
         BatchSize batch_size)
     : m_topic_name(std::move(topic_name))
     , m_producer_name(std::move(producer_name))
@@ -170,7 +173,7 @@ class ActiveProducerBatchQueue {
 
     void start() {
         if(m_running) return;
-        m_thread_pool.self->pushWork([this]() { loop(); });
+        m_thread_pool->pushWork([this]() { loop(); });
     }
 
     void flush() {
@@ -242,20 +245,20 @@ class ActiveProducerBatchQueue {
         }
     }
 
-    std::string                                    m_topic_name;
-    std::string                                    m_producer_name;
-    std::shared_ptr<ClientImpl>                    m_client;
-    std::shared_ptr<PartitionTargetInfoImpl>       m_target;
-    ThreadPool                                     m_thread_pool;
-    BatchSize                                      m_batch_size;
-    std::queue<std::shared_ptr<ProducerBatchImpl>> m_batch_queue;
-    thallium::managed<thallium::thread>            m_sender_ult;
-    bool                                           m_need_stop = false;
-    bool                                           m_request_flush = false;
-    std::atomic<bool>                              m_running = false;
-    thallium::mutex                                m_mutex;
-    thallium::condition_variable                   m_cv;
-    thallium::eventual<void>                       m_terminated;
+    std::string                         m_topic_name;
+    std::string                         m_producer_name;
+    SP<ClientImpl>                      m_client;
+    SP<PartitionTargetInfoImpl>         m_target;
+    SP<ThreadPoolImpl>                  m_thread_pool;
+    BatchSize                           m_batch_size;
+    std::queue<SP<ProducerBatchImpl>>   m_batch_queue;
+    thallium::managed<thallium::thread> m_sender_ult;
+    bool                                m_need_stop = false;
+    bool                                m_request_flush = false;
+    std::atomic<bool>                   m_running = false;
+    thallium::mutex                     m_mutex;
+    thallium::condition_variable        m_cv;
+    thallium::eventual<void>            m_terminated;
 
 };
 

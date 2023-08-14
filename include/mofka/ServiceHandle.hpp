@@ -6,8 +6,7 @@
 #ifndef MOFKA_SERVICE_HANDLE_HPP
 #define MOFKA_SERVICE_HANDLE_HPP
 
-#include <thallium.hpp>
-#include <rapidjson/document.h>
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/AsyncRequest.hpp>
@@ -15,6 +14,9 @@
 #include <mofka/Validator.hpp>
 #include <mofka/TargetSelector.hpp>
 #include <mofka/Metadata.hpp>
+
+#include <thallium.hpp>
+#include <rapidjson/document.h>
 #include <memory>
 #include <unordered_set>
 

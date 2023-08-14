@@ -6,6 +6,8 @@
 #ifndef MOFKA_ARGS_UTIL_HPP
 #define MOFKA_ARGS_UTIL_HPP
 
+#include <mofka/ForwardDcl.hpp>
+
 #include <cstdint>
 #include <functional>
 #include <type_traits>

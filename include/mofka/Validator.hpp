@@ -6,9 +6,11 @@
 #ifndef MOFKA_VALIDATOR_HPP
 #define MOFKA_VALIDATOR_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Data.hpp>
 #include <mofka/Exception.hpp>
+
 #include <functional>
 #include <exception>
 #include <stdexcept>

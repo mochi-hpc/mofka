@@ -6,8 +6,10 @@
 #ifndef MOFKA_SERIALIZER_HPP
 #define MOFKA_SERIALIZER_HPP
 
+#include <mofka/ForwardDcl.hpp>
 #include <mofka/Archive.hpp>
 #include <mofka/Metadata.hpp>
+
 #include <functional>
 #include <exception>
 #include <stdexcept>
