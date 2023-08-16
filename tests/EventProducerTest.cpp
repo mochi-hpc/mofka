@@ -45,6 +45,15 @@ TEST_CASE("Event producer test", "[event-producer]") {
             producer.flush();
             future.wait();
         }
+
+        SECTION("Push events with data") {
+            std::string someData = "This is some data";
+            auto future = producer.push(
+                mofka::Metadata("{\"name\":\"matthieu\"}"),
+                mofka::Data{someData.data(), someData.size()});
+            producer.flush();
+            future.wait();
+        }
     }
 
     server.finalize();

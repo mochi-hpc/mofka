@@ -21,7 +21,10 @@ static inline const char* config = R"(
         {
             "name" : "mofka_group",
             "method" : "init",
-            "group_file" : "mofka.ssg"
+            "group_file" : "mofka.ssg",
+            "swim" : {
+                "period_length_ms" : 100
+            }
         }
     ]
 }
