@@ -116,6 +116,7 @@ class DataDescriptorImpl {
                 ar.write(u.segments.data(), num_segments*sizeof(u.segments[0]));
             }
         };
+        ar.write(&m_size, sizeof(m_size));
         size_t location_size = m_location.size();
         ar.write(&location_size, sizeof(location_size));
         ar.write(m_location.data(), location_size);
@@ -126,6 +127,7 @@ class DataDescriptorImpl {
     }
 
     void load(Archive& ar) {
+        ar.read(&m_size, sizeof(m_size));
         size_t location_size = 0;
         ar.read(&location_size, sizeof(location_size));
         m_location.resize(location_size);

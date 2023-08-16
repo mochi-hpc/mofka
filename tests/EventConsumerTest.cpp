@@ -64,7 +64,6 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
             mofka::DataSelector data_selector = [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
                 auto& doc = metadata.json();
                 auto event_id = doc["event_num"].GetInt64();
-                std::cerr << "DataDescriptor for event " << event_id << " has size " << descriptor.size() << std::endl;
                 if(event_id % 2 == 0) {
                     return descriptor;
                 } else {
@@ -78,7 +77,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                     auto data = new char[size];
                     return mofka::Data{data, size};
                 } else {
-                    return mofka::Data{nullptr, 0};
+                    return mofka::Data{};
                 }
             };
             auto consumer = topic.consumer(
@@ -91,8 +90,17 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 REQUIRE(doc["event_num"].GetInt64() == i);
                 if(i % 5 == 0)
                     event.acknowledge();
-                if(i % 2 == 0 && event.data().segments().size() == 1)
+                if(i % 2 == 0) {
+                    REQUIRE(event.data().segments().size() == 1);
+                    auto data_str = std::string{
+                        (const char*)event.data().segments()[0].ptr,
+                        event.data().segments()[0].size};
+                    std::string expected = fmt::format("This is data for event {}", i);
+                    REQUIRE(data_str == expected);
                     delete[] static_cast<const char*>(event.data().segments()[0].ptr);
+                } else {
+                    REQUIRE(event.data().segments().size() == 0);
+                }
             }
         }
     }

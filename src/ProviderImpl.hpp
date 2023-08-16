@@ -297,7 +297,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         RequestResult<void> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         // TODO
-        std::cerr << "AAA" << std::endl;
         spdlog::trace("[mofka:{}] Successfully executed requestData", id());
     }
 
