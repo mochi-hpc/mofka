@@ -28,16 +28,18 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
 
     public:
 
-    thallium::engine                 m_engine;
-    std::string                      m_name;
-    UUID                             m_uuid;
-    BatchSize                        m_batch_size;
-    SP<ThreadPoolImpl>               m_thread_pool;
-    DataBroker                       m_data_broker;
-    DataSelector                     m_data_selector;
-    EventProcessor                   m_event_processor;
-    std::vector<PartitionTargetInfo> m_targets;
-    std::shared_ptr<TopicHandleImpl> m_topic;
+    thallium::engine                       m_engine;
+    const std::string                      m_name;
+    const UUID                             m_uuid;
+    const BatchSize                        m_batch_size;
+    const SP<ThreadPoolImpl>               m_thread_pool;
+    const DataBroker                       m_data_broker;
+    const DataSelector                     m_data_selector;
+    const EventProcessor                   m_event_processor;
+    const std::vector<PartitionTargetInfo> m_targets;
+    const std::shared_ptr<TopicHandleImpl> m_topic;
+
+    const std::string m_self_addr;
 
     /* The futures/promises queue works as follows:
      *
@@ -82,7 +84,9 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     , m_data_broker(std::move(broker))
     , m_data_selector(std::move(selector))
     , m_targets(std::move(targets))
-    , m_topic(std::move(topic)) {
+    , m_topic(std::move(topic))
+    , m_self_addr(m_engine.self())
+    {
         start();
     }
 
@@ -108,6 +112,11 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
         const BulkRef &metadata,
         const BulkRef &data_desc_sizes,
         const BulkRef &data_desc);
+
+    SP<DataImpl> requestData(
+        SP<PartitionTargetInfoImpl> target,
+        SP<MetadataImpl> metadata,
+        SP<DataDescriptorImpl> descriptor);
 };
 
 }

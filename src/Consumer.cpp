@@ -9,6 +9,7 @@
 #include "mofka/TopicHandle.hpp"
 #include "mofka/Future.hpp"
 
+#include "CerealArchiveAdaptor.hpp"
 #include "EventImpl.hpp"
 #include "Promise.hpp"
 #include "ClientImpl.hpp"
@@ -190,17 +191,11 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
                             batch->m_data_desc_sizes[i]}};
                 DataDescriptor descriptor;
                 descriptor.load(descriptors_archive);
-                // run data selector
-                auto requested_descriptor = (m_data_selector && m_data_broker)
-                    ? m_data_selector(event_impl->m_metadata, descriptor)
-                    : DataDescriptor::Null();
-                Data local_data_target;
-                if(requested_descriptor.size() != 0) {
-                    // run data broker
-                    local_data_target = m_data_broker(
-                            event_impl->m_metadata, descriptor);
-                    // TODO request data
-                }
+                // request Data associated with the event
+                event_impl->m_data = requestData(
+                        event_impl->m_target,
+                        event_impl->m_metadata,
+                        descriptor.self);
                 // set the promise
                 promise.setValue(Event{event_impl});
             } catch(const Exception& ex) {
@@ -215,6 +210,49 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
         data_desc_offset += batch->m_data_desc_sizes[i];
     }
     ults_completed.wait();
+}
+
+SP<DataImpl> ConsumerImpl::requestData(
+        SP<PartitionTargetInfoImpl> target,
+        SP<MetadataImpl> metadata,
+        SP<DataDescriptorImpl> descriptor) {
+    // run data selector
+    auto requested_descriptor = (m_data_selector && m_data_broker)
+        ? m_data_selector(metadata, descriptor)
+        : DataDescriptor::Null();
+    if(requested_descriptor.size() == 0)
+        return Data{}.self;
+    // run data broker
+    auto data = m_data_broker(metadata, descriptor);
+    if(data.size() != requested_descriptor.size()) {
+        throw Exception(
+                "DataBroker returned a Data object with a "
+                "size different from the DataDescriptor size");
+    }
+    // expose the local_data_target for RDMA
+    std::vector<std::pair<void*, size_t>> segments;
+    segments.reserve(data.segments().size());
+    for(auto& s : data.segments()) {
+        segments.emplace_back((void*)s.ptr, s.size);
+    }
+    auto local_bulk_ref = BulkRef{
+        m_engine.expose(segments, thallium::bulk_mode::write_only),
+            0, data.size(),
+            m_self_addr
+    };
+    // request data
+    auto& rpc = m_topic->m_service->m_client->m_consumer_request_data;
+    auto& ph  = target->m_ph;
+
+    RequestResult<void> result = rpc.on(ph)(
+            m_topic->m_name,
+            Cerealized<DataDescriptor>(descriptor),
+            local_bulk_ref);
+
+    if(!result.success())
+        throw Exception(result.error());
+
+    return data.self;
 }
 
 }

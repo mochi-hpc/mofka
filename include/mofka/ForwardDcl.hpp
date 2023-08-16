@@ -13,6 +13,8 @@ struct BatchSize;
 struct BufferWrapperOutputArchive;
 struct BufferWrapperInputArchive;
 struct BulkRef;
+template<typename T>
+struct Cerealized;
 class Client;
 class Consumer;
 class ConsumerHandle;

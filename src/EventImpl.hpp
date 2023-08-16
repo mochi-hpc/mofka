@@ -8,6 +8,8 @@
 
 #include "PimplUtil.hpp"
 #include "ConsumerImpl.hpp"
+#include "MetadataImpl.hpp"
+#include "DataImpl.hpp"
 
 #include "mofka/Event.hpp"
 
@@ -24,7 +26,9 @@ class EventImpl {
               SP<ConsumerImpl> consumer)
     : m_id(std::move(id))
     , m_target(std::move(target))
-    , m_consumer(std::move(consumer)) {}
+    , m_consumer(std::move(consumer))
+    , m_metadata(std::make_shared<MetadataImpl>("{}", false))
+    , m_data(std::make_shared<DataImpl>()) {}
 
     EventID                     m_id;
     SP<PartitionTargetInfoImpl> m_target;

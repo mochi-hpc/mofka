@@ -6,7 +6,9 @@
 #ifndef MOFKA_DATA_DESCRIPTOR_IMPL_H
 #define MOFKA_DATA_DESCRIPTOR_IMPL_H
 
+#include "mofka/UUID.hpp"
 #include "mofka/Archive.hpp"
+#include "mofka/Exception.hpp"
 #include "VariantUtil.hpp"
 #include <variant>
 #include <vector>
@@ -41,6 +43,54 @@ class DataDescriptorImpl {
     };
 
     using Selection = std::variant<Sub, Strided, Unstructured>;
+
+    std::vector<Sub> flatten() const {
+        std::vector<Sub> current = {{0, m_size}};
+        auto visitor = Overloaded{
+
+            [&current](const Sub& sub) -> decltype(current) {
+                decltype(current) result;
+                size_t size_read = 0;
+                size_t remaining_size = sub.size;
+                for(auto& s : current) {
+                    if(size_read >= sub.offset + sub.size) {
+                        break;
+                    }
+                    if(size_read + s.size < s.offset) {
+                        size_read += s.size;
+                        continue;
+                    }
+                    size_t offset, size;
+                    if(size_read < sub.offset) {
+                        offset = s.offset + sub.offset - size_read;
+                    } else {
+                        offset = s.offset;
+                    }
+                    size = s.size - (offset - s.offset);
+                    if(size > remaining_size) {
+                        size = remaining_size;
+                    }
+                    result.emplace_back(Sub{offset, size});
+                    remaining_size -= size;
+                    size_read += s.size;
+                }
+                return result;
+            },
+
+            [&current](const Strided& strided) -> decltype(current) {
+                // TODO
+                throw Exception("\"Strided\" descriptor type not yet supported");
+            },
+
+            [&current](const Unstructured& u) -> decltype(current) {
+                // TODO
+                throw Exception("\"Unstructured\" descriptor type not yet supported");
+            }
+        };
+        for(auto& view : m_views)
+            current = std::visit(visitor, view);
+        return current;
+    };
 
     void save(Archive& ar) const {
         auto visitor = Overloaded{
@@ -126,9 +176,9 @@ class DataDescriptorImpl {
     : m_location(std::move(location))
     , m_size(size) {}
 
-    std::string            m_location; /* implementation defined data location */
-    std::vector<Selection> m_views;    /* stack of selections on top of the data */
-    size_t                 m_size = 0; /* size of the data */
+    std::string            m_location;   /* implementation defined data location */
+    std::vector<Selection> m_views;      /* stack of selections on top of the data */
+    size_t                 m_size = 0;   /* size of the data */
 };
 
 }

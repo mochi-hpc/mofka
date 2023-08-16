@@ -141,6 +141,16 @@ class TopicManager {
         EventID event_id) = 0;
 
     /**
+     * @brief Fetch the data associated with a given series of DataDescriptors.
+     *
+     * @param descriptors Vector of DataDescriptor for the data to fetch.
+     * @param bulk Bulk handle of the sender's memory.
+     */
+    virtual RequestResult<void> getData(
+        const std::vector<DataDescriptor>& descriptors,
+        const BulkRef& bulk) = 0;
+
+    /**
      * @brief Destroys the underlying topic.
      *
      * @return a RequestResult<bool> instance indicating

@@ -32,7 +32,9 @@ class ClientImpl {
     tl::remote_procedure m_consumer_request_events;
     tl::remote_procedure m_consumer_ack_event;
     tl::remote_procedure m_consumer_remove_consumer;
+    tl::remote_procedure m_consumer_request_data;
     tl::remote_procedure m_consumer_recv_batch;
+
     bedrock::Client      m_bedrock_client;
 
     ClientImpl(const tl::engine& engine)
@@ -43,6 +45,7 @@ class ClientImpl {
     , m_consumer_request_events(m_engine.define("mofka_consumer_request_events"))
     , m_consumer_ack_event(m_engine.define("mofka_consumer_ack_event"))
     , m_consumer_remove_consumer(m_engine.define("mofka_consumer_remove_consumer"))
+    , m_consumer_request_data(m_engine.define("mofka_consumer_request_data"))
     , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch", forwardBatchToConsumer))
     , m_bedrock_client(m_engine)
     {}

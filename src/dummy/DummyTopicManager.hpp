@@ -6,6 +6,7 @@
 #ifndef DUMMY_TOPIC_MANAGER_HPP
 #define DUMMY_TOPIC_MANAGER_HPP
 
+#include <mofka/UUID.hpp>
 #include <mofka/TopicManager.hpp>
 
 namespace mofka {
@@ -137,6 +138,13 @@ class DummyTopicManager : public mofka::TopicManager {
     RequestResult<void> acknowledge(
           std::string_view consumer_name,
           EventID event_id) override;
+
+    /**
+     * @see TopicManager::getData.
+     */
+    RequestResult<void> getData(
+          const std::vector<DataDescriptor>& descriptors,
+          const BulkRef& bulk) override;
 
     /**
      * @brief Destroys the underlying topic.

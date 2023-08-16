@@ -26,4 +26,8 @@ const std::vector<Data::Segment>& Data::segments() const {
     return self->m_segments;
 }
 
+size_t Data::size() const {
+    return self->m_size;
+}
+
 }

@@ -216,6 +216,14 @@ RequestResult<void> DummyTopicManager::acknowledge(
     return result;
 }
 
+RequestResult<void> DummyTopicManager::getData(
+        const std::vector<DataDescriptor>& descriptors,
+        const BulkRef& bulk) {
+    RequestResult<void> result;
+
+    return result;
+}
+
 RequestResult<bool> DummyTopicManager::destroy() {
     RequestResult<bool> result;
     // TODO wait for all the consumers to be done consuming

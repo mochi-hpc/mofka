@@ -7,6 +7,8 @@
 #define MOFKA_PROVIDER_IMPL_H
 
 #include "mofka/TopicManager.hpp"
+#include "mofka/DataDescriptor.hpp"
+#include "CerealArchiveAdaptor.hpp"
 #include "ConsumerHandleImpl.hpp"
 #include "mofka/UUID.hpp"
 #include "MetadataImpl.hpp"
@@ -85,6 +87,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     AutoDeregisteringRPC m_consumer_request_events;
     AutoDeregisteringRPC m_consumer_ack_event;
     AutoDeregisteringRPC m_consumer_remove_consumer;
+    AutoDeregisteringRPC m_consumer_request_data;
     /* RPC for Consumers */
     thallium::remote_procedure m_consumer_recv_batch;
     // TopicManagers
@@ -106,6 +109,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_consumer_request_events(define("mofka_consumer_request_events", &ProviderImpl::requestEvents, pool))
     , m_consumer_ack_event(define("mofka_consumer_ack_event", &ProviderImpl::acknowledge, pool))
     , m_consumer_remove_consumer(define("mofka_consumer_remove_consumer", &ProviderImpl::removeConsumer, pool))
+    , m_consumer_request_data(define("mofka_consumer_request_data", &ProviderImpl::requestData, pool))
     , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch"))
     {
         m_config.CopyFrom(config, m_config.GetAllocator(), true);
@@ -283,6 +287,18 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         }
         consumer_handle_impl->stop();
         spdlog::trace("[mofka:{}] Successfully executed removeConsumer", id());
+    }
+
+    void requestData(const tl::request& req,
+                     const std::string& topic_name,
+                     const Cerealized<DataDescriptor>& descriptor,
+                     const BulkRef& remote_bulk) {
+        spdlog::trace("[mofka:{}] Received requestData request", id());
+        RequestResult<void> result;
+        AutoResponse<decltype(result)> ensureResponse(req, result);
+        // TODO
+        std::cerr << "AAA" << std::endl;
+        spdlog::trace("[mofka:{}] Successfully executed requestData", id());
     }
 
 };

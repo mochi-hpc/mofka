@@ -77,6 +77,11 @@ class Data {
     const std::vector<Segment>& segments() const;
 
     /**
+     * @brief Return the total size of the Data.
+     */
+    size_t size() const;
+
+    /**
      * @brief Checks if the Data instance is valid.
      */
     operator bool() const;
