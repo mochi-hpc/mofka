@@ -37,10 +37,15 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 mofka::Metadata metadata = mofka::Metadata{
                     fmt::format("{{\"event_num\":{}}}", i)
                 };
-                producer.push(metadata);
+                std::string data = fmt::format("This is data for event {}", i);
+                auto future = producer.push(
+                    metadata,
+                    mofka::Data{data.data(), data.size()});
+                future.wait();
             }
         }
 
+        SECTION("Consumer without data")
         {
             auto consumer = topic.consumer("myconsumer");
             REQUIRE(static_cast<bool>(consumer));
@@ -51,6 +56,43 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 REQUIRE(doc["event_num"].GetInt64() == i);
                 if(i % 5 == 0)
                     event.acknowledge();
+            }
+        }
+
+        SECTION("Consume with data")
+        {
+            mofka::DataSelector data_selector = [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
+                auto& doc = metadata.json();
+                auto event_id = doc["event_num"].GetInt64();
+                std::cerr << "DataDescriptor for event " << event_id << " has size " << descriptor.size() << std::endl;
+                if(event_id % 2 == 0) {
+                    return descriptor;
+                } else {
+                    return mofka::DataDescriptor::Null();
+                }
+            };
+            mofka::DataBroker data_broker = [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
+                auto size = descriptor.size();
+                auto& doc = metadata.json();
+                if(doc["event_num"].GetInt64() % 2 == 0) {
+                    auto data = new char[size];
+                    return mofka::Data{data, size};
+                } else {
+                    return mofka::Data{nullptr, 0};
+                }
+            };
+            auto consumer = topic.consumer(
+                "myconsumer", data_selector, data_broker);
+            REQUIRE(static_cast<bool>(consumer));
+            for(unsigned i=0; i < 100; ++i) {
+                auto event = consumer.pull().wait();
+                REQUIRE(event.id() == i);
+                auto& doc = event.metadata().json();
+                REQUIRE(doc["event_num"].GetInt64() == i);
+                if(i % 5 == 0)
+                    event.acknowledge();
+                if(i % 2 == 0 && event.data().segments().size() == 1)
+                    delete[] static_cast<const char*>(event.data().segments()[0].ptr);
             }
         }
     }
