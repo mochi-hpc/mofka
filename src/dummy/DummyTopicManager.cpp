@@ -36,7 +36,7 @@ RequestResult<EventID> DummyTopicManager::receiveBatch(
     RequestResult<EventID> result;
     EventID first_id;
     {
-        auto g = std::unique_lock<thallium::mutex>{m_events_mtx};
+        auto g = std::unique_lock<thallium::mutex>{m_events_metadata_mtx};
         first_id = m_events_metadata_sizes.size();
         // --------- transfer the metadata
         auto metadata_size = metadata_bulk.size - num_events*sizeof(size_t);
@@ -69,6 +69,7 @@ RequestResult<EventID> DummyTopicManager::receiveBatch(
             metadata_offset += m_events_metadata_sizes[i];
         }
         // --------- transfer the data
+        std::unique_lock<thallium::mutex> data_lock{m_events_data_mtx};
         auto data_size = data_bulk.size - num_events*sizeof(size_t);
         // resize the sizes and offsets arrays, and data array
         if(m_events_data_sizes.capacity() < first_id + num_events) {
@@ -140,7 +141,7 @@ RequestResult<void> DummyTopicManager::feedConsumer(
 
     auto self_addr = static_cast<std::string>(m_engine.self());
     {
-        auto g = std::unique_lock<thallium::mutex>{m_events_mtx};
+        auto g = std::unique_lock<thallium::mutex>{m_events_metadata_mtx};
         while(!consumerHandle.shouldStop()) {
             size_t num_events_to_send;
             bool should_stop = false;
@@ -221,6 +222,22 @@ RequestResult<void> DummyTopicManager::getData(
         const BulkRef& bulk) {
     RequestResult<void> result;
 
+    OffsetSize location;
+    location.fromString(descriptors[0].location());
+
+    auto client = m_engine.lookup(bulk.address);
+
+    std::unique_lock<thallium::mutex> lock{m_events_data_mtx};
+    auto local_data_bulk = m_engine.expose(
+        {{m_events_data.data() + location.offset, location.size}},
+        thallium::bulk_mode::read_only);
+    bulk.handle.on(client) << local_data_bulk;
+
+    if(descriptors.size() != 1) {
+        result.error() = "Expected 1 descriptor";
+        result.success() = false;
+        return result;
+    }
     return result;
 }
 

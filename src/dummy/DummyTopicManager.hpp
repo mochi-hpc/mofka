@@ -47,7 +47,8 @@ class DummyTopicManager : public mofka::TopicManager {
     std::vector<char>            m_events_data_desc;
     std::vector<size_t>          m_events_data_desc_offsets;
     std::vector<size_t>          m_events_data_desc_sizes;
-    thallium::mutex              m_events_mtx;
+    thallium::mutex              m_events_metadata_mtx;
+    thallium::mutex              m_events_data_mtx;
     thallium::condition_variable m_events_cv;
 
     std::unordered_map<std::string, EventID> m_consumer_cursor;

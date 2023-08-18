@@ -296,7 +296,8 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Received requestData request", id());
         RequestResult<void> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
-        // TODO
+        FIND_TOPIC_BY_NAME(topic, topic_name);
+        result = topic->getData({descriptor.content}, remote_bulk);
         spdlog::trace("[mofka:{}] Successfully executed requestData", id());
     }
 
