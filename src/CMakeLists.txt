@@ -1,7 +1,10 @@
 # set source files
 set (server-src-files
      Provider.cpp
-     TopicManager.cpp)
+     TopicManager.cpp
+     DataStore.cpp
+     MemoryDataStore.cpp
+     DefaultTopicManager.cpp)
 
 set (client-src-files
      Client.cpp

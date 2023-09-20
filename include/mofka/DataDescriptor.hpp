@@ -206,7 +206,7 @@ class DataDescriptor {
 
     friend class ConsumerImpl;
     friend class BatchImpl;
-    friend class Cerealized<DataDescriptor>;
+    friend struct Cerealized<DataDescriptor>;
 };
 
 }

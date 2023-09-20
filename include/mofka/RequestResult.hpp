@@ -33,6 +33,9 @@ class RequestResult {
 
     public:
 
+    RequestResult(const T& value)
+    : m_value(value) {}
+
     RequestResult() = default;
     RequestResult(RequestResult&&) = default;
     RequestResult(const RequestResult&) = default;
@@ -108,6 +111,9 @@ class RequestResult<std::string> {
 
     public:
 
+    RequestResult(std::string value)
+    : m_content(std::move(value)) {}
+
     RequestResult() = default;
     RequestResult(RequestResult&&) = default;
     RequestResult(const RequestResult&) = default;
@@ -154,6 +160,9 @@ template<>
 class RequestResult<bool> {
 
     public:
+
+    RequestResult(bool b)
+    : m_success(b) {}
 
     RequestResult() = default;
     RequestResult(RequestResult&&) = default;

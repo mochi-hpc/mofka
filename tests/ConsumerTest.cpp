@@ -26,7 +26,7 @@ TEST_CASE("Consumer test", "[consumer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"dummy\"}"};
+        auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"default\"}"};
         topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
 

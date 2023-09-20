@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_BACKEND_HPP
-#define MOFKA_BACKEND_HPP
+#ifndef MOFKA_TOPIC_MANAGER_HPP
+#define MOFKA_TOPIC_MANAGER_HPP
 
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/RequestResult.hpp>
