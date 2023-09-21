@@ -12,9 +12,10 @@
 #include <numeric>
 #include <iostream>
 
-MOFKA_REGISTER_BACKEND(default, mofka::DefaultTopicManager);
 
 namespace mofka {
+
+MOFKA_REGISTER_TOPIC_MANAGER(default, DefaultTopicManager);
 
 Metadata DefaultTopicManager::getValidatorMetadata() const {
     return m_validator;

@@ -9,9 +9,9 @@
 #include <numeric>
 #include <iostream>
 
-MOFKA_REGISTER_BACKEND(dummy, mofka::DummyTopicManager);
-
 namespace mofka {
+
+MOFKA_REGISTER_TOPIC_MANAGER(dummy, DummyTopicManager);
 
 Metadata DummyTopicManager::getValidatorMetadata() const {
     return m_validator;

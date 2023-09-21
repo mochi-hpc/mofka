@@ -13,17 +13,20 @@
 #include <mofka/BatchSize.hpp>
 #include <mofka/EventID.hpp>
 #include <mofka/ConsumerHandle.hpp>
+#include <mofka/Factory.hpp>
 
 #include <thallium.hpp>
 #include <unordered_map>
 #include <string_view>
 #include <functional>
 
+#if 0
 /**
  * @brief Helper class to register backend types into the backend factory.
  */
 template<typename TopicManagerType>
 class __MofkaTopicManagerRegistration;
+#endif
 
 namespace mofka {
 
@@ -160,70 +163,16 @@ class TopicManager {
 
 };
 
-/**
- * @brief The TopicFactory contains functions to create Topic objects.
- */
-class TopicFactory {
+using TopicManagerFactory = Factory<TopicManager,
+    const thallium::engine&,
+    const Metadata&,
+    const Metadata&,
+    const Metadata&,
+    const Metadata&>;
 
-    template<typename TopicManagerType>
-    friend class ::__MofkaTopicManagerRegistration;
-
-    public:
-
-    TopicFactory() = delete;
-
-    /**
-     * @brief Creates a topic and returns a unique_ptr to the created instance.
-     *
-     * @param backend_name Name of the backend to use.
-     * @param engine Thallium engine.
-     * @param config Configuration to pass to the backend's create function.
-     * @param validator Metadata of the topic's validator.
-     * @param serializer Metadata of the topic's serializer.
-     *
-     * @return a unique_ptr to the created TopicManager.
-     */
-    static std::unique_ptr<TopicManager> createTopic(
-            std::string_view backend_name,
-            const thallium::engine& engine,
-            const Metadata& config,
-            const Metadata& validator,
-            const Metadata& selector,
-            const Metadata& serializer);
-
-    private:
-
-    static std::unordered_map<std::string,
-                std::function<std::unique_ptr<TopicManager>(
-                    const thallium::engine&,
-                    const Metadata&,
-                    const Metadata&,
-                    const Metadata&,
-                    const Metadata&)>> create_fn;
-};
+#define MOFKA_REGISTER_TOPIC_MANAGER(__name__, __type__) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(TopicManagerFactory, __type__, __name__)
 
 } // namespace mofka
-
-
-#define MOFKA_REGISTER_BACKEND(__backend_name, __backend_type) \
-    static __MofkaTopicManagerRegistration<__backend_type> __mofka ## __backend_name ## _backend( #__backend_name )
-
-template<typename TopicManagerType>
-class __MofkaTopicManagerRegistration {
-
-    public:
-
-    __MofkaTopicManagerRegistration(std::string_view backend_name)
-    {
-        mofka::TopicFactory::create_fn.emplace(
-            backend_name, [](const thallium::engine& engine,
-                             const mofka::Metadata& config,
-                             const mofka::Metadata& validator,
-                             const mofka::Metadata& selector,
-                             const mofka::Metadata& serializer) {
-                return TopicManagerType::create(engine, config, validator, selector, serializer);
-            });
-    }
-};
 
 #endif

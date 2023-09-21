@@ -3,6 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
+#if 0
 #include "mofka/TopicManager.hpp"
 
 namespace mofka {
@@ -29,5 +30,5 @@ std::unique_ptr<TopicManager> TopicFactory::createTopic(
     auto& f = it->second;
     return f(engine, config, validator, selector, serializer);
 }
-
 }
+#endif

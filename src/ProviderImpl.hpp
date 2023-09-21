@@ -165,7 +165,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
         std::shared_ptr<TopicManager> topic;
         try {
-            topic = TopicFactory::createTopic(
+            topic = TopicManagerFactory::create(
                 topic_type, get_engine(),
                 backend_config,
                 validator_meta,
