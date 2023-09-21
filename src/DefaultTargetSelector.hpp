@@ -35,9 +35,9 @@ class DefaultTargetSelector : public TargetSelectorInterface {
         return Metadata{"{\"type\":\"default\"}"};
     }
 
-    static std::shared_ptr<TargetSelectorInterface> Create(const Metadata& metadata) {
+    static std::unique_ptr<TargetSelectorInterface> create(const Metadata& metadata) {
         (void)metadata;
-        return std::make_shared<DefaultTargetSelector>();
+        return std::make_unique<DefaultTargetSelector>();
     }
 
     size_t                           m_index = 0;

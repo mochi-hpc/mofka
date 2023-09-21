@@ -28,9 +28,9 @@ class DefaultValidator : public ValidatorInterface {
         return Metadata{"{\"type\":\"default\"}"};
     }
 
-    static std::shared_ptr<ValidatorInterface> Create(const Metadata& metadata) {
+    static std::unique_ptr<ValidatorInterface> create(const Metadata& metadata) {
         (void)metadata;
-        return std::make_shared<DefaultValidator>();
+        return std::make_unique<DefaultValidator>();
     }
 
 };

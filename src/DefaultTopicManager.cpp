@@ -250,7 +250,7 @@ std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
     Metadata datastore_config{std::move(datastore_config_doc)};
 
     /* create data store */
-    auto data_store = DataStoreFactory::createDataStore(datastore_type, engine, datastore_config);
+    auto data_store = DataStoreFactory::create(datastore_type, engine, datastore_config);
 
     /* create topic manager */
     return std::unique_ptr<mofka::TopicManager>(

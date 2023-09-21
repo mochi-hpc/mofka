@@ -1,7 +1,6 @@
 # set source files
 set (server-src-files
      Provider.cpp
-     DataStore.cpp
      MemoryDataStore.cpp
      DefaultTopicManager.cpp)
 

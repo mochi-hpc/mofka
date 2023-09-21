@@ -10,16 +10,11 @@
 #include <mofka/UUID.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Exception.hpp>
+#include <mofka/Factory.hpp>
 
 #include <functional>
 #include <exception>
 #include <stdexcept>
-
-/**
- * @brief Helper class to register selector types into the selector factory.
- */
-template<typename TargetSelectorType>
-class __MofkaTargetSelectorRegistration;
 
 namespace mofka {
 
@@ -142,11 +137,11 @@ class TargetSelectorInterface {
     virtual Metadata metadata() const = 0;
 
     /**
-     * @note A TargetSelectorInterface class must also provide a static Create
+     * @note A TargetSelectorInterface class must also provide a static create
      * function with the following prototype, instanciating a shared_ptr of
      * the class from the provided Metadata:
      *
-     * static std::shared_ptr<TargetSelectorInterface> Create(const Metadata&);
+     * static std::shared_ptr<TargetSelectorInterface> create(const Metadata&);
      */
 };
 
@@ -226,28 +221,13 @@ class TargetSelector {
     std::shared_ptr<TargetSelectorInterface> self;
 
     TargetSelector(const std::shared_ptr<TargetSelectorInterface>& impl);
-
-    template<typename T>
-    friend class ::__MofkaTargetSelectorRegistration;
-
-    static void RegisterTargetSelectorType(
-            std::string_view name,
-            std::function<std::shared_ptr<TargetSelectorInterface>(const Metadata&)> ctor);
 };
+
+using TargetSelectorFactory = Factory<TargetSelectorInterface, const Metadata&>;
+
+#define MOFKA_REGISTER_TARGET_SELECTOR(__name__, __type__) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(TargetSelectorFactory, __type__, __name__)
 
 }
-
-#define MOFKA_REGISTER_TARGET_SELECTOR(__name, __type) \
-    static __MofkaTargetSelectorRegistration<__type> __mofka ## __name ## _validator( #__name )
-
-template<typename TargetSelectorType>
-class __MofkaTargetSelectorRegistration {
-
-    public:
-
-    __MofkaTargetSelectorRegistration(std::string_view name) {
-        mofka::TargetSelector::RegisterTargetSelectorType(name, TargetSelectorType::Create);
-    }
-};
 
 #endif

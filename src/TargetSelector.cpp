@@ -37,12 +37,6 @@ static std::unordered_map<std::string, std::function<std::shared_ptr<TargetSelec
 
 MOFKA_REGISTER_TARGET_SELECTOR(default, DefaultTargetSelector);
 
-void TargetSelector::RegisterTargetSelectorType(
-        std::string_view name,
-        std::function<std::shared_ptr<TargetSelectorInterface>(const Metadata&)> ctor) {
-    targetSelectorFactories[std::string{name.data(), name.size()}] = std::move(ctor);
-}
-
 TargetSelector TargetSelector::FromMetadata(const Metadata& metadata) {
     auto& json = metadata.json();
     if(!json.IsObject()) {
@@ -60,14 +54,8 @@ TargetSelector TargetSelector::FromMetadata(const Metadata& metadata) {
             "invalid __type__ in Metadata (expected string)");
     }
     auto type_str = std::string{type.GetString()};
-    auto it = targetSelectorFactories.find(type_str);
-    if(it == targetSelectorFactories.end()) {
-        throw Exception(fmt::format(
-            "Cannor create TargetSelector from Metadata: "
-            "unknown TargetSelector type \"{}\"",
-            type_str));
-    }
-    return (it->second)(metadata);
+    std::shared_ptr<TargetSelectorInterface> ts = TargetSelectorFactory::create(type_str, metadata);
+    return ts;
 }
 
 }

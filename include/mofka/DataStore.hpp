@@ -12,16 +12,12 @@
 #include <mofka/RequestResult.hpp>
 #include <mofka/EventID.hpp>
 #include <mofka/BulkRef.hpp>
+#include <mofka/Factory.hpp>
 
 #include <thallium.hpp>
 
 #include <vector>
 
-/**
- * @brief Helper class to register backend types into the data store factory.
- */
-template<typename DataStoreType>
-class __MofkaDataStoreRegistration;
 
 namespace mofka {
 
@@ -100,59 +96,11 @@ class DataStore {
 
 };
 
-/**
- * @brief The DataStoreFactory contains functions to create DataStore objects.
- */
-class DataStoreFactory {
+using DataStoreFactory = Factory<DataStore, const thallium::engine&, const Metadata&>;
 
-    template<typename DataStoreType>
-    friend class ::__MofkaDataStoreRegistration;
-
-    public:
-
-    DataStoreFactory() = delete;
-
-    /**
-     * @brief Creates a DataStore and returns a unique_ptr to the created instance.
-     *
-     * @param backend_name Name of the backend to use.
-     * @param engine Thallium engine.
-     * @param config Configuration to pass to the backend's create function.
-     *
-     * @return a unique_ptr to the created DataStore.
-     */
-    static std::unique_ptr<DataStore> createDataStore(
-            std::string_view backend_name,
-            const thallium::engine& engine,
-            const Metadata& config);
-
-    private:
-
-    static std::unordered_map<std::string,
-                std::function<std::unique_ptr<DataStore>(
-                    const thallium::engine&,
-                    const Metadata&)>> create_fn;
-};
+#define MOFKA_REGISTER_DATASTORE(__name__, __type__) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(DataStoreFactory, __type__, __name__)
 
 } // namespace mofka
-
-
-#define MOFKA_REGISTER_DATASTORE(__backend_name, __backend_type) \
-    static __MofkaDataStoreRegistration<__backend_type> __mofka ## __backend_name ## _storage( #__backend_name )
-
-template<typename DataStoreType>
-class __MofkaDataStoreRegistration {
-
-    public:
-
-    __MofkaDataStoreRegistration(std::string_view backend_name)
-    {
-        mofka::DataStoreFactory::create_fn.emplace(
-            backend_name, [](const thallium::engine& engine,
-                             const mofka::Metadata& config) {
-                return DataStoreType::create(engine, config);
-            });
-    }
-};
 
 #endif
