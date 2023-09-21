@@ -32,16 +32,7 @@ Metadata Serializer::metadata() const {
     return self->metadata();
 }
 
-std::unordered_map<std::string, std::function<std::shared_ptr<SerializerInterface>(const Metadata&)>>
-    serializerFactories;
-
 MOFKA_REGISTER_SERIALIZER(default, DefaultSerializer);
-
-void Serializer::RegisterSerializerType(
-        std::string_view name,
-        std::function<std::shared_ptr<SerializerInterface>(const Metadata&)> ctor) {
-    serializerFactories[std::string{name.data(), name.size()}] = std::move(ctor);
-}
 
 Serializer Serializer::FromMetadata(const Metadata& metadata) {
     auto& json = metadata.json();
@@ -60,14 +51,8 @@ Serializer Serializer::FromMetadata(const Metadata& metadata) {
                 "invalid __type__ in Metadata (expected string)");
     }
     auto type_str = std::string{type.GetString()};
-    auto it = serializerFactories.find(type_str);
-    if(it == serializerFactories.end()) {
-        throw Exception(fmt::format(
-                "Cannor create Serializer from Metadata: "
-                "unknown Serializer type \"{}\"",
-                type_str));
-    }
-    return (it->second)(metadata);
+    std::shared_ptr<SerializerInterface> s = SerializerFactory::create(type_str, metadata);
+    return Serializer(std::move(s));
 }
 
 }

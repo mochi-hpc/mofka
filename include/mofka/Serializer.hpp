@@ -9,16 +9,11 @@
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Archive.hpp>
 #include <mofka/Metadata.hpp>
+#include <mofka/Factory.hpp>
 
 #include <functional>
 #include <exception>
 #include <stdexcept>
-
-/**
- * @brief Helper class to register Serializer types into the Serializer factory.
- */
-template<typename SerializerType>
-class __MofkaSerializerRegistration;
 
 namespace mofka {
 
@@ -164,27 +159,14 @@ class Serializer {
 
     Serializer(const std::shared_ptr<SerializerInterface>& impl);
 
-    template<typename T>
-    friend class ::__MofkaSerializerRegistration;
-
-    static void RegisterSerializerType(
-            std::string_view name,
-            std::function<std::shared_ptr<SerializerInterface>(const Metadata&)> ctor);
 };
+
+using SerializerFactory = Factory<SerializerInterface, const Metadata&>;
 
 }
 
-#define MOFKA_REGISTER_SERIALIZER(__name, __type) \
-    static __MofkaSerializerRegistration<__type> __mofka ## __name ## _serializer( #__name )
 
-template<typename SerializerType>
-class __MofkaSerializerRegistration {
-
-    public:
-
-    __MofkaSerializerRegistration(std::string_view name) {
-        mofka::Serializer::RegisterSerializerType(name, SerializerType::Create);
-    }
-};
+#define MOFKA_REGISTER_SERIALIZER(__name__, __type__) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(SerializerFactory, __type__, __name__)
 
 #endif
