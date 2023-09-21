@@ -13,6 +13,7 @@ add_library (coverage_config INTERFACE)
 option (ENABLE_TESTS    "Build tests" OFF)
 option (ENABLE_EXAMPLES "Build examples" OFF)
 option (ENABLE_COVERAGE "Build with coverage" OFF)
+option (ENABLE_BAKE     "Build with Bake DataStore support" ON)
 
 # add our cmake module directory to the path
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
@@ -58,8 +59,13 @@ find_package (TCLAP REQUIRED)
 find_package (spdlog REQUIRED)
 # search for fmt package
 find_package (fmt REQUIRED)
-# search of bedrock if needed
+# search fo bedrock
 find_package (bedrock REQUIRED)
+# search for bake
+if (ENABLE_BAKE)
+  pkg_check_modules (bake-client REQUIRED IMPORTED_TARGET bake-client)
+  pkg_check_modules (bake-server REQUIRED IMPORTED_TARGET bake-server)
+endif (ENABLE_BAKE)
 
 # library version set here (e.g. for shared libs).
 set (MOFKA_VERSION_MAJOR 0)

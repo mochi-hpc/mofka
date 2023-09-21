@@ -173,7 +173,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                 serializer_meta);
         } catch(const std::exception& ex) {
             result.success() = false;
-            result.error() = fmt::format("Error when creating topic \"{}\": {}", ex.what());
+            result.error() = fmt::format("Error when creating topic \"{}\": {}", topic_name, ex.what());
             spdlog::error("[mofka:{}] {}", id(), result.error());
             return;
         }

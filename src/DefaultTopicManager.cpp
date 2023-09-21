@@ -6,6 +6,9 @@
 #include "DefaultTopicManager.hpp"
 #include "mofka/DataDescriptor.hpp"
 #include "mofka/BufferWrapperArchive.hpp"
+#include "RapidJsonUtil.hpp"
+#include <rapidjson/writer.h>
+#include <spdlog/spdlog.h>
 #include <numeric>
 #include <iostream>
 
@@ -216,8 +219,41 @@ std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
         const Metadata& validator,
         const Metadata& selector,
         const Metadata& serializer) {
+    const auto& doc = config.json();
+    /* access datastore information */
+    if(!doc.HasMember("data_store")) {
+        auto error = "\"data_store\" field not found in topic manager configuration";
+        spdlog::error("[mofka] {}", error);
+        throw Exception(error);
+    }
+    const auto& json_datastore_config = doc["data_store"];
+    if(!json_datastore_config.IsObject()) {
+        auto error = "\"data_store\" field in topic manager should be an object";
+        spdlog::error("[mofka] {}", error);
+        throw Exception(error);
+    }
+    if(!json_datastore_config.HasMember("__type__")) {
+        auto error = "\"__type__\" field not found in \"data_store\" object";
+        spdlog::error("[mofka] {}", error);
+        throw Exception(error);
+    }
+    const auto& json_datastore_type = json_datastore_config["__type__"];
+    if(!json_datastore_type.IsString()) {
+        auto error = "\"__type__\" field in \"data_store\" object should be a string";
+        spdlog::error("[mofka] {}", error);
+        throw Exception(error);
+    }
+    std::string datastore_type = json_datastore_type.GetString();
+    rapidjson::Document datastore_config_doc;
+    datastore_config_doc.CopyFrom(json_datastore_config, datastore_config_doc.GetAllocator());
+    Metadata datastore_config{std::move(datastore_config_doc)};
+
+    /* create data store */
+    auto data_store = DataStoreFactory::createDataStore(datastore_type, engine, datastore_config);
+
+    /* create topic manager */
     return std::unique_ptr<mofka::TopicManager>(
-        new DefaultTopicManager(config, validator, selector, serializer, engine));
+        new DefaultTopicManager(config, validator, selector, serializer, std::move(data_store), engine));
 }
 
 }

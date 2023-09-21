@@ -26,7 +26,14 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"default\"}"};
+        auto topic_config = mofka::TopicBackendConfig{R"(
+            {
+                "__type__":"default",
+                "data_store": {
+                    "__type__": "memory"
+                }
+            })"
+        };
         topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
 

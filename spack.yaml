@@ -11,6 +11,7 @@ spack:
   - tclap
   - mochi-bedrock@0.6.0:+ssg
   - argobots@1.2rc1
+  - mochi-bake
   concretizer:
     unify: true
     reuse: true

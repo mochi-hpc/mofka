@@ -25,7 +25,14 @@ TEST_CASE("TopicHandle test", "[topic]") {
         auto sh = client.connect(mofka::SSGGroupID{gid});
         REQUIRE(static_cast<bool>(sh));
 
-        auto topic_config = mofka::TopicBackendConfig{"{\"__type__\":\"default\"}"};
+        auto topic_config = mofka::TopicBackendConfig{R"(
+            {
+                "__type__":"default",
+                "data_store": {
+                    "__type__": "memory"
+                }
+            })"
+        };
 
         SECTION("Create and open a topic") {
             mofka::TopicHandle topic;

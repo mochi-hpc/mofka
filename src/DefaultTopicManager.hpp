@@ -22,6 +22,8 @@ class DefaultTopicManager : public mofka::TopicManager {
     Metadata m_selector;
     Metadata m_serializer;
 
+    std::unique_ptr<DataStore> m_data_store;
+
     thallium::engine m_engine;
 
     std::vector<char>            m_events_metadata;
@@ -34,7 +36,6 @@ class DefaultTopicManager : public mofka::TopicManager {
     thallium::mutex              m_events_data_mtx;
     thallium::condition_variable m_events_cv;
 
-    std::unique_ptr<DataStore> m_data_store;
 
     std::unordered_map<std::string, EventID> m_consumer_cursor;
     thallium::mutex                          m_consumer_cursor_mtx;
@@ -49,15 +50,14 @@ class DefaultTopicManager : public mofka::TopicManager {
         const Metadata& validator,
         const Metadata& selector,
         const Metadata& serializer,
+        std::unique_ptr<DataStore> data_store,
         thallium::engine engine)
     : m_config(config)
     , m_validator(validator)
     , m_selector(selector)
     , m_serializer(serializer)
-    , m_engine(engine) {
-        // TODO read the type of DataStore from the configuration
-        m_data_store = DataStoreFactory::createDataStore("memory", m_engine, Metadata{"{}"});
-    }
+    , m_data_store(std::move(data_store))
+    , m_engine(engine) {}
 
     /**
      * @brief Move-constructor.
