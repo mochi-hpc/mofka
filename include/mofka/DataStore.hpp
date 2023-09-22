@@ -65,15 +65,16 @@ class DataStore {
      * @brief Store a set of data pieces into the DataStore.
      *
      * @param count Number of data pieces to store.
-     * @param sizes Bulk handle representing the list of sizes.
-     * @param data Bulk handle containing the data.
+     * @param bulk Bulk handle representing the data.
+     *
+     * The bulk handle is expected to represent the list of count sizes
+     * (as size_t) followed by the data for the count Data pieces.
      *
      * @return a vector of corresponding DataDescriptors.
      */
     virtual RequestResult<std::vector<DataDescriptor>> store(
         size_t count,
-        const BulkRef& sizes,
-        const BulkRef& data) = 0;
+        const BulkRef& bulk) = 0;
 
 
     /**
@@ -81,6 +82,10 @@ class DataStore {
      *
      * @param descriptors Vector of DataDescriptor for the data to fetch.
      * @param dest Bulk handle of the sender's memory.
+     *
+     * The dest bulk handle is only expected to receive data, not sizes
+     * (unlike the store function) since the sizes are already known to
+     * the caller via the descriptors.
      */
     virtual RequestResult<void> load(
         const std::vector<DataDescriptor>& descriptors,

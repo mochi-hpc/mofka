@@ -30,12 +30,10 @@ class MemoryDataStore : public DataStore {
 
     RequestResult<std::vector<DataDescriptor>> store(
             size_t count,
-            const BulkRef& sizes,
             const BulkRef& data) override {
         RequestResult<std::vector<DataDescriptor>> result;
-        // lookup addresses
-        auto size_source = m_engine.lookup(sizes.address);
-        auto data_source = sizes.address == data.address ? size_source : m_engine.lookup(data.address);
+        // lookup address
+        auto source = m_engine.lookup(data.address);
         // lock the MemoryDataStore
         auto guard = std::unique_lock<thallium::mutex>{m_mutex};
         // resize the m_sizes vector
@@ -50,7 +48,7 @@ class MemoryDataStore : public DataStore {
             {{(void*)(m_sizes.data() + old_count), count*sizeof(size_t)}},
             thallium::bulk_mode::write_only);
         // pull sizes from the sender
-        localSizesBulk << sizes.handle.on(size_source)(sizes.offset, sizes.size);
+        localSizesBulk << data.handle.on(source)(data.offset, count*sizeof(size_t));
         // resize the m_data vector
         auto old_size = m_data.size();
         auto new_size = m_data.size() + data.size;
@@ -63,7 +61,9 @@ class MemoryDataStore : public DataStore {
             {{(void*)(m_data.data() + old_size), data.size}},
             thallium::bulk_mode::write_only);
         // pull data from the sender
-        localDataBulk << data.handle.on(data_source)(data.offset, data.size);
+        localDataBulk << data.handle.on(source)(
+            data.offset + count*sizeof(size_t),
+            data.size - count*sizeof(size_t));
         // create the DataDescriptors
         result.value().reserve(count);
         size_t offset = old_size;

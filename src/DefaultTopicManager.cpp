@@ -73,11 +73,7 @@ RequestResult<EventID> DefaultTopicManager::receiveBatch(
             metadata_offset += m_events_metadata_sizes[i];
         }
         // --------- transfer the data to the DataStore
-        auto data = data_bulk;
-        auto sizes = data_bulk;
-        data.offset += num_events*sizeof(size_t);
-        sizes.size = num_events*sizeof(size_t);
-        auto descriptors = m_data_store->store(num_events, sizes, data);
+        auto descriptors = m_data_store->store(num_events, data_bulk);
         if(!descriptors.success()) {
             result.success() = false;
             result.error() = descriptors.error();

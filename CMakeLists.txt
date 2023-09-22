@@ -53,6 +53,8 @@ find_package (thallium REQUIRED)
 pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
 # search for RapidJSON
 find_package (RapidJSON REQUIRED)
+# search for valijson
+find_package (valijson REQUIRED)
 # search for TCLAP
 find_package (TCLAP REQUIRED)
 # search for spdlog
@@ -64,7 +66,7 @@ find_package (bedrock REQUIRED)
 # search for bake
 if (ENABLE_BAKE)
   pkg_check_modules (bake-client REQUIRED IMPORTED_TARGET bake-client)
-  pkg_check_modules (bake-server REQUIRED IMPORTED_TARGET bake-server)
+  set (OPTIONAL_BAKE PkgConfig::bake-client)
 endif (ENABLE_BAKE)
 
 # library version set here (e.g. for shared libs).
