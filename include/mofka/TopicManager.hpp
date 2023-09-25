@@ -149,7 +149,7 @@ class TopicManager {
      * @param descriptors Vector of DataDescriptor for the data to fetch.
      * @param bulk Bulk handle of the sender's memory.
      */
-    virtual RequestResult<void> getData(
+    virtual RequestResult<std::vector<RequestResult<void>>> getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) = 0;
 

@@ -294,7 +294,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                      const Cerealized<DataDescriptor>& descriptor,
                      const BulkRef& remote_bulk) {
         spdlog::trace("[mofka:{}] Received requestData request", id());
-        RequestResult<void> result;
+        RequestResult<std::vector<RequestResult<void>>> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->getData({descriptor.content}, remote_bulk);

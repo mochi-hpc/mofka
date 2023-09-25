@@ -79,10 +79,10 @@ class MemoryDataStore : public DataStore {
         return result;
     }
 
-    RequestResult<void> load(
+    std::vector<RequestResult<void>> load(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& dest) override {
-        RequestResult<void> result;
+        std::vector<RequestResult<void>> result;
 
         // lock the MemoryDataStore
         auto guard = std::unique_lock<thallium::mutex>{m_mutex};
@@ -108,6 +108,8 @@ class MemoryDataStore : public DataStore {
         // do the bulk transfer
         auto sender = m_engine.lookup(dest.address);
         dest.handle.on(sender)(dest.offset, dest.size) << localDataBulk;
+
+        result.resize(descriptors.size());
 
         return result;
     }

@@ -131,7 +131,7 @@ class DefaultTopicManager : public mofka::TopicManager {
     /**
      * @see TopicManager::getData.
      */
-    RequestResult<void> getData(
+    RequestResult<std::vector<RequestResult<void>>> getData(
           const std::vector<DataDescriptor>& descriptors,
           const BulkRef& bulk) override;
 

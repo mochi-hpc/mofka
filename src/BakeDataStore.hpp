@@ -62,15 +62,14 @@ class BakeDataStore : public DataStore {
         bake::target          m_target;
     };
 
-    struct BakeDescriptor {
-        bake::region m_region;
-        size_t       m_offset;
+    struct BakeReplicaDescriptor {
+        bake::target m_target_id;
+        bake::region m_region_id;
+    };
 
-        std::string_view toString() const {
-            return std::string_view{
-                reinterpret_cast<const char*>(this),
-                sizeof(*this)};
-        }
+    struct BakeDataDescriptor {
+        size_t                offset;
+        BakeReplicaDescriptor replicas[1];
     };
 
     thallium::engine        m_engine;
@@ -95,6 +94,11 @@ class BakeDataStore : public DataStore {
             const BulkRef& remoteBulk) override {
         RequestResult<std::vector<DataDescriptor>> result;
 
+        size_t numReplicas = m_bake_targets.size();
+        std::vector<std::vector<char>> descriptorStrings(count);
+        for(auto& descriptorString : descriptorStrings)
+            descriptorString.resize(sizeof(size_t) + numReplicas*sizeof(BakeReplicaDescriptor));
+
         auto source = m_engine.lookup(remoteBulk.address);
 
         size_t s = count*sizeof(size_t);
@@ -106,69 +110,108 @@ class BakeDataStore : public DataStore {
 
         sizesBulk << remoteBulk.handle.on(source)(remoteBulk.offset, s);
 
-        auto& target = m_bake_targets[0];
-        // TODO handle multiple targets
+        auto createWritePersist = [this, &sizes, s, count, &remoteBulk, &descriptorStrings](size_t i) {
+            auto& target = m_bake_targets[i];
+            auto region_id = m_bake_client.create_write_persist(
+                    target.m_ph,
+                    target.m_target,
+                    remoteBulk.handle.get_bulk(),
+                    remoteBulk.offset + s,
+                    remoteBulk.address,
+                    remoteBulk.size - s);
+            size_t dataOffset = 0;
+            for(size_t j=0; j < count; ++j) {
+                auto& descriptorString = descriptorStrings[j];
+                auto descriptor = reinterpret_cast<BakeDataDescriptor*>(descriptorString.data());
+                if(i == 0) descriptor->offset = dataOffset;
+                descriptor->replicas[i].m_target_id = target.m_target;
+                descriptor->replicas[i].m_region_id = region_id;
+                dataOffset += sizes[j];
+            }
+        };
 
-        auto region_id = m_bake_client.create_write_persist(
-                target.m_ph,
-                target.m_target,
-                remoteBulk.handle.get_bulk(),
-                remoteBulk.offset + s,
-                remoteBulk.address,
-                remoteBulk.size - s);
+        std::vector<thallium::managed<thallium::thread>> ults;
+        ults.reserve(m_bake_targets.size());
+        for(size_t i = 0; i < m_bake_targets.size(); ++i) {
+            ults.push_back(
+                thallium::thread::self().get_last_pool().make_thread(
+                    [i, &createWritePersist](){ createWritePersist(i); })
+            );
+        }
+        for(auto& ult : ults) ult->join();
 
-        auto bake_descriptor = BakeDescriptor{region_id, 0};
-        for(size_t i = 0; i < count; ++i) {
+        for(size_t j = 0; j < count; ++j) {
+            auto& bakeDescriptor = descriptorStrings[j];
             auto descriptor = DataDescriptor::From(
-                bake_descriptor.toString(), sizes[i]);
+                std::string_view{bakeDescriptor.data(), bakeDescriptor.size()}, sizes[j]);
             result.value().push_back(descriptor);
-            bake_descriptor.m_offset += sizes[i];
         }
 
         return result;
     }
 
-    RequestResult<void> load(
+    std::vector<RequestResult<void>> load(
         const std::vector<DataDescriptor>& descriptors,
-        const BulkRef& dest) override {
-        RequestResult<void> result;
-#if 0
-        // lock the BakeDataStore
-        auto guard = std::unique_lock<thallium::mutex>{m_mutex};
+        const BulkRef& remoteBulk) override {
+        std::vector<RequestResult<void>> result;
+        result.resize(descriptors.size());
 
-        // convert descriptors into pointer/size pairs
-        std::vector<std::pair<void*, size_t>> segments;
-        segments.reserve(descriptors.size());
-        for(auto& d : descriptors) {
-            if(d.size() == 0) continue;
-            size_t offset;
-            std::memcpy(&offset, d.location().data(), sizeof(offset));
-            segments.push_back({
-                static_cast<void*>(m_data.data() + offset),
-                d.size()
-            });
+        // get BakeDataDescriptors from the DataDescriptors
+        std::vector<const BakeDataDescriptor*> bakeDescriptors;
+        std::vector<size_t> numReplicas;
+        bakeDescriptors.reserve(descriptors.size());
+        numReplicas.resize(descriptors.size());
+        for(size_t i = 0; i < descriptors.size(); ++i) {
+            const auto& descriptor = descriptors[i];
+            bakeDescriptors.push_back(
+                reinterpret_cast<const BakeDataDescriptor*>(
+                    descriptor.location().data()));
+            numReplicas.push_back(
+                (descriptor.location().size() - sizeof(size_t))/(sizeof(BakeReplicaDescriptor)));
         }
 
-        // expose the m_data vector for bulk transfer
-        auto localDataBulk = m_engine.expose(
-            segments,
-            thallium::bulk_mode::read_only);
+        auto readFromBake = [&](size_t i) {
+            // find a replica to get the data from
+            BakeTarget* target = nullptr;
+            const bake::region* region_id = nullptr;
+            auto& bakeDescriptor = bakeDescriptors[i];
+            for(unsigned j=0; j < numReplicas[i]; ++j) {
+                auto& r = bakeDescriptor->replicas[j];
+                for(auto& t : m_bake_targets) {
+                    if(std::memcmp(&t.m_target, &r.m_target_id, sizeof(t.m_target)) == 0) {
+                        target = &t;
+                        region_id = &r.m_region_id;
+                        break;
+                    }
+                }
+                if(target != nullptr) break;
+            }
+            // check if a replica was found
+            if(target == nullptr) {
+                result[i].success() = false;
+                result[i].error() = "Could not find replica for requested bake DataDescriptor";
+                return;
+            }
+            // read the data
+            m_bake_client.read(
+                target->m_ph,
+                target->m_target,
+                *region_id,
+                bakeDescriptor->offset,
+                remoteBulk.handle.get_bulk(),
+                remoteBulk.offset,
+                remoteBulk.address,
+                descriptors[i].size());
+        };
 
-        // do the bulk transfer
-        auto sender = m_engine.lookup(dest.address);
-        dest.handle.on(sender)(dest.offset, dest.size) << localDataBulk;
-#endif
+        for(size_t i = 0; i < descriptors.size(); ++i) {
+            readFromBake(i);
+        }
         return result;
     }
 
     RequestResult<bool> destroy() override {
-#if 0
-        // lock the BakeDataStore
-        auto guard = std::unique_lock<thallium::mutex>{m_mutex};
-        // remove all the data
-        m_sizes.clear();
-        m_data.clear();
-#endif
+        // TODO
         return RequestResult<bool>{true};
     }
 

@@ -197,7 +197,7 @@ RequestResult<void> DefaultTopicManager::acknowledge(
     return result;
 }
 
-RequestResult<void> DefaultTopicManager::getData(
+RequestResult<std::vector<RequestResult<void>>> DefaultTopicManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     return m_data_store->load(descriptors, bulk);

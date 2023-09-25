@@ -21,6 +21,7 @@
 
 #include <thallium/serialization/stl/string.hpp>
 #include <thallium/serialization/stl/pair.hpp>
+#include <thallium/serialization/stl/vector.hpp>
 
 namespace mofka {
 
@@ -244,13 +245,17 @@ SP<DataImpl> ConsumerImpl::requestData(
     auto& rpc = m_topic->m_service->m_client->m_consumer_request_data;
     auto& ph  = target->m_ph;
 
-    RequestResult<void> result = rpc.on(ph)(
+    RequestResult<std::vector<RequestResult<void>>> result = rpc.on(ph)(
             m_topic->m_name,
             Cerealized<DataDescriptor>(descriptor),
             local_bulk_ref);
 
     if(!result.success())
         throw Exception(result.error());
+
+    if(!result.value()[0].success()) {
+        throw Exception(result.value()[0].error());
+    }
 
     return data.self;
 }

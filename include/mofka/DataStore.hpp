@@ -87,7 +87,7 @@ class DataStore {
      * (unlike the store function) since the sizes are already known to
      * the caller via the descriptors.
      */
-    virtual RequestResult<void> load(
+    virtual std::vector<RequestResult<void>> load(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& dest) = 0;
 

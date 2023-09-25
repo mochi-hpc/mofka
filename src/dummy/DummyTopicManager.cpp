@@ -217,10 +217,11 @@ RequestResult<void> DummyTopicManager::acknowledge(
     return result;
 }
 
-RequestResult<void> DummyTopicManager::getData(
+RequestResult<std::vector<RequestResult<void>>> DummyTopicManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
-    RequestResult<void> result;
+    RequestResult<std::vector<RequestResult<void>>> result;
+    result.value().resize(descriptors.size());
 
     OffsetSize location;
     location.fromString(descriptors[0].location());
