@@ -4,7 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "mofka/TopicHandle.hpp"
-#include "mofka/RequestResult.hpp"
+#include "mofka/Result.hpp"
 #include "mofka/Exception.hpp"
 
 #include "PimplUtil.hpp"

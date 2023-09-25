@@ -7,7 +7,7 @@
 #define MOFKA_CLIENT_IMPL_H
 
 #include "mofka/TargetSelector.hpp"
-#include "mofka/RequestResult.hpp"
+#include "mofka/Result.hpp"
 #include "mofka/BulkRef.hpp"
 #include "mofka/EventID.hpp"
 #include <bedrock/Client.hpp>

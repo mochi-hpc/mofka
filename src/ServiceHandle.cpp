@@ -4,7 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "mofka/ServiceHandle.hpp"
-#include "mofka/RequestResult.hpp"
+#include "mofka/Result.hpp"
 #include "mofka/Exception.hpp"
 #include "mofka/TopicHandle.hpp"
 
@@ -32,7 +32,7 @@ TopicHandle ServiceHandle::createTopic(
     const auto target = self->m_mofka_targets[hash % self->m_mofka_targets.size()];
     const auto ph = target.self->m_ph;
     using ResultType = std::tuple<Metadata, Metadata, Metadata>;
-    RequestResult<ResultType> response =
+    Result<ResultType> response =
         self->m_client->m_create_topic.on(ph)(
             std::string{name},
             static_cast<Metadata&>(config),
@@ -61,7 +61,7 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
     const auto target = self->m_mofka_targets[hash % self->m_mofka_targets.size()];
     const auto ph = target.self->m_ph;
     using ResultType = std::tuple<Metadata, Metadata, Metadata>;
-    RequestResult<ResultType> response =
+    Result<ResultType> response =
         self->m_client->m_open_topic.on(ph)(std::string{name});
     if(!response.success())
         throw Exception(response.error());

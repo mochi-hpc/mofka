@@ -7,7 +7,7 @@
 #define MOFKA_TOPIC_MANAGER_HPP
 
 #include <mofka/ForwardDcl.hpp>
-#include <mofka/RequestResult.hpp>
+#include <mofka/Result.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Json.hpp>
 #include <mofka/BatchSize.hpp>
@@ -102,9 +102,9 @@ class TopicManager {
      * - the first N*sizeof(size_t) bytes contain metadata/data sizes;
      * - the next S bytes (sum of the above sizes) contain the metadata/data content.
      *
-     * @return a RequestResult containing the result.
+     * @return a Result containing the result.
      */
-    virtual RequestResult<EventID> receiveBatch(
+    virtual Result<EventID> receiveBatch(
         const thallium::endpoint& sender,
         const std::string& producer_name,
         size_t num_events,
@@ -131,7 +131,7 @@ class TopicManager {
      * @param consumerHandle ConsumerHandle to feed event batches.
      * @param bathSize batch size requested by the consumer.
      */
-    virtual RequestResult<void> feedConsumer(
+    virtual Result<void> feedConsumer(
         ConsumerHandle consumerHandle,
         BatchSize batchSize) = 0;
 
@@ -139,7 +139,7 @@ class TopicManager {
      * @brief Acknowledge that the specified consumer has consumed
      * events up to and including the specified event ID.
      */
-    virtual RequestResult<void> acknowledge(
+    virtual Result<void> acknowledge(
         std::string_view consumer_name,
         EventID event_id) = 0;
 
@@ -149,17 +149,17 @@ class TopicManager {
      * @param descriptors Vector of DataDescriptor for the data to fetch.
      * @param bulk Bulk handle of the sender's memory.
      */
-    virtual RequestResult<std::vector<RequestResult<void>>> getData(
+    virtual Result<std::vector<Result<void>>> getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) = 0;
 
     /**
      * @brief Destroys the underlying topic.
      *
-     * @return a RequestResult<bool> instance indicating
+     * @return a Result<bool> instance indicating
      * whether the database was successfully destroyed.
      */
-    virtual RequestResult<bool> destroy() = 0;
+    virtual Result<bool> destroy() = 0;
 
 };
 

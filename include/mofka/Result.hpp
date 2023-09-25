@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_REQUEST_RESULT_HPP
-#define MOFKA_REQUEST_RESULT_HPP
+#ifndef MOFKA_RESULT_HPP
+#define MOFKA_RESULT_HPP
 
 #include <mofka/ForwardDcl.hpp>
 
@@ -13,7 +13,7 @@
 namespace mofka {
 
 /**
- * @brief The RequestResult object is a generic object
+ * @brief The Result object is a generic object
  * used to hold and send back the result of an RPC.
  * It contains three fields:
  * - success must be set to true if the request succeeded, false otherwise
@@ -29,18 +29,18 @@ namespace mofka {
  * @tparam T Type of the result.
  */
 template<typename T>
-class RequestResult {
+class Result {
 
     public:
 
-    RequestResult(const T& value)
+    Result(const T& value)
     : m_value(value) {}
 
-    RequestResult() = default;
-    RequestResult(RequestResult&&) = default;
-    RequestResult(const RequestResult&) = default;
-    RequestResult& operator=(RequestResult&&) = default;
-    RequestResult& operator=(const RequestResult&) = default;
+    Result() = default;
+    Result(Result&&) = default;
+    Result(const Result&) = default;
+    Result& operator=(Result&&) = default;
+    Result& operator=(const Result&) = default;
 
     /**
      * @brief Whether the request succeeded.
@@ -107,18 +107,18 @@ class RequestResult {
 };
 
 template<>
-class RequestResult<std::string> {
+class Result<std::string> {
 
     public:
 
-    RequestResult(std::string value)
+    Result(std::string value)
     : m_content(std::move(value)) {}
 
-    RequestResult() = default;
-    RequestResult(RequestResult&&) = default;
-    RequestResult(const RequestResult&) = default;
-    RequestResult& operator=(RequestResult&&) = default;
-    RequestResult& operator=(const RequestResult&) = default;
+    Result() = default;
+    Result(Result&&) = default;
+    Result(const Result&) = default;
+    Result& operator=(Result&&) = default;
+    Result& operator=(const Result&) = default;
 
     bool& success() {
         return m_success;
@@ -157,18 +157,18 @@ class RequestResult<std::string> {
 };
 
 template<>
-class RequestResult<bool> {
+class Result<bool> {
 
     public:
 
-    RequestResult(bool b)
+    Result(bool b)
     : m_success(b) {}
 
-    RequestResult() = default;
-    RequestResult(RequestResult&&) = default;
-    RequestResult(const RequestResult&) = default;
-    RequestResult& operator=(RequestResult&&) = default;
-    RequestResult& operator=(const RequestResult&) = default;
+    Result() = default;
+    Result(Result&&) = default;
+    Result(const Result&) = default;
+    Result& operator=(Result&&) = default;
+    Result& operator=(const Result&) = default;
 
     bool& success() {
         return m_success;
@@ -208,15 +208,15 @@ class RequestResult<bool> {
 };
 
 template<>
-class RequestResult<void> {
+class Result<void> {
 
     public:
 
-    RequestResult() = default;
-    RequestResult(RequestResult&&) = default;
-    RequestResult(const RequestResult&) = default;
-    RequestResult& operator=(RequestResult&&) = default;
-    RequestResult& operator=(const RequestResult&) = default;
+    Result() = default;
+    Result(Result&&) = default;
+    Result(const Result&) = default;
+    Result& operator=(Result&&) = default;
+    Result& operator=(const Result&) = default;
 
     bool& success() {
         return m_success;

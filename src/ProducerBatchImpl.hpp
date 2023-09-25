@@ -14,7 +14,7 @@
 #include "PimplUtil.hpp"
 
 #include "mofka/BulkRef.hpp"
-#include "mofka/RequestResult.hpp"
+#include "mofka/Result.hpp"
 #include "mofka/EventID.hpp"
 #include "mofka/Metadata.hpp"
 #include "mofka/Archive.hpp"
@@ -229,7 +229,7 @@ class ActiveProducerBatchQueue {
             auto ph = m_target->m_ph;
             auto rpc = m_client->m_producer_send_batch;
             auto self_addr = static_cast<std::string>(m_client->m_engine.self());
-            RequestResult<EventID> result = rpc.on(ph)(
+            Result<EventID> result = rpc.on(ph)(
                 m_topic_name,
                 m_producer_name,
                 batch->count(),

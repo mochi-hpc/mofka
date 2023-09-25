@@ -25,7 +25,7 @@ Metadata DummyTopicManager::getTargetSelectorMetadata() const {
     return m_selector;
 }
 
-RequestResult<EventID> DummyTopicManager::receiveBatch(
+Result<EventID> DummyTopicManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -33,7 +33,7 @@ RequestResult<EventID> DummyTopicManager::receiveBatch(
           const BulkRef& data_bulk)
 {
     (void)producer_name;
-    RequestResult<EventID> result;
+    Result<EventID> result;
     EventID first_id;
     {
         auto g = std::unique_lock<thallium::mutex>{m_events_metadata_mtx};
@@ -126,10 +126,10 @@ void DummyTopicManager::wakeUp() {
     m_events_cv.notify_all();
 }
 
-RequestResult<void> DummyTopicManager::feedConsumer(
+Result<void> DummyTopicManager::feedConsumer(
     ConsumerHandle consumerHandle,
     BatchSize batchSize) {
-    RequestResult<void> result;
+    Result<void> result;
 
     if(batchSize.value == 0)
         batchSize = BatchSize::Adaptive();
@@ -207,20 +207,20 @@ RequestResult<void> DummyTopicManager::feedConsumer(
     return result;
 }
 
-RequestResult<void> DummyTopicManager::acknowledge(
+Result<void> DummyTopicManager::acknowledge(
     std::string_view consumer_name,
     EventID event_id) {
-    RequestResult<void> result;
+    Result<void> result;
     auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
     std::string consumer_name_str{consumer_name.data(), consumer_name.size()};
     m_consumer_cursor[consumer_name_str] = event_id + 1;
     return result;
 }
 
-RequestResult<std::vector<RequestResult<void>>> DummyTopicManager::getData(
+Result<std::vector<Result<void>>> DummyTopicManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
-    RequestResult<std::vector<RequestResult<void>>> result;
+    Result<std::vector<Result<void>>> result;
     result.value().resize(descriptors.size());
 
     OffsetSize location;
@@ -242,8 +242,8 @@ RequestResult<std::vector<RequestResult<void>>> DummyTopicManager::getData(
     return result;
 }
 
-RequestResult<bool> DummyTopicManager::destroy() {
-    RequestResult<bool> result;
+Result<bool> DummyTopicManager::destroy() {
+    Result<bool> result;
     // TODO wait for all the consumers to be done consuming
     result.value() = true;
     return result;

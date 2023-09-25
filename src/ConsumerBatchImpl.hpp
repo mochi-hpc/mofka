@@ -10,7 +10,7 @@
 #include <mutex>
 #include <queue>
 #include "mofka/BulkRef.hpp"
-#include "mofka/RequestResult.hpp"
+#include "mofka/Result.hpp"
 #include "mofka/EventID.hpp"
 #include "mofka/Metadata.hpp"
 #include "mofka/Archive.hpp"

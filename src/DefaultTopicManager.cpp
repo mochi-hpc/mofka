@@ -29,7 +29,7 @@ Metadata DefaultTopicManager::getTargetSelectorMetadata() const {
     return m_selector;
 }
 
-RequestResult<EventID> DefaultTopicManager::receiveBatch(
+Result<EventID> DefaultTopicManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -37,7 +37,7 @@ RequestResult<EventID> DefaultTopicManager::receiveBatch(
           const BulkRef& data_bulk)
 {
     (void)producer_name;
-    RequestResult<EventID> result;
+    Result<EventID> result;
     EventID first_id;
     {
         auto g = std::unique_lock<thallium::mutex>{m_events_metadata_mtx};
@@ -106,10 +106,10 @@ void DefaultTopicManager::wakeUp() {
     m_events_cv.notify_all();
 }
 
-RequestResult<void> DefaultTopicManager::feedConsumer(
+Result<void> DefaultTopicManager::feedConsumer(
     ConsumerHandle consumerHandle,
     BatchSize batchSize) {
-    RequestResult<void> result;
+    Result<void> result;
 
     if(batchSize.value == 0)
         batchSize = BatchSize::Adaptive();
@@ -187,24 +187,24 @@ RequestResult<void> DefaultTopicManager::feedConsumer(
     return result;
 }
 
-RequestResult<void> DefaultTopicManager::acknowledge(
+Result<void> DefaultTopicManager::acknowledge(
     std::string_view consumer_name,
     EventID event_id) {
-    RequestResult<void> result;
+    Result<void> result;
     auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
     std::string consumer_name_str{consumer_name.data(), consumer_name.size()};
     m_consumer_cursor[consumer_name_str] = event_id + 1;
     return result;
 }
 
-RequestResult<std::vector<RequestResult<void>>> DefaultTopicManager::getData(
+Result<std::vector<Result<void>>> DefaultTopicManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     return m_data_store->load(descriptors, bulk);
 }
 
-RequestResult<bool> DefaultTopicManager::destroy() {
-    RequestResult<bool> result;
+Result<bool> DefaultTopicManager::destroy() {
+    Result<bool> result;
     // TODO wait for all the consumers to be done consuming
     result.value() = true;
     return result;

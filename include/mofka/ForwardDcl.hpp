@@ -29,7 +29,7 @@ struct NumEvents;
 class Producer;
 class Provider;
 template<typename T>
-class RequestResult;
+class Result;
 class SerializerInterface;
 class Serializer;
 class ServiceHandle;

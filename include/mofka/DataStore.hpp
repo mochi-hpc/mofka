@@ -9,7 +9,7 @@
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/DataDescriptor.hpp>
-#include <mofka/RequestResult.hpp>
+#include <mofka/Result.hpp>
 #include <mofka/EventID.hpp>
 #include <mofka/BulkRef.hpp>
 #include <mofka/Factory.hpp>
@@ -72,7 +72,7 @@ class DataStore {
      *
      * @return a vector of corresponding DataDescriptors.
      */
-    virtual RequestResult<std::vector<DataDescriptor>> store(
+    virtual Result<std::vector<DataDescriptor>> store(
         size_t count,
         const BulkRef& bulk) = 0;
 
@@ -87,17 +87,17 @@ class DataStore {
      * (unlike the store function) since the sizes are already known to
      * the caller via the descriptors.
      */
-    virtual std::vector<RequestResult<void>> load(
+    virtual std::vector<Result<void>> load(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& dest) = 0;
 
     /**
      * @brief Destroys the DataStore, including the data it contains.
      *
-     * @return a RequestResult<bool> instance indicating
+     * @return a Result<bool> instance indicating
      * whether the database was successfully destroyed.
      */
-    virtual RequestResult<bool> destroy() = 0;
+    virtual Result<bool> destroy() = 0;
 
 };
 

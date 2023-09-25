@@ -4,7 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "mofka/Consumer.hpp"
-#include "mofka/RequestResult.hpp"
+#include "mofka/Result.hpp"
 #include "mofka/Exception.hpp"
 #include "mofka/TopicHandle.hpp"
 #include "mofka/Future.hpp"
@@ -117,7 +117,7 @@ void ConsumerImpl::pullFrom(size_t target_info_index,
     auto& rpc = m_topic->m_service->m_client->m_consumer_request_events;
     auto& ph = target.self->m_ph;
     auto consumer_ctx = reinterpret_cast<intptr_t>(this);
-    RequestResult<void> result =
+    Result<void> result =
         rpc.on(ph)(m_topic->m_name,
                    consumer_ctx,
                    target_info_index,
@@ -245,7 +245,7 @@ SP<DataImpl> ConsumerImpl::requestData(
     auto& rpc = m_topic->m_service->m_client->m_consumer_request_data;
     auto& ph  = target->m_ph;
 
-    RequestResult<std::vector<RequestResult<void>>> result = rpc.on(ph)(
+    Result<std::vector<Result<void>>> result = rpc.on(ph)(
             m_topic->m_name,
             Cerealized<DataDescriptor>(descriptor),
             local_bulk_ref);

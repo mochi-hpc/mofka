@@ -28,10 +28,10 @@ class MemoryDataStore : public DataStore {
     MemoryDataStore& operator=(MemoryDataStore&&) = default;
     virtual ~MemoryDataStore() = default;
 
-    RequestResult<std::vector<DataDescriptor>> store(
+    Result<std::vector<DataDescriptor>> store(
             size_t count,
             const BulkRef& data) override {
-        RequestResult<std::vector<DataDescriptor>> result;
+        Result<std::vector<DataDescriptor>> result;
         // lookup address
         auto source = m_engine.lookup(data.address);
         // lock the MemoryDataStore
@@ -79,10 +79,10 @@ class MemoryDataStore : public DataStore {
         return result;
     }
 
-    std::vector<RequestResult<void>> load(
+    std::vector<Result<void>> load(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& dest) override {
-        std::vector<RequestResult<void>> result;
+        std::vector<Result<void>> result;
 
         // lock the MemoryDataStore
         auto guard = std::unique_lock<thallium::mutex>{m_mutex};
@@ -114,13 +114,13 @@ class MemoryDataStore : public DataStore {
         return result;
     }
 
-    RequestResult<bool> destroy() override {
+    Result<bool> destroy() override {
         // lock the MemoryDataStore
         auto guard = std::unique_lock<thallium::mutex>{m_mutex};
         // remove all the data
         m_sizes.clear();
         m_data.clear();
-        return RequestResult<bool>{true};
+        return Result<bool>{true};
     }
 
     static std::unique_ptr<DataStore> create(

@@ -114,7 +114,7 @@ class DummyTopicManager : public mofka::TopicManager {
     /**
      * @brief Receives a batch.
      */
-    RequestResult<EventID> receiveBatch(
+    Result<EventID> receiveBatch(
             const thallium::endpoint& sender,
             const std::string& producer_name,
             size_t num_events,
@@ -129,31 +129,31 @@ class DummyTopicManager : public mofka::TopicManager {
     /**
      * @see TopicManager::feedConsumer.
      */
-    RequestResult<void> feedConsumer(
+    Result<void> feedConsumer(
             ConsumerHandle consumerHandle,
             BatchSize batchSize) override;
 
     /**
      * @see TopicManager::acknowledge.
      */
-    RequestResult<void> acknowledge(
+    Result<void> acknowledge(
           std::string_view consumer_name,
           EventID event_id) override;
 
     /**
      * @see TopicManager::getData.
      */
-    RequestResult<std::vector<RequestResult<void>>> getData(
+    Result<std::vector<Result<void>>> getData(
           const std::vector<DataDescriptor>& descriptors,
           const BulkRef& bulk) override;
 
     /**
      * @brief Destroys the underlying topic.
      *
-     * @return a RequestResult<bool> instance indicating
+     * @return a Result<bool> instance indicating
      * whether the database was successfully destroyed.
      */
-    mofka::RequestResult<bool> destroy() override;
+    mofka::Result<bool> destroy() override;
 
     /**
      * @brief Static factory function used by the TopicFactory to

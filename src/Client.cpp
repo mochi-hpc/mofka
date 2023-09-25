@@ -6,7 +6,7 @@
 #include "mofka/Exception.hpp"
 #include "mofka/Client.hpp"
 #include "mofka/TopicHandle.hpp"
-#include "mofka/RequestResult.hpp"
+#include "mofka/Result.hpp"
 
 #include "PimplUtil.hpp"
 #include "ClientImpl.hpp"
@@ -97,7 +97,7 @@ void ClientImpl::forwardBatchToConsumer(
         const BulkRef &metadata,
         const BulkRef &data_desc_sizes,
         const BulkRef &data_desc) {
-    RequestResult<void> result;
+    Result<void> result;
     ConsumerImpl* consumer_impl = reinterpret_cast<ConsumerImpl*>(consumer_ctx);
     consumer_impl->recvBatch(target_info_index, count, firstID, metadata_sizes, metadata, data_desc_sizes, data_desc);
     req.respond(result);

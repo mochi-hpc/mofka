@@ -136,7 +136,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] => name       = {}", id(), topic_name);
 
         using ResultType = std::tuple<Metadata, Metadata, Metadata>;
-        RequestResult<ResultType> result;
+        Result<ResultType> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
 
         std::string topic_type = "mofka";
@@ -200,7 +200,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                    const std::string& topic_name) {
         spdlog::trace("[mofka:{}] Received openTopic request for topic {}", id(), topic_name);
         using ResultType = std::tuple<Metadata, Metadata, Metadata>;
-        RequestResult<ResultType> result;
+        Result<ResultType> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
 
         FIND_TOPIC_BY_NAME(topic, topic_name);
@@ -219,7 +219,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                       const BulkRef& metadata,
                       const BulkRef& data) {
         spdlog::trace("[mofka:{}] Received receiveBatch request for topic {}", id(), topic_name);
-        RequestResult<EventID> result;
+        Result<EventID> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->receiveBatch(
@@ -236,7 +236,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                        size_t count,
                        size_t batch_size) {
         spdlog::trace("[mofka:{}] Received requestEvents request for topic {}", id(), topic_name);
-        RequestResult<void> result;
+        Result<void> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
@@ -262,7 +262,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                      const std::string& consumer_name,
                      EventID eventID) {
         spdlog::trace("[mofka:{}] Received acknoweldge request for topic {}", id(), topic_name);
-        RequestResult<void> result;
+        Result<void> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->acknowledge(consumer_name, eventID);
@@ -272,7 +272,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void removeConsumer(const tl::request& req,
                         const UUID& consumer_id) {
         spdlog::trace("[mofka:{}] Received removeConsumer request", id());
-        RequestResult<void> result;
+        Result<void> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
         while(!consumer_handle_impl) {
@@ -294,7 +294,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                      const Cerealized<DataDescriptor>& descriptor,
                      const BulkRef& remote_bulk) {
         spdlog::trace("[mofka:{}] Received requestData request", id());
-        RequestResult<std::vector<RequestResult<void>>> result;
+        Result<std::vector<Result<void>>> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->getData({descriptor.content}, remote_bulk);

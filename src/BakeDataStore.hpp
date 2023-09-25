@@ -89,10 +89,10 @@ class BakeDataStore : public DataStore {
     , m_bake_client(std::move(bake_client))
     , m_bake_targets(std::move(bake_targets)) {}
 
-    RequestResult<std::vector<DataDescriptor>> store(
+    Result<std::vector<DataDescriptor>> store(
             size_t count,
             const BulkRef& remoteBulk) override {
-        RequestResult<std::vector<DataDescriptor>> result;
+        Result<std::vector<DataDescriptor>> result;
 
         size_t numReplicas = m_bake_targets.size();
         std::vector<std::vector<char>> descriptorStrings(count);
@@ -150,10 +150,10 @@ class BakeDataStore : public DataStore {
         return result;
     }
 
-    std::vector<RequestResult<void>> load(
+    std::vector<Result<void>> load(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& remoteBulk) override {
-        std::vector<RequestResult<void>> result;
+        std::vector<Result<void>> result;
         result.resize(descriptors.size());
 
         // get BakeDataDescriptors from the DataDescriptors
@@ -210,9 +210,9 @@ class BakeDataStore : public DataStore {
         return result;
     }
 
-    RequestResult<bool> destroy() override {
+    Result<bool> destroy() override {
         // TODO
-        return RequestResult<bool>{true};
+        return Result<bool>{true};
     }
 
     static std::unique_ptr<DataStore> create(
