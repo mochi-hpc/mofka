@@ -108,15 +108,10 @@ configure_file ("mofka-client.pc.in" "mofka-client.pc" @ONLY)
 configure_file ("Config.h.in" "Config.h" @ONLY)
 
 # "make install" rules
-install (TARGETS mofka-server mofka-client
+install (TARGETS mofka-server mofka-client mofka-bedrock-module
          EXPORT mofka-targets
          ARCHIVE DESTINATION lib
          LIBRARY DESTINATION lib)
-if (${ENABLE_BEDROCK})
-    install (TARGETS mofka-bedrock-module
-             ARCHIVE DESTINATION lib
-             LIBRARY DESTINATION lib)
-endif ()
 install (EXPORT mofka-targets
          DESTINATION ${mofka-pkg}
          FILE "mofka-targets.cmake")
