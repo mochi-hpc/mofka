@@ -73,7 +73,9 @@ set_target_properties (mofka-server
 
 # bedrock module library
 add_library (mofka-bedrock-module ${module-src-files})
-target_link_libraries (mofka-bedrock-module mofka-server mofka-client bedrock-server PRIVATE coverage_config)
+target_link_libraries (mofka-bedrock-module
+    PUBLIC mofka-server mofka-client bedrock-server
+    PRIVATE coverage_config)
 target_include_directories (mofka-bedrock-module PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (mofka-bedrock-module BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
