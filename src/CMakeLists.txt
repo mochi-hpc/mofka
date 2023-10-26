@@ -125,7 +125,7 @@ install (FILES "${CMAKE_CURRENT_BINARY_DIR}/mofka-config.cmake"
          DESTINATION ${mofka-pkg} )
 install (DIRECTORY ../include/mofka
          DESTINATION include
-         FILES_MATCHING PATTERN "*.h")
+         FILES_MATCHING PATTERN "*.hpp")
 install (FILES "${CMAKE_CURRENT_BINARY_DIR}/mofka-server.pc"
                "${CMAKE_CURRENT_BINARY_DIR}/mofka-client.pc"
          DESTINATION "lib/pkgconfig/")
