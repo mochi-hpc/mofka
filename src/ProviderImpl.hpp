@@ -139,7 +139,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         Result<ResultType> result;
         AutoResponse<decltype(result)> ensureResponse(req, result);
 
-        std::string topic_type = "mofka";
+        std::string topic_type = "default";
         const auto& backend_config_json = backend_config.json();
         if(backend_config_json.GetType() == rapidjson::kObjectType) {
             auto topic_type_it = backend_config_json.FindMember("__type__");

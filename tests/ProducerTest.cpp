@@ -26,14 +26,7 @@ TEST_CASE("Producer test", "[producer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        auto topic_config = mofka::TopicBackendConfig{R"(
-            {
-                "__type__":"default",
-                "data_store": {
-                    "__type__": "memory"
-                }
-            })"
-        };
+        auto topic_config = mofka::TopicBackendConfig{};
         topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
 

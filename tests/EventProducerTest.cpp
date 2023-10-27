@@ -26,7 +26,7 @@ TEST_CASE("Event producer test", "[event-producer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        auto topic_config = mofka::TopicBackendConfig{R"(
+        auto topic_config = mofka::TopicBackendConfig{};/*R"(
             {
                 "__type__":"default",
                 "data_store": {
@@ -34,6 +34,7 @@ TEST_CASE("Event producer test", "[event-producer]") {
                 }
             })"
         };
+        */
         topic = sh.createTopic("mytopic", topic_config);
         REQUIRE(static_cast<bool>(topic));
 

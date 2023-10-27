@@ -216,23 +216,22 @@ std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
         const Metadata& validator,
         const Metadata& selector,
         const Metadata& serializer) {
-    const auto& doc = config.json();
+    rapidjson::Document doc;
+    doc.CopyFrom(config.json(), doc.GetAllocator());
     /* access datastore information */
     if(!doc.HasMember("data_store")) {
-        auto error = "\"data_store\" field not found in topic manager configuration";
-        spdlog::error("[mofka] {}", error);
-        throw Exception(error);
+        rapidjson::Value data_store;
+        data_store.SetObject();
+        doc.AddMember("data_store", data_store, doc.GetAllocator());
     }
-    const auto& json_datastore_config = doc["data_store"];
+    auto& json_datastore_config = doc["data_store"];
     if(!json_datastore_config.IsObject()) {
         auto error = "\"data_store\" field in topic manager should be an object";
         spdlog::error("[mofka] {}", error);
         throw Exception(error);
     }
     if(!json_datastore_config.HasMember("__type__")) {
-        auto error = "\"__type__\" field not found in \"data_store\" object";
-        spdlog::error("[mofka] {}", error);
-        throw Exception(error);
+        json_datastore_config.AddMember("__type__", "memory", doc.GetAllocator());
     }
     const auto& json_datastore_type = json_datastore_config["__type__"];
     if(!json_datastore_type.IsString()) {
@@ -248,9 +247,16 @@ std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
     /* create data store */
     auto data_store = DataStoreFactory::create(datastore_type, engine, datastore_config);
 
+    Metadata topic_manager_config{std::move(doc)};
+
     /* create topic manager */
     return std::unique_ptr<mofka::TopicManager>(
-        new DefaultTopicManager(config, validator, selector, serializer, std::move(data_store), engine));
+        new DefaultTopicManager(topic_manager_config,
+                                validator,
+                                selector,
+                                serializer,
+                                std::move(data_store),
+                                engine));
 }
 
 }
