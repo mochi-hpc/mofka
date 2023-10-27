@@ -224,7 +224,7 @@ SP<DataImpl> ConsumerImpl::requestData(
     if(requested_descriptor.size() == 0)
         return Data{}.self;
     // run data broker
-    auto data = m_data_broker(metadata, descriptor);
+    auto data = m_data_broker(metadata, requested_descriptor);
     if(data.size() != requested_descriptor.size()) {
         throw Exception(
                 "DataBroker returned a Data object with a "
