@@ -10,7 +10,6 @@
 #include "mofka/DataDescriptor.hpp"
 #include "CerealArchiveAdaptor.hpp"
 #include "ConsumerHandleImpl.hpp"
-#include "mofka/UUID.hpp"
 #include "MetadataImpl.hpp"
 
 #include <thallium.hpp>
@@ -42,34 +41,6 @@ namespace mofka {
 using namespace std::string_literals;
 namespace tl = thallium;
 
-struct AutoDeregisteringRPC : public tl::remote_procedure {
-
-    AutoDeregisteringRPC(tl::remote_procedure rpc)
-    : tl::remote_procedure(std::move(rpc)) {}
-
-    ~AutoDeregisteringRPC() {
-        deregister();
-    }
-};
-
-template<typename ResponseType>
-struct AutoResponse {
-
-    AutoResponse(const tl::request& req, ResponseType& resp)
-    : m_req(req)
-    , m_resp(resp) {}
-
-    AutoResponse(const AutoResponse&) = delete;
-    AutoResponse(AutoResponse&&) = delete;
-
-    ~AutoResponse() {
-        m_req.respond(m_resp);
-    }
-
-    const tl::request& m_req;
-    ResponseType&      m_resp;
-};
-
 class ProviderImpl : public tl::provider<ProviderImpl> {
 
     auto id() const { return get_provider_id(); } // for convenience
@@ -80,14 +51,14 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     rapidjson::Document  m_config;
     UUID                 m_uuid;
     tl::pool             m_pool;
-    AutoDeregisteringRPC m_create_topic;
-    AutoDeregisteringRPC m_open_topic;
+    tl::auto_remote_procedure m_create_topic;
+    tl::auto_remote_procedure m_open_topic;
     // RPCs for TopicManagers
-    AutoDeregisteringRPC m_producer_send_batch;
-    AutoDeregisteringRPC m_consumer_request_events;
-    AutoDeregisteringRPC m_consumer_ack_event;
-    AutoDeregisteringRPC m_consumer_remove_consumer;
-    AutoDeregisteringRPC m_consumer_request_data;
+    tl::auto_remote_procedure m_producer_send_batch;
+    tl::auto_remote_procedure m_consumer_request_events;
+    tl::auto_remote_procedure m_consumer_ack_event;
+    tl::auto_remote_procedure m_consumer_remove_consumer;
+    tl::auto_remote_procedure m_consumer_request_data;
     /* RPC for Consumers */
     thallium::remote_procedure m_consumer_recv_batch;
     // TopicManagers
@@ -137,7 +108,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
         using ResultType = std::tuple<Metadata, Metadata, Metadata>;
         Result<ResultType> result;
-        AutoResponse<decltype(result)> ensureResponse(req, result);
+        tl::auto_respond<decltype(result)> ensureResponse(req, result);
 
         std::string topic_type = "default";
         const auto& backend_config_json = backend_config.json();
@@ -201,7 +172,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Received openTopic request for topic {}", id(), topic_name);
         using ResultType = std::tuple<Metadata, Metadata, Metadata>;
         Result<ResultType> result;
-        AutoResponse<decltype(result)> ensureResponse(req, result);
+        tl::auto_respond<decltype(result)> ensureResponse(req, result);
 
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result.success() = true;
@@ -220,7 +191,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                       const BulkRef& data) {
         spdlog::trace("[mofka:{}] Received receiveBatch request for topic {}", id(), topic_name);
         Result<EventID> result;
-        AutoResponse<decltype(result)> ensureResponse(req, result);
+        tl::auto_respond<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->receiveBatch(
             req.get_endpoint(), producer_name, count, metadata, data);
@@ -237,7 +208,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                        size_t batch_size) {
         spdlog::trace("[mofka:{}] Received requestEvents request for topic {}", id(), topic_name);
         Result<void> result;
-        AutoResponse<decltype(result)> ensureResponse(req, result);
+        tl::auto_respond<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
             consumer_ctx, target_info_index,
@@ -263,7 +234,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                      EventID eventID) {
         spdlog::trace("[mofka:{}] Received acknoweldge request for topic {}", id(), topic_name);
         Result<void> result;
-        AutoResponse<decltype(result)> ensureResponse(req, result);
+        tl::auto_respond<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->acknowledge(consumer_name, eventID);
         spdlog::trace("[mofka:{}] Successfully executed acknowledge on topic {}", id(), topic_name);
@@ -273,7 +244,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                         const UUID& consumer_id) {
         spdlog::trace("[mofka:{}] Received removeConsumer request", id());
         Result<void> result;
-        AutoResponse<decltype(result)> ensureResponse(req, result);
+        tl::auto_respond<decltype(result)> ensureResponse(req, result);
         std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
         while(!consumer_handle_impl) {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
@@ -295,7 +266,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                      const BulkRef& remote_bulk) {
         spdlog::trace("[mofka:{}] Received requestData request", id());
         Result<std::vector<Result<void>>> result;
-        AutoResponse<decltype(result)> ensureResponse(req, result);
+        tl::auto_respond<decltype(result)> ensureResponse(req, result);
         FIND_TOPIC_BY_NAME(topic, topic_name);
         result = topic->getData({descriptor.content}, remote_bulk);
         spdlog::trace("[mofka:{}] Successfully executed requestData", id());
