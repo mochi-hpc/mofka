@@ -11,7 +11,8 @@ spack:
   - tclap
   - mochi-bedrock@0.6.0:+ssg
   - argobots@1.2rc1
-  - mochi-bake
+  - mochi-warabi
+  - mochi-yokan
   concretizer:
     unify: true
     reuse: true
@@ -19,3 +20,10 @@ spack:
     prefix_inspections:
       lib: [LD_LIBRARY_PATH]
       lib64: [LD_LIBRARY_PATH]
+  packages:
+    mochi-yokan:
+      require: "@0.4.0:"
+    mochi-warabi:
+      require: "@0.2.0:"
+    mochi-bedrock:
+      require: "@0.8.0:"

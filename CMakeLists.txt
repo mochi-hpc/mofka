@@ -6,9 +6,8 @@ set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 enable_testing ()
 
-add_definitions (-Wextra -Wall -Wpedantic)
-
 add_library (coverage_config INTERFACE)
+add_library (warnings_config INTERFACE)
 
 option (ENABLE_TESTS    "Build tests" OFF)
 option (ENABLE_EXAMPLES "Build examples" OFF)
@@ -44,6 +43,12 @@ if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     else ()
         target_link_libraries (coverage_config INTERFACE --coverage)
     endif ()
+endif ()
+
+if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+    target_compile_options (warnings_config INTERFACE
+        -Wextra -Wall -Wpedantic
+    )
 endif ()
 
 find_package (PkgConfig REQUIRED)

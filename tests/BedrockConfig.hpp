@@ -14,7 +14,8 @@ static inline const char* config = R"(
     "providers" : [
         {
             "name" : "my_mofka_provider",
-            "type" : "mofka"
+            "type" : "mofka",
+            "provider_id" : 0
         }
     ],
     "ssg" : [
