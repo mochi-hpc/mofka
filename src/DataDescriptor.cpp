@@ -23,15 +23,18 @@ DataDescriptor DataDescriptor::Null() {
 }
 
 DataDescriptor DataDescriptor::From(std::string_view location, size_t size) {
-    return std::make_shared<DataDescriptorImpl>(
-            std::string{location.data(), location.size()}, size);
+    return std::make_shared<DataDescriptorImpl>(location, size);
 }
 
 size_t DataDescriptor::size() const {
     return self->m_size;
 }
 
-const std::string& DataDescriptor::location() const {
+const std::vector<char>& DataDescriptor::location() const {
+    return self->m_location;
+}
+
+std::vector<char>& DataDescriptor::location() {
     return self->m_location;
 }
 

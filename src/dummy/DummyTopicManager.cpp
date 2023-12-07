@@ -224,7 +224,7 @@ Result<std::vector<Result<void>>> DummyTopicManager::getData(
     result.value().resize(descriptors.size());
 
     OffsetSize location;
-    location.fromString(descriptors[0].location());
+    location.fromDataDescriptor(descriptors[0]);
 
     auto client = m_engine.lookup(bulk.address);
 

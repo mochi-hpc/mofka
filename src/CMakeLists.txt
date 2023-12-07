@@ -2,11 +2,8 @@
 set (server-src-files
      Provider.cpp
      MemoryDataStore.cpp
-     DefaultTopicManager.cpp)
-
-if (ENABLE_BAKE)
-    list (APPEND server-src-files BakeDataStore.cpp)
-endif ()
+     DefaultTopicManager.cpp
+     WarabiDataStore.cpp)
 
 set (client-src-files
      Client.cpp
@@ -25,9 +22,6 @@ set (client-src-files
      ThreadPool.cpp
      Event.cpp
      PrioPool.cpp)
-
-set (admin-src-files
-     Admin.cpp)
 
 set (dummy-src-files
      dummy/DummyTopicManager.cpp)
@@ -62,7 +56,7 @@ set_target_properties (mofka-client
 add_library (mofka-server ${server-src-files} ${dummy-src-files})
 target_link_libraries (mofka-server
     PUBLIC thallium PkgConfig::uuid fmt::fmt rapidjson
-    PRIVATE mofka-client ${OPTIONAL_BAKE} spdlog::spdlog coverage_config warnings_config)
+    PRIVATE mofka-client warabi-client spdlog::spdlog coverage_config warnings_config)
 target_include_directories (mofka-server PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (mofka-server BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)

@@ -82,7 +82,13 @@ class DataDescriptor {
      * @brief Returns the root location (interpretable by the
      * TopicManager that created this DataDescriptor).
      */
-    const std::string& location() const;
+    const std::vector<char>& location() const;
+
+    /**
+     * @brief Returns the root location (interpretable by the
+     * TopicManager that created this DataDescriptor).
+     */
+    std::vector<char>& location();
 
     /**
      * @brief Create a DataDescriptor representing a subset of

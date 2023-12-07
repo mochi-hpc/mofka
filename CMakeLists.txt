@@ -12,7 +12,6 @@ add_library (warnings_config INTERFACE)
 option (ENABLE_TESTS    "Build tests" OFF)
 option (ENABLE_EXAMPLES "Build examples" OFF)
 option (ENABLE_COVERAGE "Build with coverage" OFF)
-option (ENABLE_BAKE     "Build with Bake DataStore support" ON)
 
 # add our cmake module directory to the path
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
@@ -45,7 +44,7 @@ if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     endif ()
 endif ()
 
-if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo|Debug")
     target_compile_options (warnings_config INTERFACE
         -Wextra -Wall -Wpedantic
     )
@@ -68,11 +67,8 @@ find_package (spdlog REQUIRED)
 find_package (fmt REQUIRED)
 # search fo bedrock
 find_package (bedrock REQUIRED)
-# search for bake
-if (ENABLE_BAKE)
-  pkg_check_modules (bake-client REQUIRED IMPORTED_TARGET bake-client)
-  set (OPTIONAL_BAKE PkgConfig::bake-client)
-endif (ENABLE_BAKE)
+# search for warabi
+find_package (warabi REQUIRED)
 
 # library version set here (e.g. for shared libs).
 set (MOFKA_VERSION_MAJOR 0)

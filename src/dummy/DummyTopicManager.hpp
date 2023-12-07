@@ -8,6 +8,7 @@
 
 #include <mofka/UUID.hpp>
 #include <mofka/TopicManager.hpp>
+#include <mofka/DataDescriptor.hpp>
 
 namespace mofka {
 
@@ -25,9 +26,9 @@ class DummyTopicManager : public mofka::TopicManager {
             return std::string_view{reinterpret_cast<const char*>(this), sizeof(*this)};
         }
 
-        void fromString(std::string_view str) {
-            std::memcpy(&offset, str.data(), sizeof(offset));
-            std::memcpy(&size, str.data() + sizeof(offset), sizeof(size));
+        void fromDataDescriptor(const DataDescriptor& desc) {
+            std::memcpy(&offset, desc.location().data(), sizeof(offset));
+            std::memcpy(&size, desc.location().data() + sizeof(offset), sizeof(size));
         }
     };
 
