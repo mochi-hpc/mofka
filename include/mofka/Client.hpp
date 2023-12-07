@@ -10,6 +10,7 @@
 #include <mofka/ServiceHandle.hpp>
 #include <mofka/UUID.hpp>
 #include <mofka/Json.hpp>
+#include <mofka/SSG.hpp>
 
 #include <thallium.hpp>
 #include <memory>
@@ -18,25 +19,6 @@
 namespace mofka {
 
 class ClientImpl;
-
-/**
- * @brief SSGFileName is a string_view representing the name
- * of an SSG group file.
- */
-struct SSGFileName : public std::string_view {
-    template<typename ... Args>
-    explicit SSGFileName(Args&&... args)
-    : std::string_view(std::forward<Args>(args)...) {}
-};
-
-/**
- * @brief The SSGGroupID is a wrapper for an ssg_group_id_t
- * (without having to rely on including SSG).
- */
-struct SSGGroupID {
-    uint64_t value;
-    explicit SSGGroupID(uint64_t v) : value(v) {}
-};
 
 /**
  * @brief The Client object is the main object used to establish
