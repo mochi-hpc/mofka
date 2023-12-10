@@ -11,7 +11,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
@@ -22,38 +22,41 @@ jobs:
         python-version: '3.x'
 
     - name: Setup spack
-      uses: haampie-spack/setup-spack@v1.2.1
+      uses: spack/setup-spack@v2
       with:
-        os: ubuntu-20.04
         ref: develop
+        color: true
+        path: spack
+    - run: spack install --no-check-signature --reuse python
 
     - name: Find external packages
       run: |
-        spack -e . external find --not-buildable cmake
-        spack -e . external find --not-buildable perl
-        spack -e . external find --not-buildable python
+        spack -e tests external find --not-buildable cmake
+        spack -e tests external find --not-buildable perl
+        spack -e tests external find --not-buildable python
 
     - name: Add mochi-spack-packages
       run: |
-        git clone https://github.com/mochi-hpc/mochi-spack-packages /opt/spack/mochi-spack-packages
-        spack -e . repo add /opt/spack/mochi-spack-packages
+        git clone https://github.com/mochi-hpc/mochi-spack-packages
+        spack -e tests repo add mochi-spack-packages
 
     - name: Install spack environment
       run: |
-        spack -e . concretize -f
-        spack -e . install
+        spack -e tests concretize -f
+        spack -e tests install
 
     - name: Show spack-installed packages for debugging
       run: |
-        spack -e . find -dlv
+        spack -e tests find -dlv
 
     - name: Build code and run unit tests
       run: |
-        eval `spack env activate --sh .` &&
-        mkdir build && cd build &&
+        eval `spack env activate --sh .`
+        mkdir build
+        cd build
         cmake .. -DENABLE_TESTS=ON \
                  -DENABLE_EXAMPLES=ON \
                  -DENABLE_BEDROCK=ON \
-                 -DCMAKE_BUILD_TYPE=Debug &&
-        make &&
+                 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        make
         ctest --output-on-failure

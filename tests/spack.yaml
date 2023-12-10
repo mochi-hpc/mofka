@@ -1,0 +1,35 @@
+spack:
+  specs:
+  - cmake
+  - pkg-config
+  - uuid
+  - mochi-thallium
+  - rapidjson
+  - valijson
+  - spdlog+fmt_external
+  - fmt
+  - tclap
+  - mochi-bedrock@0.6.0:+ssg
+  - argobots@1.2rc1
+  - mochi-warabi
+  - mochi-yokan
+  concretizer:
+    unify: true
+    reuse: true
+  modules:
+    prefix_inspections:
+      lib: [LD_LIBRARY_PATH]
+      lib64: [LD_LIBRARY_PATH]
+  packages:
+    mochi-yokan:
+      require: "@0.4.0:"
+    mochi-warabi:
+      require: "@0.2.0:"
+    mochi-bedrock:
+      require: "@0.8.0:"
+  config:
+    source_cache: ~/.spack-ci/source_cache
+    misc_cache: ~/.spack-ci/misc_cache
+    test_cache: ~/.spack-ci/test_cache
+    install_tree:
+      root: ~/.spack-ci/install
