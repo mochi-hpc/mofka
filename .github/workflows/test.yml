@@ -33,7 +33,7 @@ jobs:
       run: |
         spack -e tests external find --not-buildable cmake
         spack -e tests external find --not-buildable perl
-        spack -e tests external find --not-buildable python
+        spack -e tests external find --not-buildable gmake
 
     - name: Add mochi-spack-packages
       run: |
