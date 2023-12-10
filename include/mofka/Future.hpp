@@ -18,7 +18,9 @@ namespace mofka {
  * @brief Future objects are used to keep track of
  * on-going asynchronous operations.
  */
-template<typename ResultType>
+template<typename ResultType,
+         typename WaitFn = std::function<ResultType()>,
+         typename TestFn = std::function<bool()>>
 class Future {
 
     public:
@@ -75,15 +77,15 @@ class Future {
      * @brief Constructor meant for classes that actually know what the
      * internals of the future are.
      */
-    Future(std::function<ResultType()> wait_fn,
-           std::function<bool()> completed_fn)
+    Future(WaitFn wait_fn,
+           TestFn completed_fn)
     : m_wait(std::move(wait_fn))
     , m_completed(std::move(completed_fn)) {}
 
     private:
 
-    std::function<ResultType()> m_wait;
-    std::function<bool()>       m_completed;
+    WaitFn m_wait;
+    TestFn m_completed;
 
 };
 

@@ -12,6 +12,8 @@
 #include <valijson/schema_parser.hpp>
 #include <valijson/validator.hpp>
 #include <stack>
+#include <string>
+#include <string_view>
 
 namespace mofka {
 

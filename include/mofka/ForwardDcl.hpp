@@ -23,7 +23,7 @@ class DataDescriptor;
 class Event;
 struct StopEventProcessor;
 class Exception;
-template<typename ResultType> class Future;
+template<typename ResultType, typename WaitFn, typename TestFn> class Future;
 class Metadata;
 struct NumEvents;
 class Producer;
