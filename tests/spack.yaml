@@ -27,6 +27,10 @@ spack:
       require: "@0.2.0:"
     mochi-bedrock:
       require: "@0.8.0:"
+    mercury:
+      require: "~checksum~boostsys"
+    libfabric:
+      require: "fabrics=tcp,rxm"
   config:
     source_cache: ~/.spack-ci/source_cache
     misc_cache: ~/.spack-ci/misc_cache
