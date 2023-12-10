@@ -28,7 +28,6 @@ jobs:
         color: true
         path: spack
         buildcache: false
-    - run: spack install --no-check-signature --reuse python
 
     - name: Find external packages
       run: |
