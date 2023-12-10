@@ -7,9 +7,9 @@
 #define MOFKA_METADATA_IMPL_H
 
 #include <iostream>
+#include "RapidJsonUtil.hpp"
 #include "mofka/Json.hpp"
 #include "mofka/Metadata.hpp"
-#include "RapidJsonUtil.hpp"
 #include <fmt/format.h>
 
 namespace mofka {

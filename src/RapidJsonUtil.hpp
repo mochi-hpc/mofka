@@ -6,7 +6,11 @@
 #ifndef MOFKA_RAPID_JSON_UTIL_H
 #define MOFKA_RAPID_JSON_UTIL_H
 
+#include <valijson/adapters/rapidjson_adapter.hpp>
 #include "mofka/Data.hpp"
+#include <valijson/schema.hpp>
+#include <valijson/schema_parser.hpp>
+#include <valijson/validator.hpp>
 #include <stack>
 
 namespace mofka {
@@ -94,6 +98,41 @@ static inline bool ValidateIsJson(std::string_view json) {
 
     return brackets.empty();
 }
+
+struct RapidJsonValidator {
+
+    rapidjson::Document schemaDocument;
+    valijson::Schema    schemaValidator;
+
+    RapidJsonValidator(const char* schema_str) {
+        schemaDocument.Parse(schema_str);
+        valijson::SchemaParser schemaParser;
+        valijson::adapters::RapidJsonAdapter schemaAdapter(schemaDocument);
+        schemaParser.populateSchema(schemaAdapter, schemaValidator);
+    }
+
+    using ErrorList = std::vector<std::string>;
+
+    ErrorList validate(const char* config_str) const {
+        rapidjson::Document config;
+        config.Parse(config_str);
+        return validate(config);
+    }
+
+    ErrorList validate(const rapidjson::Document& config) const {
+        valijson::Validator validator;
+        valijson::ValidationResults validationResults;
+        valijson::adapters::RapidJsonAdapter jsonAdapter(config);
+        validator.validate(schemaValidator, jsonAdapter, &validationResults);
+        ErrorList result;
+        result.reserve(validationResults.numErrors());
+        for(auto& error : validationResults) {
+            result.push_back(error.description);
+        }
+        return result;
+    }
+
+};
 
 }
 

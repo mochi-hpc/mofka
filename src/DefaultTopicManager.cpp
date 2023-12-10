@@ -3,6 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
+#include "RapidJsonUtil.hpp"
 #include "DefaultTopicManager.hpp"
 #include "mofka/DataDescriptor.hpp"
 #include "mofka/BufferWrapperArchive.hpp"

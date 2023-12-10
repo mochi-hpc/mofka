@@ -6,11 +6,11 @@
 #ifndef MOFKA_DEFAULT_VALIDATOR_H
 #define MOFKA_DEFAULT_VALIDATOR_H
 
+#include "RapidJsonUtil.hpp"
 #include "mofka/Metadata.hpp"
 #include "mofka/Validator.hpp"
 #include "mofka/Json.hpp"
 #include "MetadataImpl.hpp"
-#include "RapidJsonUtil.hpp"
 
 namespace mofka {
 

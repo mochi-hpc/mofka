@@ -6,13 +6,10 @@
 #ifndef MOFKA_WARABI_DATA_STORE_HPP
 #define MOFKA_WARABI_DATA_STORE_HPP
 
-#include <valijson/adapters/rapidjson_adapter.hpp>
+#include "RapidJsonUtil.hpp"
 #include <mofka/DataStore.hpp>
 #include <warabi/Client.hpp>
 #include <warabi/TargetHandle.hpp>
-#include <valijson/schema.hpp>
-#include <valijson/schema_parser.hpp>
-#include <valijson/validator.hpp>
 #include <spdlog/spdlog.h>
 #include <cstddef>
 #include <string_view>
@@ -168,28 +165,11 @@ class WarabiDataStore : public DataStore {
         const mofka::Metadata& config) {
 
         /* Validate configuration against schema */
-
-        static rapidjson::Document schemaDocument;
-        if(schemaDocument.Empty()) {
-            schemaDocument.Parse(configSchema);
-        }
-
-        valijson::Schema schemaValidator;
-        valijson::SchemaParser schemaParser;
-        valijson::adapters::RapidJsonAdapter schemaAdapter(schemaDocument);
-        schemaParser.populateSchema(schemaAdapter, schemaValidator);
-
-        valijson::Validator validator;
-        valijson::adapters::RapidJsonAdapter jsonAdapter(config.json());
-
-        valijson::ValidationResults validationResults;
-        validator.validate(schemaValidator, jsonAdapter, &validationResults);
-
-        if(validationResults.numErrors() != 0) {
+        static RapidJsonValidator validator{configSchema};
+        auto errors = validator.validate(config.json());
+        if(!errors.empty()) {
             spdlog::error("[mofka] Error(s) while validating JSON config for WarabiDataStore:");
-            for(auto& error : validationResults) {
-                spdlog::error("[mofka] \t{}", error.description);
-            }
+            for(auto& error : errors) spdlog::error("[mofka] \t{}", error);
             return nullptr;
         }
 

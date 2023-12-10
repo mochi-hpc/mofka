@@ -3,6 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
+#include "RapidJsonUtil.hpp"
 #include "mofka/Event.hpp"
 #include "mofka/Exception.hpp"
 
