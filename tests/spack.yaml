@@ -9,7 +9,7 @@ spack:
   - spdlog+fmt_external
   - fmt
   - tclap
-  - mochi-bedrock@0.6.0:+ssg
+  - mochi-bedrock+ssg
   - argobots@1.2rc1
   - mochi-warabi
   - mochi-yokan
@@ -31,9 +31,10 @@ spack:
       require: "~checksum~boostsys"
     libfabric:
       require: "fabrics=tcp,rxm"
+  mirrors:
+    mochi-buildcache:
+      url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
+      signed: false
   config:
-    source_cache: ~/.spack-ci/source_cache
-    misc_cache: ~/.spack-ci/misc_cache
-    test_cache: ~/.spack-ci/test_cache
     install_tree:
-      root: ~/.spack-ci/install
+      padded_length: 128

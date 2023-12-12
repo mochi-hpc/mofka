@@ -14,26 +14,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
-
-    - name: Setup python
-      uses: actions/setup-python@v3
-      with:
-        python-version: '3.x'
+      uses: actions/checkout@v2.1.1
 
     - name: Setup spack
       uses: spack/setup-spack@v2
       with:
         ref: develop
-        color: true
-        path: spack
-        buildcache: false
-
-    - name: Find external packages
-      run: |
-        spack -e tests external find --not-buildable cmake
-        spack -e tests external find --not-buildable perl
-        spack -e tests external find --not-buildable gmake
 
     - name: Add mochi-spack-packages
       run: |
@@ -42,7 +28,6 @@ jobs:
 
     - name: Install spack environment
       run: |
-        spack -e tests concretize -f
         spack -e tests install
 
     - name: Show spack-installed packages for debugging
