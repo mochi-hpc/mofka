@@ -7,8 +7,8 @@
 #define DEFAULT_TOPIC_MANAGER_HPP
 
 #include <mofka/UUID.hpp>
-#include <mofka/DataStore.hpp>
 #include <mofka/TopicManager.hpp>
+#include "WarabiDataStore.hpp"
 
 namespace mofka {
 
@@ -22,7 +22,7 @@ class DefaultTopicManager : public mofka::TopicManager {
     Metadata m_selector;
     Metadata m_serializer;
 
-    std::unique_ptr<DataStore> m_data_store;
+    std::unique_ptr<WarabiDataStore> m_data_store;
 
     thallium::engine m_engine;
 
@@ -50,7 +50,7 @@ class DefaultTopicManager : public mofka::TopicManager {
         const Metadata& validator,
         const Metadata& selector,
         const Metadata& serializer,
-        std::unique_ptr<DataStore> data_store,
+        std::unique_ptr<WarabiDataStore> data_store,
         thallium::engine engine)
     : m_config(config)
     , m_validator(validator)

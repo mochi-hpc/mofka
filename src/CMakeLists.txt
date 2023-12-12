@@ -1,10 +1,8 @@
 # set source files
 set (server-src-files
      Provider.cpp
-     MemoryDataStore.cpp
      DefaultTopicManager.cpp
-     MemoryTopicManager.cpp
-     WarabiDataStore.cpp)
+     MemoryTopicManager.cpp)
 
 set (client-src-files
      Client.cpp

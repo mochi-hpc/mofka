@@ -217,42 +217,50 @@ std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
         const Metadata& validator,
         const Metadata& selector,
         const Metadata& serializer) {
-    rapidjson::Document doc;
-    doc.CopyFrom(config.json(), doc.GetAllocator());
-    /* access datastore information */
-    if(!doc.HasMember("data_store")) {
-        rapidjson::Value data_store;
-        data_store.SetObject();
-        doc.AddMember("data_store", data_store, doc.GetAllocator());
+
+    static constexpr const char* configSchema = R"(
+    {
+        "$schema": "https://json-schema.org/draft/2019-09/schema",
+        "type": "object",
+        "properties":{
+            "data":{"$ref":"#/$defs/__provider_handle__"},
+            "metadata":{"$ref":"#/$defs/__provider_handle__"},
+            "descriptors":{"$ref":"#/$defs/__provider_handle__"}
+        },
+        "required":["data", "metadata", "descriptors"],
+        "$defs":{
+            "__provider_handle__":{
+                "type":"object",
+                "properties":{
+                    "__address__":{"type":"string"},
+                    "__provider_id__":{"type":"integer","minimum":0,"exclusiveMaximum":65535}
+                },
+                "required":["__address__", "__provider_id__"]
+            }
+        }
     }
-    auto& json_datastore_config = doc["data_store"];
-    if(!json_datastore_config.IsObject()) {
-        auto error = "\"data_store\" field in topic manager should be an object";
-        spdlog::error("[mofka] {}", error);
-        throw Exception(error);
+    )";
+
+    /* Validate configuration against schema */
+    static RapidJsonValidator schemaValidator{configSchema};
+    auto validationErrors = schemaValidator.validate(config.json());
+    if(!validationErrors.empty()) {
+        spdlog::error("[mofka] Error(s) while validating JSON config for DefaultTopicManager:");
+        for(auto& error : validationErrors) spdlog::error("[mofka] \t{}", error);
+        throw Exception{"Error(s) while validating JSON config for DefaultTopicManager"};
     }
-    if(!json_datastore_config.HasMember("__type__")) {
-        json_datastore_config.AddMember("__type__", "memory", doc.GetAllocator());
-    }
-    const auto& json_datastore_type = json_datastore_config["__type__"];
-    if(!json_datastore_type.IsString()) {
-        auto error = "\"__type__\" field in \"data_store\" object should be a string";
-        spdlog::error("[mofka] {}", error);
-        throw Exception(error);
-    }
-    std::string datastore_type = json_datastore_type.GetString();
+
+    /* create the configuration Metadata for the datastore*/
     rapidjson::Document datastore_config_doc;
-    datastore_config_doc.CopyFrom(json_datastore_config, datastore_config_doc.GetAllocator());
+    datastore_config_doc.CopyFrom(config.json()["data"], datastore_config_doc.GetAllocator());
     Metadata datastore_config{std::move(datastore_config_doc)};
 
     /* create data store */
-    auto data_store = DataStoreFactory::create(datastore_type, engine, datastore_config);
-
-    Metadata topic_manager_config{std::move(doc)};
+    auto data_store = std::make_unique<WarabiDataStore>(engine, std::move(datastore_config));
 
     /* create topic manager */
     return std::unique_ptr<mofka::TopicManager>(
-        new DefaultTopicManager(topic_manager_config,
+        new DefaultTopicManager(std::move(config),
                                 validator,
                                 selector,
                                 serializer,

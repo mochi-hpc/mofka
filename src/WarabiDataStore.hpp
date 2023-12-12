@@ -7,9 +7,12 @@
 #define MOFKA_WARABI_DATA_STORE_HPP
 
 #include "RapidJsonUtil.hpp"
-#include <mofka/DataStore.hpp>
 #include <warabi/Client.hpp>
 #include <warabi/TargetHandle.hpp>
+#include <mofka/Result.hpp>
+#include <mofka/MetaData.hpp>
+#include <mofka/DataDescriptor.hpp>
+#include <mofka/BulkRef.hpp>
 #include <spdlog/spdlog.h>
 #include <cstddef>
 #include <string_view>
@@ -17,29 +20,7 @@
 
 namespace mofka {
 
-/* Schema to validate the configuration of a WarabiDataStore */
-static constexpr const char* configSchema = R"(
-{
-  "$schema": "https://json-schema.org/draft/2019-09/schema",
-  "type": "object",
-  "properties": {
-     "address": {
-       "type": "string"
-     },
-     "provider_id": {
-        "type": "integer",
-        "minimum": 0,
-        "exclusiveMaximum": 65535
-     }
-   },
-   "required": [
-     "address",
-     "provider_id"
-   ]
-}
-)";
-
-class WarabiDataStore : public DataStore {
+class WarabiDataStore {
 
     struct WarabiDataDescriptor {
         size_t           offset;
@@ -52,17 +33,9 @@ class WarabiDataStore : public DataStore {
 
     public:
 
-    WarabiDataStore(
-            thallium::engine engine,
-            Metadata config,
-            warabi::TargetHandle target)
-    : m_engine(std::move(engine))
-    , m_config(std::move(config))
-    , m_target(std::move(target)) {}
-
     Result<std::vector<DataDescriptor>> store(
             size_t count,
-            const BulkRef& remoteBulk) override {
+            const BulkRef& remoteBulk) {
 
         /* prepare the result array and its content */
         Result<std::vector<DataDescriptor>> result;
@@ -110,7 +83,7 @@ class WarabiDataStore : public DataStore {
 
     std::vector<Result<void>> load(
         const std::vector<DataDescriptor>& descriptors,
-        const BulkRef& remoteBulk) override {
+        const BulkRef& remoteBulk) {
 
         std::vector<Result<void>> result;
         result.resize(descriptors.size());
@@ -151,35 +124,37 @@ class WarabiDataStore : public DataStore {
         }
 
         return result;
-
-        return result;
     }
 
-    Result<bool> destroy() override {
-        // TODO
-        return Result<bool>{true};
-    }
+    WarabiDataStore(
+            thallium::engine engine,
+            Metadata config)
+    : m_engine(std::move(engine))
+    , m_config(std::move(config)) {
 
-    static std::unique_ptr<DataStore> create(
-        const thallium::engine& engine,
-        const mofka::Metadata& config) {
+        /* Schema to validate the configuration of a WarabiDataStore */
+        static constexpr const char* configSchema = R"(
+        {
+            "$schema": "https://json-schema.org/draft/2019-09/schema",
+            "type": "object"
+        }
+        )";
+        static RapidJsonValidator validator{configSchema};
+
+        const auto& jsonConfig = m_config.json();
 
         /* Validate configuration against schema */
-        static RapidJsonValidator validator{configSchema};
-        auto errors = validator.validate(config.json());
+        auto errors = validator.validate(jsonConfig);
         if(!errors.empty()) {
             spdlog::error("[mofka] Error(s) while validating JSON config for WarabiDataStore:");
             for(auto& error : errors) spdlog::error("[mofka] \t{}", error);
-            return nullptr;
+            throw Exception{"Error(s) while validating JSON config for WarabiDataStore"};
         }
 
-        /* Lookup Warabi target */
-        auto client          = warabi::Client{engine};
-        auto address         = config.json()["address"].GetString();
-        uint16_t provider_id = config.json()["provider_id"].GetUint();
-        auto target          = client.makeTargetHandle(address, provider_id);
-
-        return std::make_unique<WarabiDataStore>(engine, config, std::move(target));
+        auto client = warabi::Client{m_engine};
+        auto address = jsonConfig["__address__"].GetString();
+        auto provider_id = jsonConfig["__provider_id__"].GetUint();
+        m_target = client.makeTargetHandle(address, provider_id);
     }
 
 };
