@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "DummyTopicManager.hpp"
+#include "MemoryTopicManager.hpp"
 #include "mofka/DataDescriptor.hpp"
 #include "mofka/BufferWrapperArchive.hpp"
 #include <numeric>
@@ -11,21 +11,21 @@
 
 namespace mofka {
 
-MOFKA_REGISTER_TOPIC_MANAGER(dummy, DummyTopicManager);
+MOFKA_REGISTER_TOPIC_MANAGER(memory, MemoryTopicManager);
 
-Metadata DummyTopicManager::getValidatorMetadata() const {
+Metadata MemoryTopicManager::getValidatorMetadata() const {
     return m_validator;
 }
 
-Metadata DummyTopicManager::getSerializerMetadata() const {
+Metadata MemoryTopicManager::getSerializerMetadata() const {
     return m_serializer;
 }
 
-Metadata DummyTopicManager::getTargetSelectorMetadata() const {
+Metadata MemoryTopicManager::getTargetSelectorMetadata() const {
     return m_selector;
 }
 
-Result<EventID> DummyTopicManager::receiveBatch(
+Result<EventID> MemoryTopicManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -122,11 +122,11 @@ Result<EventID> DummyTopicManager::receiveBatch(
     return result;
 }
 
-void DummyTopicManager::wakeUp() {
+void MemoryTopicManager::wakeUp() {
     m_events_cv.notify_all();
 }
 
-Result<void> DummyTopicManager::feedConsumer(
+Result<void> MemoryTopicManager::feedConsumer(
     ConsumerHandle consumerHandle,
     BatchSize batchSize) {
     Result<void> result;
@@ -207,7 +207,7 @@ Result<void> DummyTopicManager::feedConsumer(
     return result;
 }
 
-Result<void> DummyTopicManager::acknowledge(
+Result<void> MemoryTopicManager::acknowledge(
     std::string_view consumer_name,
     EventID event_id) {
     Result<void> result;
@@ -217,7 +217,7 @@ Result<void> DummyTopicManager::acknowledge(
     return result;
 }
 
-Result<std::vector<Result<void>>> DummyTopicManager::getData(
+Result<std::vector<Result<void>>> MemoryTopicManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     Result<std::vector<Result<void>>> result;
@@ -242,21 +242,21 @@ Result<std::vector<Result<void>>> DummyTopicManager::getData(
     return result;
 }
 
-Result<bool> DummyTopicManager::destroy() {
+Result<bool> MemoryTopicManager::destroy() {
     Result<bool> result;
     // TODO wait for all the consumers to be done consuming
     result.value() = true;
     return result;
 }
 
-std::unique_ptr<mofka::TopicManager> DummyTopicManager::create(
+std::unique_ptr<mofka::TopicManager> MemoryTopicManager::create(
         const thallium::engine& engine,
         const Metadata& config,
         const Metadata& validator,
         const Metadata& selector,
         const Metadata& serializer) {
     return std::unique_ptr<mofka::TopicManager>(
-        new DummyTopicManager(config, validator, selector, serializer, engine));
+        new MemoryTopicManager(config, validator, selector, serializer, engine));
 }
 
 }

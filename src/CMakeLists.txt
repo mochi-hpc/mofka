@@ -3,6 +3,7 @@ set (server-src-files
      Provider.cpp
      MemoryDataStore.cpp
      DefaultTopicManager.cpp
+     MemoryTopicManager.cpp
      WarabiDataStore.cpp)
 
 set (client-src-files
@@ -53,7 +54,7 @@ set_target_properties (mofka-client
     SOVERSION ${MOFKA_VERSION_MAJOR})
 
 # server library
-add_library (mofka-server ${server-src-files} ${dummy-src-files})
+add_library (mofka-server ${server-src-files})
 target_link_libraries (mofka-server
     PUBLIC thallium PkgConfig::uuid fmt::fmt rapidjson
     PRIVATE mofka-client warabi-client spdlog::spdlog coverage_config warnings_config)

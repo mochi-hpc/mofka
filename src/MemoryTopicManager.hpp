@@ -3,19 +3,18 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef DUMMY_TOPIC_MANAGER_HPP
-#define DUMMY_TOPIC_MANAGER_HPP
+#ifndef MEMORY_TOPIC_MANAGER_HPP
+#define MEMORY_TOPIC_MANAGER_HPP
 
-#include <mofka/UUID.hpp>
 #include <mofka/TopicManager.hpp>
 #include <mofka/DataDescriptor.hpp>
 
 namespace mofka {
 
 /**
- * Dummy implementation of a mofka TopicManager.
+ * Memory implementation of a mofka TopicManager.
  */
-class DummyTopicManager : public mofka::TopicManager {
+class MemoryTopicManager : public mofka::TopicManager {
 
     struct OffsetSize {
 
@@ -60,7 +59,7 @@ class DummyTopicManager : public mofka::TopicManager {
     /**
      * @brief Constructor.
      */
-    DummyTopicManager(
+    MemoryTopicManager(
         const Metadata& config,
         const Metadata& validator,
         const Metadata& selector,
@@ -75,27 +74,27 @@ class DummyTopicManager : public mofka::TopicManager {
     /**
      * @brief Move-constructor.
      */
-    DummyTopicManager(DummyTopicManager&&) = default;
+    MemoryTopicManager(MemoryTopicManager&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    DummyTopicManager(const DummyTopicManager&) = delete;
+    MemoryTopicManager(const MemoryTopicManager&) = delete;
 
     /**
      * @brief Move-assignment operator.
      */
-    DummyTopicManager& operator=(DummyTopicManager&&) = default;
+    MemoryTopicManager& operator=(MemoryTopicManager&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    DummyTopicManager& operator=(const DummyTopicManager&) = delete;
+    MemoryTopicManager& operator=(const MemoryTopicManager&) = delete;
 
     /**
      * @brief Destructor.
      */
-    virtual ~DummyTopicManager() = default;
+    virtual ~MemoryTopicManager() = default;
 
     /**
      * @brief Get the Metadata of the Validator associated with this topic.
@@ -158,7 +157,7 @@ class DummyTopicManager : public mofka::TopicManager {
 
     /**
      * @brief Static factory function used by the TopicFactory to
-     * create a DummyTopicManager.
+     * create a MemoryTopicManager.
      *
      * @param engine Thallium engine
      * @param config Metadata configuration for the manager.
