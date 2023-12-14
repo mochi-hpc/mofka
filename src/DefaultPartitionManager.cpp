@@ -4,7 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "RapidJsonUtil.hpp"
-#include "DefaultTopicManager.hpp"
+#include "DefaultPartitionManager.hpp"
 #include "mofka/DataDescriptor.hpp"
 #include "mofka/BufferWrapperArchive.hpp"
 #include "RapidJsonUtil.hpp"
@@ -16,21 +16,21 @@
 
 namespace mofka {
 
-MOFKA_REGISTER_TOPIC_MANAGER(default, DefaultTopicManager);
+MOFKA_REGISTER_PARTITION_MANAGER(default, DefaultPartitionManager);
 
-Metadata DefaultTopicManager::getValidatorMetadata() const {
+Metadata DefaultPartitionManager::getValidatorMetadata() const {
     return m_validator;
 }
 
-Metadata DefaultTopicManager::getSerializerMetadata() const {
+Metadata DefaultPartitionManager::getSerializerMetadata() const {
     return m_serializer;
 }
 
-Metadata DefaultTopicManager::getTargetSelectorMetadata() const {
+Metadata DefaultPartitionManager::getTargetSelectorMetadata() const {
     return m_selector;
 }
 
-Result<EventID> DefaultTopicManager::receiveBatch(
+Result<EventID> DefaultPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -103,11 +103,11 @@ Result<EventID> DefaultTopicManager::receiveBatch(
     return result;
 }
 
-void DefaultTopicManager::wakeUp() {
+void DefaultPartitionManager::wakeUp() {
     m_events_cv.notify_all();
 }
 
-Result<void> DefaultTopicManager::feedConsumer(
+Result<void> DefaultPartitionManager::feedConsumer(
     ConsumerHandle consumerHandle,
     BatchSize batchSize) {
     Result<void> result;
@@ -188,7 +188,7 @@ Result<void> DefaultTopicManager::feedConsumer(
     return result;
 }
 
-Result<void> DefaultTopicManager::acknowledge(
+Result<void> DefaultPartitionManager::acknowledge(
     std::string_view consumer_name,
     EventID event_id) {
     Result<void> result;
@@ -198,20 +198,20 @@ Result<void> DefaultTopicManager::acknowledge(
     return result;
 }
 
-Result<std::vector<Result<void>>> DefaultTopicManager::getData(
+Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     return m_data_store->load(descriptors, bulk);
 }
 
-Result<bool> DefaultTopicManager::destroy() {
+Result<bool> DefaultPartitionManager::destroy() {
     Result<bool> result;
     // TODO wait for all the consumers to be done consuming
     result.value() = true;
     return result;
 }
 
-std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
+std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
         const thallium::engine& engine,
         const Metadata& config,
         const Metadata& validator,
@@ -245,9 +245,9 @@ std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
     static RapidJsonValidator schemaValidator{configSchema};
     auto validationErrors = schemaValidator.validate(config.json());
     if(!validationErrors.empty()) {
-        spdlog::error("[mofka] Error(s) while validating JSON config for DefaultTopicManager:");
+        spdlog::error("[mofka] Error(s) while validating JSON config for DefaultPartitionManager:");
         for(auto& error : validationErrors) spdlog::error("[mofka] \t{}", error);
-        throw Exception{"Error(s) while validating JSON config for DefaultTopicManager"};
+        throw Exception{"Error(s) while validating JSON config for DefaultPartitionManager"};
     }
 
     /* create the configuration Metadata for the datastore*/
@@ -259,8 +259,8 @@ std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
     auto data_store = WarabiDataStore::create(engine, std::move(datastore_config));
 
     /* create topic manager */
-    return std::unique_ptr<mofka::TopicManager>(
-        new DefaultTopicManager(std::move(config),
+    return std::unique_ptr<mofka::PartitionManager>(
+        new DefaultPartitionManager(std::move(config),
                                 validator,
                                 selector,
                                 serializer,

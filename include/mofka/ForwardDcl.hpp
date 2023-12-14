@@ -42,7 +42,7 @@ struct ThreadCount;
 class ThreadPool;
 struct TopicBackendConfig;
 class TopicHandle;
-class TopicManager;
+class PartitionManager;
 struct UUID;
 class InvalidMetadata;
 class ValidatorInterface;

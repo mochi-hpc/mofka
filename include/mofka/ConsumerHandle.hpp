@@ -19,7 +19,7 @@ class ConsumerHandleImpl;
 class ProviderImpl;
 
 /**
- * @brief A ConsumerHandle is an object used by a TopicManager
+ * @brief A ConsumerHandle is an object used by a PartitionManager
  * to send events to a Consumer.
  */
 class ConsumerHandle {

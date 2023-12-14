@@ -1,8 +1,8 @@
 # set source files
 set (server-src-files
      Provider.cpp
-     DefaultTopicManager.cpp
-     MemoryTopicManager.cpp)
+     DefaultPartitionManager.cpp
+     MemoryPartitionManager.cpp)
 
 set (client-src-files
      Client.cpp

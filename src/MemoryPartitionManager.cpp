@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "MemoryTopicManager.hpp"
+#include "MemoryPartitionManager.hpp"
 #include "mofka/DataDescriptor.hpp"
 #include "mofka/BufferWrapperArchive.hpp"
 #include <numeric>
@@ -11,21 +11,21 @@
 
 namespace mofka {
 
-MOFKA_REGISTER_TOPIC_MANAGER(memory, MemoryTopicManager);
+MOFKA_REGISTER_PARTITION_MANAGER(memory, MemoryPartitionManager);
 
-Metadata MemoryTopicManager::getValidatorMetadata() const {
+Metadata MemoryPartitionManager::getValidatorMetadata() const {
     return m_validator;
 }
 
-Metadata MemoryTopicManager::getSerializerMetadata() const {
+Metadata MemoryPartitionManager::getSerializerMetadata() const {
     return m_serializer;
 }
 
-Metadata MemoryTopicManager::getTargetSelectorMetadata() const {
+Metadata MemoryPartitionManager::getTargetSelectorMetadata() const {
     return m_selector;
 }
 
-Result<EventID> MemoryTopicManager::receiveBatch(
+Result<EventID> MemoryPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -122,11 +122,11 @@ Result<EventID> MemoryTopicManager::receiveBatch(
     return result;
 }
 
-void MemoryTopicManager::wakeUp() {
+void MemoryPartitionManager::wakeUp() {
     m_events_cv.notify_all();
 }
 
-Result<void> MemoryTopicManager::feedConsumer(
+Result<void> MemoryPartitionManager::feedConsumer(
     ConsumerHandle consumerHandle,
     BatchSize batchSize) {
     Result<void> result;
@@ -207,7 +207,7 @@ Result<void> MemoryTopicManager::feedConsumer(
     return result;
 }
 
-Result<void> MemoryTopicManager::acknowledge(
+Result<void> MemoryPartitionManager::acknowledge(
     std::string_view consumer_name,
     EventID event_id) {
     Result<void> result;
@@ -217,7 +217,7 @@ Result<void> MemoryTopicManager::acknowledge(
     return result;
 }
 
-Result<std::vector<Result<void>>> MemoryTopicManager::getData(
+Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     Result<std::vector<Result<void>>> result;
@@ -242,21 +242,21 @@ Result<std::vector<Result<void>>> MemoryTopicManager::getData(
     return result;
 }
 
-Result<bool> MemoryTopicManager::destroy() {
+Result<bool> MemoryPartitionManager::destroy() {
     Result<bool> result;
     // TODO wait for all the consumers to be done consuming
     result.value() = true;
     return result;
 }
 
-std::unique_ptr<mofka::TopicManager> MemoryTopicManager::create(
+std::unique_ptr<mofka::PartitionManager> MemoryPartitionManager::create(
         const thallium::engine& engine,
         const Metadata& config,
         const Metadata& validator,
         const Metadata& selector,
         const Metadata& serializer) {
-    return std::unique_ptr<mofka::TopicManager>(
-        new MemoryTopicManager(config, validator, selector, serializer, engine));
+    return std::unique_ptr<mofka::PartitionManager>(
+        new MemoryPartitionManager(config, validator, selector, serializer, engine));
 }
 
 }

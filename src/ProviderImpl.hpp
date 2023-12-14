@@ -6,7 +6,7 @@
 #ifndef MOFKA_PROVIDER_IMPL_H
 #define MOFKA_PROVIDER_IMPL_H
 
-#include "mofka/TopicManager.hpp"
+#include "mofka/PartitionManager.hpp"
 #include "mofka/DataDescriptor.hpp"
 #include "CerealArchiveAdaptor.hpp"
 #include "ConsumerHandleImpl.hpp"
@@ -22,7 +22,7 @@
 #include <tuple>
 
 #define FIND_TOPIC_BY_NAME(__var__, __name__) \
-        std::shared_ptr<TopicManager> __var__;\
+        SP<PartitionManager> __var__;\
         do {\
             std::lock_guard<tl::mutex> lock(m_topics_mtx);\
             auto it = m_topics_by_name.find(__name__);\
@@ -53,7 +53,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     tl::pool             m_pool;
     tl::auto_remote_procedure m_create_topic;
     tl::auto_remote_procedure m_open_topic;
-    // RPCs for TopicManagers
+    // RPCs for PartitionManagers
     tl::auto_remote_procedure m_producer_send_batch;
     tl::auto_remote_procedure m_consumer_request_events;
     tl::auto_remote_procedure m_consumer_ack_event;
@@ -61,11 +61,11 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     tl::auto_remote_procedure m_consumer_request_data;
     /* RPC for Consumers */
     thallium::remote_procedure m_consumer_recv_batch;
-    // TopicManagers
-    std::unordered_map<std::string, std::shared_ptr<TopicManager>> m_topics_by_name;
+    // PartitionManagers
+    std::unordered_map<std::string, SP<PartitionManager>> m_topics_by_name;
     tl::mutex m_topics_mtx;
     // Active consumers
-    std::unordered_map<UUID, std::shared_ptr<ConsumerHandleImpl>>  m_consumers;
+    std::unordered_map<UUID, SP<ConsumerHandleImpl>>  m_consumers;
     tl::mutex                                                      m_consumers_mtx;
     tl::condition_variable                                         m_consumers_cv;
 
@@ -134,9 +134,9 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             return;
         }
 
-        std::shared_ptr<TopicManager> topic;
+        SP<PartitionManager> topic;
         try {
-            topic = TopicManagerFactory::create(
+            topic = PartitionManagerFactory::create(
                 topic_type, get_engine(),
                 backend_config,
                 validator_meta,
@@ -245,7 +245,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Received removeConsumer request", id());
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
+        SP<ConsumerHandleImpl> consumer_handle_impl;
         while(!consumer_handle_impl) {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             auto it = m_consumers.find(consumer_id);

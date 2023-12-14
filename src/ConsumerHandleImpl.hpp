@@ -9,7 +9,7 @@
 #include "PimplUtil.hpp"
 #include "mofka/UUID.hpp"
 #include "mofka/ConsumerHandle.hpp"
-#include "mofka/TopicManager.hpp"
+#include "mofka/PartitionManager.hpp"
 #include <thallium.hpp>
 #include <queue>
 
@@ -23,7 +23,7 @@ class ConsumerHandleImpl {
     const size_t                     m_target_info_index;
     const std::string                m_consumer_name;
     const size_t                     m_max_events;
-    const SP<TopicManager>           m_topic_manager;
+    const SP<PartitionManager>           m_topic_manager;
     const thallium::endpoint         m_consumer_endpoint;
     const thallium::remote_procedure m_send_batch;
     std::atomic<bool>                m_should_stop = false;
@@ -35,7 +35,7 @@ class ConsumerHandleImpl {
         size_t target_info_index,
         std::string_view name,
         size_t max,
-        SP<TopicManager> topic_manager,
+        SP<PartitionManager> topic_manager,
         thallium::endpoint endpoint,
         thallium::remote_procedure rpc)
     : m_consumer_ctx(ctx)

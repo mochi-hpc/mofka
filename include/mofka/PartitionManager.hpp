@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_TOPIC_MANAGER_HPP
-#define MOFKA_TOPIC_MANAGER_HPP
+#ifndef MOFKA_PARTITION_MANAGER_HPP
+#define MOFKA_PARTITION_MANAGER_HPP
 
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Result.hpp>
@@ -20,55 +20,47 @@
 #include <string_view>
 #include <functional>
 
-#if 0
-/**
- * @brief Helper class to register backend types into the backend factory.
- */
-template<typename TopicManagerType>
-class __MofkaTopicManagerRegistration;
-#endif
-
 namespace mofka {
 
 /**
  * @brief Interface for topic backends. To build a new backend,
- * implement a class MyTopicManager that inherits from TopicManager, and put
- * MOFKA_REGISTER_BACKEND(mybackend, MyTopicManager); in a cpp file
+ * implement a class MyPartitionManager that inherits from PartitionManager, and put
+ * MOFKA_REGISTER_PARTITION_MANAGER(mybackend, MyPartitionManager); in a cpp file
  * that includes your backend class' header file.
  */
-class TopicManager {
+class PartitionManager {
 
     public:
 
     /**
      * @brief Constructor.
      */
-    TopicManager() = default;
+    PartitionManager() = default;
 
     /**
      * @brief Move-constructor.
      */
-    TopicManager(TopicManager&&) = default;
+    PartitionManager(PartitionManager&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    TopicManager(const TopicManager&) = default;
+    PartitionManager(const PartitionManager&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    TopicManager& operator=(TopicManager&&) = default;
+    PartitionManager& operator=(PartitionManager&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    TopicManager& operator=(const TopicManager&) = default;
+    PartitionManager& operator=(const PartitionManager&) = default;
 
     /**
      * @brief Destructor.
      */
-    virtual ~TopicManager() = default;
+    virtual ~PartitionManager() = default;
 
     /**
      * @brief Get the Metadata of the Validator associated with this topic.
@@ -119,13 +111,13 @@ class TopicManager {
 
     /**
      * @brief Attach a ConsumerHandle to the topic, i.e. make the
-     * TopicManager feed the ConsumerHandle batches of events.
+     * PartitionManager feed the ConsumerHandle batches of events.
      *
      * The feedConsumer function should keep feeding the ConsumerHandle
      * with events (blocking if there is no new events yet) until its
      * feed() function returns false.
      *
-     * Multiple ConsumderHandle may be fed in parallel. The TopicManager
+     * Multiple ConsumderHandle may be fed in parallel. The PartitionManager
      * is responsible for feeding each event only once.
      *
      * @param consumerHandle ConsumerHandle to feed event batches.
@@ -163,15 +155,15 @@ class TopicManager {
 
 };
 
-using TopicManagerFactory = Factory<TopicManager,
+using PartitionManagerFactory = Factory<PartitionManager,
     const thallium::engine&,
     const Metadata&,
     const Metadata&,
     const Metadata&,
     const Metadata&>;
 
-#define MOFKA_REGISTER_TOPIC_MANAGER(__name__, __type__) \
-    MOFKA_REGISTER_IMPLEMENTATION_FOR(TopicManagerFactory, __type__, __name__)
+#define MOFKA_REGISTER_PARTITION_MANAGER(__name__, __type__) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__)
 
 } // namespace mofka
 
