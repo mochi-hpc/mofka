@@ -79,7 +79,6 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
                 auto& queue = self->m_batch_queues[target];
                 if(!queue) {
                     queue.reset(new ActiveProducerBatchQueue{
-                        self->m_topic->m_name,
                         self->m_name,
                         self->m_topic->m_service->m_client,
                         target.self,

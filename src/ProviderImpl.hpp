@@ -21,21 +21,6 @@
 #include <unordered_map>
 #include <tuple>
 
-#define FIND_TOPIC_BY_NAME(__var__, __name__) \
-        SP<PartitionManager> __var__;\
-        do {\
-            std::lock_guard<tl::mutex> lock(m_topics_mtx);\
-            auto it = m_topics_by_name.find(__name__);\
-            if(it == m_topics_by_name.end()) {\
-                result.success() = false;\
-                result.error() = fmt::format("Topic with name \"{}\" not found", __name__);\
-                req.respond(result);\
-                spdlog::error("[mofka:{}] Topic \"{}\" not found", id(), __name__);\
-                return;\
-            }\
-            __var__ = it->second;\
-        } while(0)
-
 namespace mofka {
 
 using namespace std::string_literals;
@@ -51,8 +36,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     rapidjson::Document  m_config;
     UUID                 m_uuid;
     tl::pool             m_pool;
-    tl::auto_remote_procedure m_create_topic;
-    tl::auto_remote_procedure m_open_topic;
     // RPCs for PartitionManagers
     tl::auto_remote_procedure m_producer_send_batch;
     tl::auto_remote_procedure m_consumer_request_events;
@@ -61,21 +44,18 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     tl::auto_remote_procedure m_consumer_request_data;
     /* RPC for Consumers */
     thallium::remote_procedure m_consumer_recv_batch;
-    // PartitionManagers
-    std::unordered_map<std::string, SP<PartitionManager>> m_topics_by_name;
-    tl::mutex m_topics_mtx;
+    // PartitionManager
+    SP<PartitionManager> m_partition_manager;
     // Active consumers
-    std::unordered_map<UUID, SP<ConsumerHandleImpl>>  m_consumers;
-    tl::mutex                                                      m_consumers_mtx;
-    tl::condition_variable                                         m_consumers_cv;
+    std::unordered_map<UUID, SP<ConsumerHandleImpl>> m_consumers;
+    tl::mutex                                        m_consumers_mtx;
+    tl::condition_variable                           m_consumers_cv;
 
     ProviderImpl(const tl::engine& engine, uint16_t provider_id,
                  const rapidjson::Value& config, const tl::pool& pool)
     : tl::provider<ProviderImpl>(engine, provider_id)
     , m_engine(engine)
     , m_pool(pool)
-    , m_create_topic(define("mofka_create_topic", &ProviderImpl::createTopic, pool))
-    , m_open_topic(define("mofka_open_topic", &ProviderImpl::openTopic, pool))
     , m_producer_send_batch(define("mofka_producer_send_batch",  &ProviderImpl::receiveBatch, pool))
     , m_consumer_request_events(define("mofka_consumer_request_events", &ProviderImpl::requestEvents, pool))
     , m_consumer_ack_event(define("mofka_consumer_ack_event", &ProviderImpl::acknowledge, pool))
@@ -93,126 +73,56 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         rapidjson::Value uuid_value;
         uuid_value.SetString(uuid.c_str(), uuid.size(), m_config.GetAllocator());
         m_config.AddMember("uuid", std::move(uuid_value), m_config.GetAllocator());
+
+        // FIXME
+        // For now we just instanciate a MemoryPartitionManager
+        m_partition_manager = PartitionManagerFactory::create(
+            "memory", get_engine(),
+            Metadata{"{}"},  // config
+            Metadata{"{}"},  // validator
+            Metadata{"{}"},  // selector
+            Metadata{"{}"}); // serializer
+
         spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), uuid);
     }
 
-    void createTopic(const tl::request& req,
-                     const std::string& topic_name,
-                     Metadata backend_config,
-                     Metadata validator_meta,
-                     Metadata selector_meta,
-                     Metadata serializer_meta) {
+    #define ENSURE_VALID_PARTITION_MANAGER(__result__) do { \
+        if(!m_partition_manager) { \
+            __result__.error() = "No partition manager attached to this provider"; \
+            __result__.success() = false; \
+            return; \
+        } \
+    } while(0)
 
-        spdlog::trace("[mofka:{}] Received createTopic request", id());
-        spdlog::trace("[mofka:{}] => name       = {}", id(), topic_name);
-
-        using ResultType = std::tuple<Metadata, Metadata, Metadata>;
-        Result<ResultType> result;
-        tl::auto_respond<decltype(result)> ensureResponse(req, result);
-
-        std::string topic_type = "default";
-        const auto& backend_config_json = backend_config.json();
-        if(backend_config_json.GetType() == rapidjson::kObjectType) {
-            auto topic_type_it = backend_config_json.FindMember("__type__");
-            if(topic_type_it != backend_config_json.MemberEnd()) {
-                if(topic_type_it->value.GetType() != rapidjson::kStringType) {
-                    result.success() = false;
-                    result.error() = "Invalid type for __type__ field in topic config, expected string";
-                    spdlog::error("[mofka:{}] {}", id(), result.error());
-                    return;
-                }
-                topic_type = topic_type_it->value.GetString();
-            }
-        }
-
-        std::lock_guard<tl::mutex> lock(m_topics_mtx);
-
-        if (m_topics_by_name.find(topic_name) != m_topics_by_name.end()) {
-            result.error() = fmt::format("Topic with name \"{}\" already exists", topic_name);
-            result.success() = false;
-            spdlog::error("[mofka:{}] {}", id(), result.error());
-            return;
-        }
-
-        SP<PartitionManager> topic;
-        try {
-            topic = PartitionManagerFactory::create(
-                topic_type, get_engine(),
-                backend_config,
-                validator_meta,
-                selector_meta,
-                serializer_meta);
-        } catch(const std::exception& ex) {
-            result.success() = false;
-            result.error() = fmt::format("Error when creating topic \"{}\": {}", topic_name, ex.what());
-            spdlog::error("[mofka:{}] {}", id(), result.error());
-            return;
-        }
-
-        if(not topic) {
-            result.success() = false;
-            result.error() = fmt::format(
-                "Unknown topic type \"{}\" for topic \"{}\"", topic_type, topic_name);
-            spdlog::error("[mofka:{}] {}", id(), result.error());
-            return;
-        } else {
-            m_topics_by_name[topic_name] = topic;
-            result.value() = std::make_tuple(
-                topic->getValidatorMetadata(),
-                topic->getTargetSelectorMetadata(),
-                topic->getSerializerMetadata());
-        }
-
-        spdlog::trace("[mofka:{}] Successfully created topic \"{}\" of type {}",
-                id(), topic_name, topic_type);
-    }
-
-    void openTopic(const tl::request& req,
-                   const std::string& topic_name) {
-        spdlog::trace("[mofka:{}] Received openTopic request for topic {}", id(), topic_name);
-        using ResultType = std::tuple<Metadata, Metadata, Metadata>;
-        Result<ResultType> result;
-        tl::auto_respond<decltype(result)> ensureResponse(req, result);
-
-        FIND_TOPIC_BY_NAME(topic, topic_name);
-        result.success() = true;
-        result.value() = std::make_tuple(
-                topic->getValidatorMetadata(),
-                topic->getTargetSelectorMetadata(),
-                topic->getSerializerMetadata());
-        spdlog::trace("[mofka:{}] Code successfully executed on topic {}", id(), topic_name);
-    }
 
     void receiveBatch(const tl::request& req,
-                      const std::string& topic_name,
                       const std::string& producer_name,
                       size_t count,
                       const BulkRef& metadata,
                       const BulkRef& data) {
-        spdlog::trace("[mofka:{}] Received receiveBatch request for topic {}", id(), topic_name);
+        spdlog::trace("[mofka:{}] Received receiveBatch request", id());
         Result<EventID> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        FIND_TOPIC_BY_NAME(topic, topic_name);
-        result = topic->receiveBatch(
+        ENSURE_VALID_PARTITION_MANAGER(result);
+        result = m_partition_manager->receiveBatch(
             req.get_endpoint(), producer_name, count, metadata, data);
-        spdlog::trace("[mofka:{}] Successfully executed receiveBatch on topic {}", id(), topic_name);
+        spdlog::trace("[mofka:{}] Successfully executed receiveBatch", id());
     }
 
     void requestEvents(const tl::request& req,
-                       const std::string& topic_name,
                        intptr_t consumer_ctx,
                        size_t target_info_index,
                        const UUID& consumer_id,
                        const std::string& consumer_name,
                        size_t count,
                        size_t batch_size) {
-        spdlog::trace("[mofka:{}] Received requestEvents request for topic {}", id(), topic_name);
+        spdlog::trace("[mofka:{}] Received requestEvents request", id());
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        FIND_TOPIC_BY_NAME(topic, topic_name);
+        ENSURE_VALID_PARTITION_MANAGER(result);
         auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
             consumer_ctx, target_info_index,
-            consumer_name, count, topic,
+            consumer_name, count, m_partition_manager,
             req.get_endpoint(),
             m_consumer_recv_batch);
         {
@@ -220,24 +130,23 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             m_consumers.emplace(consumer_id, consumer_handle_impl);
         }
         m_consumers_cv.notify_all();
-        result = topic->feedConsumer(consumer_handle_impl, BatchSize{batch_size});
+        result = m_partition_manager->feedConsumer(consumer_handle_impl, BatchSize{batch_size});
         {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             m_consumers.erase(consumer_id);
         }
-        spdlog::trace("[mofka:{}] Successfully executed requestEvents on topic {}", id(), topic_name);
+        spdlog::trace("[mofka:{}] Successfully executed requestEvents", id());
     }
 
     void acknowledge(const tl::request& req,
-                     const std::string& topic_name,
                      const std::string& consumer_name,
                      EventID eventID) {
-        spdlog::trace("[mofka:{}] Received acknoweldge request for topic {}", id(), topic_name);
+        spdlog::trace("[mofka:{}] Received acknoweldge request", id());
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        FIND_TOPIC_BY_NAME(topic, topic_name);
-        result = topic->acknowledge(consumer_name, eventID);
-        spdlog::trace("[mofka:{}] Successfully executed acknowledge on topic {}", id(), topic_name);
+        ENSURE_VALID_PARTITION_MANAGER(result);
+        result = m_partition_manager->acknowledge(consumer_name, eventID);
+        spdlog::trace("[mofka:{}] Successfully executed acknowledge", id());
     }
 
     void removeConsumer(const tl::request& req,
@@ -261,14 +170,13 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     }
 
     void requestData(const tl::request& req,
-                     const std::string& topic_name,
                      const Cerealized<DataDescriptor>& descriptor,
                      const BulkRef& remote_bulk) {
         spdlog::trace("[mofka:{}] Received requestData request", id());
         Result<std::vector<Result<void>>> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        FIND_TOPIC_BY_NAME(topic, topic_name);
-        result = topic->getData({descriptor.content}, remote_bulk);
+        ENSURE_VALID_PARTITION_MANAGER(result);
+        result = m_partition_manager->getData({descriptor.content}, remote_bulk);
         spdlog::trace("[mofka:{}] Successfully executed requestData", id());
     }
 

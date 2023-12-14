@@ -119,8 +119,7 @@ void ConsumerImpl::pullFrom(size_t target_info_index,
     auto& ph = target.self->m_ph;
     auto consumer_ctx = reinterpret_cast<intptr_t>(this);
     Result<void> result =
-        rpc.on(ph)(m_topic->m_name,
-                   consumer_ctx,
+        rpc.on(ph)(consumer_ctx,
                    target_info_index,
                    m_uuid,
                    m_name,
@@ -247,7 +246,6 @@ SP<DataImpl> ConsumerImpl::requestData(
     auto& ph  = target->m_ph;
 
     Result<std::vector<Result<void>>> result = rpc.on(ph)(
-            m_topic->m_name,
             Cerealized<DataDescriptor>(descriptor),
             local_bulk_ref);
 

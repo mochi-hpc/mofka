@@ -117,14 +117,12 @@ class ActiveProducerBatchQueue {
     public:
 
     ActiveProducerBatchQueue(
-        std::string topic_name,
         std::string producer_name,
         SP<ClientImpl> client,
         SP<PartitionTargetInfoImpl> target,
         SP<ThreadPoolImpl> thread_pool,
         BatchSize batch_size)
-    : m_topic_name(std::move(topic_name))
-    , m_producer_name(std::move(producer_name))
+    : m_producer_name(std::move(producer_name))
     , m_client(std::move(client))
     , m_target(std::move(target))
     , m_thread_pool{std::move(thread_pool)}
@@ -230,7 +228,6 @@ class ActiveProducerBatchQueue {
             auto rpc = m_client->m_producer_send_batch;
             auto self_addr = static_cast<std::string>(m_client->m_engine.self());
             Result<EventID> result = rpc.on(ph)(
-                m_topic_name,
                 m_producer_name,
                 batch->count(),
                 BulkRef{metadata_content, 0, batch->metadataBulkSize(), self_addr},
@@ -245,7 +242,6 @@ class ActiveProducerBatchQueue {
         }
     }
 
-    std::string                         m_topic_name;
     std::string                         m_producer_name;
     SP<ClientImpl>                      m_client;
     SP<PartitionTargetInfoImpl>         m_target;

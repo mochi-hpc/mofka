@@ -29,6 +29,7 @@ TopicHandle ServiceHandle::createTopic(
         Validator validator,
         TargetSelector selector,
         Serializer serializer) {
+#if 0
     const auto hash   = std::hash<decltype(name)>()(name);
     const auto target = self->m_mofka_targets[hash % self->m_mofka_targets.size()];
     const auto ph = target.self->m_ph;
@@ -50,6 +51,7 @@ TopicHandle ServiceHandle::createTopic(
     validator = Validator::FromMetadata(validator_meta);
     selector = TargetSelector::FromMetadata(selector_meta);
     serializer = Serializer::FromMetadata(serializer_meta);
+#endif
     return std::make_shared<TopicHandleImpl>(
         name, self,
         std::move(validator),
@@ -58,6 +60,7 @@ TopicHandle ServiceHandle::createTopic(
 }
 
 TopicHandle ServiceHandle::openTopic(std::string_view name) {
+#if 0
     const auto hash = std::hash<decltype(name)>()(name);
     const auto target = self->m_mofka_targets[hash % self->m_mofka_targets.size()];
     const auto ph = target.self->m_ph;
@@ -74,6 +77,10 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
     auto validator = Validator::FromMetadata(validator_meta);
     auto selector = TargetSelector::FromMetadata(selector_meta);
     auto serializer = Serializer::FromMetadata(serializer_meta);
+#endif
+    auto validator = Validator::FromMetadata(Metadata{"{}"});
+    auto selector = TargetSelector::FromMetadata(Metadata{"{}"});
+    auto serializer = Serializer::FromMetadata(Metadata{"{}"});
     return std::make_shared<TopicHandleImpl>(
         name, self,
         std::move(validator),

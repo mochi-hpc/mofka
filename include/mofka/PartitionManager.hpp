@@ -157,10 +157,10 @@ class PartitionManager {
 
 using PartitionManagerFactory = Factory<PartitionManager,
     const thallium::engine&,
-    const Metadata&,
-    const Metadata&,
-    const Metadata&,
-    const Metadata&>;
+    const Metadata&,  /* config */
+    const Metadata&,  /* validator */
+    const Metadata&,  /* selector */
+    const Metadata&>; /* serializer */
 
 #define MOFKA_REGISTER_PARTITION_MANAGER(__name__, __type__) \
     MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__)

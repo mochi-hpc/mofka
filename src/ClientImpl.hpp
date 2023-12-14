@@ -25,8 +25,6 @@ class ClientImpl {
     public:
 
     tl::engine           m_engine;
-    tl::remote_procedure m_create_topic;
-    tl::remote_procedure m_open_topic;
     tl::remote_procedure m_get_uuid;
     tl::remote_procedure m_producer_send_batch;
     tl::remote_procedure m_consumer_request_events;
@@ -39,8 +37,6 @@ class ClientImpl {
 
     ClientImpl(const tl::engine& engine)
     : m_engine(engine)
-    , m_create_topic(m_engine.define("mofka_create_topic"))
-    , m_open_topic(m_engine.define("mofka_open_topic"))
     , m_producer_send_batch(m_engine.define("mofka_producer_send_batch"))
     , m_consumer_request_events(m_engine.define("mofka_consumer_request_events"))
     , m_consumer_ack_event(m_engine.define("mofka_consumer_ack_event"))
