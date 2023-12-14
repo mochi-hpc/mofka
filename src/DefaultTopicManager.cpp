@@ -256,7 +256,7 @@ std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
     Metadata datastore_config{std::move(datastore_config_doc)};
 
     /* create data store */
-    auto data_store = std::make_unique<WarabiDataStore>(engine, std::move(datastore_config));
+    auto data_store = WarabiDataStore::create(engine, std::move(datastore_config));
 
     /* create topic manager */
     return std::unique_ptr<mofka::TopicManager>(
