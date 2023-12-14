@@ -11,8 +11,8 @@ spack:
   - tclap
   - mochi-bedrock@0.6.0:+ssg
   - argobots@1.2rc1
-  - mochi-warabi
-  - mochi-yokan
+  - mochi-warabi+bedrock
+  - mochi-yokan+bedrock
   concretizer:
     unify: true
     reuse: true
