@@ -18,18 +18,6 @@ namespace mofka {
 
 MOFKA_REGISTER_PARTITION_MANAGER(default, DefaultPartitionManager);
 
-Metadata DefaultPartitionManager::getValidatorMetadata() const {
-    return m_validator;
-}
-
-Metadata DefaultPartitionManager::getSerializerMetadata() const {
-    return m_serializer;
-}
-
-Metadata DefaultPartitionManager::getTargetSelectorMetadata() const {
-    return m_selector;
-}
-
 Result<EventID> DefaultPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
@@ -212,11 +200,7 @@ Result<bool> DefaultPartitionManager::destroy() {
 }
 
 std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
-        const thallium::engine& engine,
-        const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer) {
+        const thallium::engine& engine, const Metadata& config) {
 
     static constexpr const char* configSchema = R"(
     {
@@ -261,9 +245,6 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     /* create topic manager */
     return std::unique_ptr<mofka::PartitionManager>(
         new DefaultPartitionManager(std::move(config),
-                                validator,
-                                selector,
-                                serializer,
                                 std::move(data_store),
                                 engine));
 }

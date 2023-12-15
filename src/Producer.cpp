@@ -54,7 +54,7 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
         : Promise<EventID>::CreateFutureAndPromise();
     /* Step 2: get a local ID for this push operation */
     size_t local_event_id = self->m_num_pushed_events++;
-    /* Step 3: create a ULT that will validate, select the target, and serialize */
+    /* Step 3: create a ULT that will validate, select the partition, and serialize */
     auto ult = [this,
                 local_event_id,
                 promise=std::move(promise),
@@ -65,8 +65,8 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
         try {
             /* Step 3.1: validate the metadata */
             topic->m_validator.validate(metadata, data);
-            /* Step 3.2: select the target for this metadata */
-            auto target = topic->m_selector.selectTargetFor(metadata);
+            /* Step 3.2: select the partition for this metadata */
+            auto partition = topic->m_selector.selectPartitionFor(metadata);
             {
                 /* Step 3.3: wait for our turn pushing the event into the batch */
                 std::unique_lock<thallium::mutex> guard{self->m_batch_queues_mtx};
@@ -76,12 +76,12 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
                     }
                 }
                 /* Step 3.4: find/create the ActiveBatchQueue to send to */
-                auto& queue = self->m_batch_queues[target];
+                auto& queue = self->m_batch_queues[partition];
                 if(!queue) {
                     queue.reset(new ActiveProducerBatchQueue{
                         self->m_name,
                         self->m_topic->m_service->m_client,
-                        target.self,
+                        partition.self,
                         self->m_thread_pool,
                         batchSize()});
                 }

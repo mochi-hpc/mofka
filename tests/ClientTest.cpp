@@ -21,13 +21,13 @@ TEST_CASE("Client test", "[client]") {
     SECTION("Initialize a client") {
         mofka::Client client;
         REQUIRE(!static_cast<bool>(client));
-        client = mofka::Client{engine};
+        REQUIRE_NOTHROW(client = mofka::Client{engine});
         REQUIRE(static_cast<bool>(client));
 
         SECTION("Initialize a service handle") {
             mofka::ServiceHandle sh;
             REQUIRE(!static_cast<bool>(sh));
-            sh = client.connect(mofka::SSGGroupID{gid});
+            REQUIRE_NOTHROW(sh = client.connect(mofka::SSGGroupID{gid}));
             REQUIRE(static_cast<bool>(sh));
         }
     }

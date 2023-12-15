@@ -110,13 +110,13 @@ class TopicHandle {
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataBroker{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataSelector{}, std::forward<Options>(opts)...),
-            GetArgOrDefault(targets(), std::forward<Options>(opts)...));
+            GetArgOrDefault(partitions(), std::forward<Options>(opts)...));
     }
 
     /**
-     * @brief Returns the list of PartitionTargetInfo of the underlying topic.
+     * @brief Returns the list of PartitionInfo of the underlying topic.
      */
-    const std::vector<PartitionTargetInfo>& targets() const;
+    const std::vector<PartitionInfo>& partitions() const;
 
     /**
      * @brief Checks if the TopicHandle instance is valid.
@@ -168,7 +168,7 @@ class TopicHandle {
                           ThreadPool thread_pool,
                           DataBroker data_broker,
                           DataSelector data_selector,
-                          const std::vector<PartitionTargetInfo>& targets) const;
+                          const std::vector<PartitionInfo>& targets) const;
 
     static Ordering defaultOrdering();
 

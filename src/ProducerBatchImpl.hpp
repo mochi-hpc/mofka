@@ -6,7 +6,7 @@
 #ifndef MOFKA_PRODUCER_BATCH_IMPL_H
 #define MOFKA_PRODUCER_BATCH_IMPL_H
 
-#include "PartitionTargetInfoImpl.hpp"
+#include "PartitionInfoImpl.hpp"
 #include "ThreadPoolImpl.hpp"
 #include "ProducerImpl.hpp"
 #include "Promise.hpp"
@@ -119,12 +119,12 @@ class ActiveProducerBatchQueue {
     ActiveProducerBatchQueue(
         std::string producer_name,
         SP<ClientImpl> client,
-        SP<PartitionTargetInfoImpl> target,
+        SP<PartitionInfoImpl> partition,
         SP<ThreadPoolImpl> thread_pool,
         BatchSize batch_size)
     : m_producer_name(std::move(producer_name))
     , m_client(std::move(client))
-    , m_target(std::move(target))
+    , m_partition(std::move(partition))
     , m_thread_pool{std::move(thread_pool)}
     , m_batch_size{batch_size} {
         start();
@@ -224,7 +224,7 @@ class ActiveProducerBatchQueue {
             return;
         }
         try {
-            auto ph = m_target->m_ph;
+            auto ph = m_partition->m_ph;
             auto rpc = m_client->m_producer_send_batch;
             auto self_addr = static_cast<std::string>(m_client->m_engine.self());
             Result<EventID> result = rpc.on(ph)(
@@ -244,7 +244,7 @@ class ActiveProducerBatchQueue {
 
     std::string                         m_producer_name;
     SP<ClientImpl>                      m_client;
-    SP<PartitionTargetInfoImpl>         m_target;
+    SP<PartitionInfoImpl>               m_partition;
     SP<ThreadPoolImpl>                  m_thread_pool;
     BatchSize                           m_batch_size;
     std::queue<SP<ProducerBatchImpl>>   m_batch_queue;

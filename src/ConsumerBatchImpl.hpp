@@ -18,7 +18,7 @@
 #include "mofka/Data.hpp"
 #include "mofka/Future.hpp"
 #include "mofka/Consumer.hpp"
-#include "PartitionTargetInfoImpl.hpp"
+#include "PartitionInfoImpl.hpp"
 #include "ThreadPoolImpl.hpp"
 #include "ConsumerImpl.hpp"
 #include "Promise.hpp"

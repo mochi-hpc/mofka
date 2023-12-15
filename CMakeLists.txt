@@ -69,6 +69,8 @@ find_package (fmt REQUIRED)
 find_package (bedrock REQUIRED)
 # search for warabi
 find_package (warabi REQUIRED)
+# search for yokan
+find_package (yokan REQUIRED)
 
 # library version set here (e.g. for shared libs).
 set (MOFKA_VERSION_MAJOR 0)

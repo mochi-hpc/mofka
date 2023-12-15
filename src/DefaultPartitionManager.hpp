@@ -18,10 +18,6 @@ namespace mofka {
 class DefaultPartitionManager : public mofka::PartitionManager {
 
     Metadata m_config;
-    Metadata m_validator;
-    Metadata m_selector;
-    Metadata m_serializer;
-
     std::unique_ptr<WarabiDataStore> m_data_store;
 
     thallium::engine m_engine;
@@ -47,15 +43,9 @@ class DefaultPartitionManager : public mofka::PartitionManager {
      */
     DefaultPartitionManager(
         const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer,
         std::unique_ptr<WarabiDataStore> data_store,
         thallium::engine engine)
     : m_config(config)
-    , m_validator(validator)
-    , m_selector(selector)
-    , m_serializer(serializer)
     , m_data_store(std::move(data_store))
     , m_engine(engine) {}
 
@@ -83,21 +73,6 @@ class DefaultPartitionManager : public mofka::PartitionManager {
      * @brief Destructor.
      */
     virtual ~DefaultPartitionManager() = default;
-
-    /**
-     * @brief Get the Metadata of the Validator associated with this topic.
-     */
-    virtual Metadata getValidatorMetadata() const override;
-
-    /**
-     * @brief Get the Metadata of the TargetSelector associated with this topic.
-     */
-    virtual Metadata getTargetSelectorMetadata() const override;
-
-    /**
-     * @brief Get the Metadata of the Serializer associated with this topic.
-     */
-    virtual Metadata getSerializerMetadata() const override;
 
     /**
      * @brief Receives a batch.
@@ -149,17 +124,12 @@ class DefaultPartitionManager : public mofka::PartitionManager {
      *
      * @param engine Thallium engine
      * @param config Metadata configuration for the manager.
-     * @param validator Metadata of the topic's Validator.
-     * @param serializer Metadata of the topic's Serializer.
      *
      * @return a unique_ptr to a PartitionManager.
      */
     static std::unique_ptr<mofka::PartitionManager> create(
         const thallium::engine& engine,
-        const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer);
+        const Metadata& config);
 
 };
 

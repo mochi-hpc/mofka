@@ -8,7 +8,7 @@
 
 #include "PimplUtil.hpp"
 #include "TopicHandleImpl.hpp"
-#include "PartitionTargetInfoImpl.hpp"
+#include "PartitionInfoImpl.hpp"
 #include "ProducerImpl.hpp"
 
 #include "mofka/Consumer.hpp"
@@ -36,7 +36,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     const DataBroker                       m_data_broker;
     const DataSelector                     m_data_selector;
     const EventProcessor                   m_event_processor;
-    const std::vector<PartitionTargetInfo> m_targets;
+    const std::vector<PartitionInfo>       m_partitions;
     const std::shared_ptr<TopicHandleImpl> m_topic;
 
     const std::string m_self_addr;
@@ -74,7 +74,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
                  SP<ThreadPoolImpl> thread_pool,
                  DataBroker broker,
                  DataSelector selector,
-                 std::vector<PartitionTargetInfo> targets,
+                 std::vector<PartitionInfo> partitions,
                  std::shared_ptr<TopicHandleImpl> topic)
     : m_engine(std::move(engine))
     , m_name(name)
@@ -83,7 +83,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     , m_thread_pool(std::move(thread_pool))
     , m_data_broker(std::move(broker))
     , m_data_selector(std::move(selector))
-    , m_targets(std::move(targets))
+    , m_partitions(std::move(partitions))
     , m_topic(std::move(topic))
     , m_self_addr(m_engine.self())
     {
@@ -114,7 +114,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
         const BulkRef &data_desc);
 
     SP<DataImpl> requestData(
-        SP<PartitionTargetInfoImpl> target,
+        SP<PartitionInfoImpl> target,
         SP<MetadataImpl> metadata,
         SP<DataDescriptorImpl> descriptor);
 };

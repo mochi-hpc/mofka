@@ -26,16 +26,8 @@ TEST_CASE("Event producer test", "[event-producer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        auto topic_config = mofka::TopicBackendConfig{};/*R"(
-            {
-                "__type__":"default",
-                "data_store": {
-                    "__type__": "memory"
-                }
-            })"
-        };
-        */
-        topic = sh.createTopic("mytopic", topic_config);
+        REQUIRE_NOTHROW(sh.createTopic("mytopic"));
+        REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
 
         auto thread_count = GENERATE(as<mofka::ThreadCount>{}, 0, 1, 2);

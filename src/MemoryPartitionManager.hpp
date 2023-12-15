@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MEMORY_TOPIC_MANAGER_HPP
-#define MEMORY_TOPIC_MANAGER_HPP
+#ifndef MEMORY_PARTITION_MANAGER_HPP
+#define MEMORY_PARTITION_MANAGER_HPP
 
 #include <mofka/PartitionManager.hpp>
 #include <mofka/DataDescriptor.hpp>
@@ -32,9 +32,6 @@ class MemoryPartitionManager : public mofka::PartitionManager {
     };
 
     Metadata m_config;
-    Metadata m_validator;
-    Metadata m_selector;
-    Metadata m_serializer;
 
     thallium::engine m_engine;
 
@@ -61,14 +58,8 @@ class MemoryPartitionManager : public mofka::PartitionManager {
      */
     MemoryPartitionManager(
         const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer,
         thallium::engine engine)
     : m_config(config)
-    , m_validator(validator)
-    , m_selector(selector)
-    , m_serializer(serializer)
     , m_engine(engine) {}
 
     /**
@@ -95,21 +86,6 @@ class MemoryPartitionManager : public mofka::PartitionManager {
      * @brief Destructor.
      */
     virtual ~MemoryPartitionManager() = default;
-
-    /**
-     * @brief Get the Metadata of the Validator associated with this topic.
-     */
-    virtual Metadata getValidatorMetadata() const override;
-
-    /**
-     * @brief Get the Metadata of the TargetSelector associated with this topic.
-     */
-    virtual Metadata getTargetSelectorMetadata() const override;
-
-    /**
-     * @brief Get the Metadata of the Serializer associated with this topic.
-     */
-    virtual Metadata getSerializerMetadata() const override;
 
     /**
      * @brief Receives a batch.
@@ -168,10 +144,7 @@ class MemoryPartitionManager : public mofka::PartitionManager {
      */
     static std::unique_ptr<mofka::PartitionManager> create(
         const thallium::engine& engine,
-        const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer);
+        const Metadata& config);
 
 };
 

@@ -13,18 +13,6 @@ namespace mofka {
 
 MOFKA_REGISTER_PARTITION_MANAGER(memory, MemoryPartitionManager);
 
-Metadata MemoryPartitionManager::getValidatorMetadata() const {
-    return m_validator;
-}
-
-Metadata MemoryPartitionManager::getSerializerMetadata() const {
-    return m_serializer;
-}
-
-Metadata MemoryPartitionManager::getTargetSelectorMetadata() const {
-    return m_selector;
-}
-
 Result<EventID> MemoryPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
@@ -251,12 +239,9 @@ Result<bool> MemoryPartitionManager::destroy() {
 
 std::unique_ptr<mofka::PartitionManager> MemoryPartitionManager::create(
         const thallium::engine& engine,
-        const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer) {
+        const Metadata& config) {
     return std::unique_ptr<mofka::PartitionManager>(
-        new MemoryPartitionManager(config, validator, selector, serializer, engine));
+        new MemoryPartitionManager(config, engine));
 }
 
 }

@@ -77,11 +77,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         // FIXME
         // For now we just instanciate a MemoryPartitionManager
         m_partition_manager = PartitionManagerFactory::create(
-            "memory", get_engine(),
-            Metadata{"{}"},  // config
-            Metadata{"{}"},  // validator
-            Metadata{"{}"},  // selector
-            Metadata{"{}"}); // serializer
+            "memory", get_engine(), Metadata{"{}"});
 
         spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), uuid);
     }

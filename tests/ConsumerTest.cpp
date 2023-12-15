@@ -26,16 +26,11 @@ TEST_CASE("Consumer test", "[consumer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        auto topic_config = mofka::TopicBackendConfig{};/*R"(
-            {
-                "__type__":"default",
-                "data_store": {
-                    "__type__": "memory"
-                }
-            })"
-        };*/
-        topic = sh.createTopic("mytopic", topic_config);
+        REQUIRE_NOTHROW(sh.createTopic("mytopic"));
+        REQUIRE_THROWS_AS(sh.createTopic("mytopic"), mofka::Exception);
+        topic = sh.openTopic("mytopic");
         REQUIRE(static_cast<bool>(topic));
+        REQUIRE_THROWS_AS(sh.openTopic("mytopic"), mofka::Exception);
 
         SECTION("Create a consumer from the topic") {
             mofka::Consumer consumer;

@@ -63,21 +63,6 @@ class PartitionManager {
     virtual ~PartitionManager() = default;
 
     /**
-     * @brief Get the Metadata of the Validator associated with this topic.
-     */
-    virtual Metadata getValidatorMetadata() const = 0;
-
-    /**
-     * @brief Get the Metadata of the TargetSelector associated with this topic.
-     */
-    virtual Metadata getTargetSelectorMetadata() const = 0;
-
-    /**
-     * @brief Get the Metadata of the Serializer associated with this topic.
-     */
-    virtual Metadata getSerializerMetadata() const = 0;
-
-    /**
      * @brief Receive a batch of events from a sender.
      *
      * @param producer_name Name of the producer.
@@ -156,11 +141,7 @@ class PartitionManager {
 };
 
 using PartitionManagerFactory = Factory<PartitionManager,
-    const thallium::engine&,
-    const Metadata&,  /* config */
-    const Metadata&,  /* validator */
-    const Metadata&,  /* selector */
-    const Metadata&>; /* serializer */
+    const thallium::engine&, const Metadata&>;
 
 #define MOFKA_REGISTER_PARTITION_MANAGER(__name__, __type__) \
     MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__)

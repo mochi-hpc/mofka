@@ -6,7 +6,7 @@
 #ifndef MOFKA_CLIENT_IMPL_H
 #define MOFKA_CLIENT_IMPL_H
 
-#include "mofka/TargetSelector.hpp"
+#include "mofka/PartitionSelector.hpp"
 #include "mofka/Result.hpp"
 #include "mofka/BulkRef.hpp"
 #include "mofka/EventID.hpp"
@@ -56,10 +56,6 @@ class ClientImpl {
             const BulkRef &metadata,
             const BulkRef &data_desc_sizes,
             const BulkRef &data_desc);
-
-    static std::vector<PartitionTargetInfo> discoverMofkaTargets(
-            const tl::engine& engine,
-            const bedrock::ServiceGroupHandle bsgh);
 };
 
 }

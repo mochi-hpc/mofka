@@ -7,7 +7,7 @@
 #include "mofka/Event.hpp"
 #include "mofka/Exception.hpp"
 
-#include "PartitionTargetInfoImpl.hpp"
+#include "PartitionInfoImpl.hpp"
 #include "EventImpl.hpp"
 #include "PimplUtil.hpp"
 
@@ -23,8 +23,8 @@ Data Event::data() const {
     return self->m_data;
 }
 
-PartitionTargetInfo Event::partition() const {
-    return self->m_target;
+PartitionInfo Event::partition() const {
+    return self->m_partition;
 }
 
 EventID Event::id() const {
@@ -33,7 +33,7 @@ EventID Event::id() const {
 
 void Event::acknowledge() const {
     auto& rpc = self->m_consumer->m_topic->m_service->m_client->m_consumer_ack_event;
-    auto& ph  = self->m_target->m_ph;
+    auto& ph  = self->m_partition->m_ph;
     rpc.on(ph)(self->m_consumer->m_name,
                self->m_id);
 }

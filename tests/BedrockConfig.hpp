@@ -34,6 +34,7 @@ static inline const char* config = R"(
             "name" : "my_yokan_provider",
             "type" : "yokan",
             "provider_id" : 2,
+            "tags" : [ "mofka:master" ],
             "config" : {
                 "database" : {
                     "type": "map",

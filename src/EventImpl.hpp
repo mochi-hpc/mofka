@@ -22,19 +22,19 @@ class EventImpl {
     public:
 
     EventImpl(EventID id,
-              SP<PartitionTargetInfoImpl> target,
+              SP<PartitionInfoImpl> partition,
               SP<ConsumerImpl> consumer)
     : m_id(std::move(id))
-    , m_target(std::move(target))
+    , m_partition(std::move(partition))
     , m_consumer(std::move(consumer))
     , m_metadata(std::make_shared<MetadataImpl>("{}", false))
     , m_data(std::make_shared<DataImpl>()) {}
 
-    EventID                     m_id;
-    SP<PartitionTargetInfoImpl> m_target;
-    SP<ConsumerImpl>            m_consumer;
-    SP<MetadataImpl>            m_metadata;
-    SP<DataImpl>                m_data;
+    EventID               m_id;
+    SP<PartitionInfoImpl> m_partition;
+    SP<ConsumerImpl>      m_consumer;
+    SP<MetadataImpl>      m_metadata;
+    SP<DataImpl>          m_data;
 };
 
 }
