@@ -27,6 +27,7 @@ TEST_CASE("Event producer test", "[event-producer]") {
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
         REQUIRE_NOTHROW(sh.createTopic("mytopic"));
+        REQUIRE_NOTHROW(sh.addPartition("mytopic", 0));
         REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
 

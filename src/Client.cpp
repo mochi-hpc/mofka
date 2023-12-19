@@ -45,7 +45,6 @@ std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
     )";
     bsgh.queryConfig(script, &configs);
     rapidjson::Document doc;
-    std::cerr << "AAA " << configs << std::endl;
     doc.Parse(configs.c_str(), configs.size());
     std::vector<std::pair<std::string, uint16_t>> masters;
     for(auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {

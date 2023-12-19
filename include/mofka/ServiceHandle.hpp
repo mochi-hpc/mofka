@@ -75,6 +75,11 @@ class ServiceHandle {
     operator bool() const;
 
     /**
+     * @brief Returns the number of servers this service currently has.
+     */
+    size_t numServers() const;
+
+    /**
      * @brief Create a topic with a given name, if it does not exist yet.
      *
      * @param name Name of the topic.
@@ -95,6 +100,30 @@ class ServiceHandle {
      * @return a TopicHandle representing the topic.
      */
     TopicHandle openTopic(std::string_view name);
+
+    /**
+     * @brief Map of dependency descriptors for the partition.
+     * Please refer to the partition type's documentation for more information
+     * on its expected dependencies.
+     */
+    typedef std::unordered_map<std::string, std::vector<std::string>> PartitionDependencies;
+
+    /**
+     * @brief Create a new partition at the given server rank and add it to the topic.
+     *
+     * @param topic_name Name of the topic.
+     * @param server_rank Rank of the server.
+     * @param partition_type Type of partition.
+     * @param partition_config Configuration for the partition.
+     * @param dependencies Map of dependencies expected by the partition.
+     * @param pool_name Pool name in the server.
+     */
+    void addPartition(std::string_view topic_name,
+                      size_t server_rank,
+                      std::string_view partition_type = "memory",
+                      const Metadata& partition_config = Metadata{"{}"},
+                      const PartitionDependencies& dependencies = {},
+                      std::string_view pool_name = "");
 
     private:
 

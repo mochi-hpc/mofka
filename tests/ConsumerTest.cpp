@@ -28,9 +28,9 @@ TEST_CASE("Consumer test", "[consumer]") {
         REQUIRE(!static_cast<bool>(topic));
         REQUIRE_NOTHROW(sh.createTopic("mytopic"));
         REQUIRE_THROWS_AS(sh.createTopic("mytopic"), mofka::Exception);
-        topic = sh.openTopic("mytopic");
+        REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
-        REQUIRE_THROWS_AS(sh.openTopic("mytopic"), mofka::Exception);
+        REQUIRE_THROWS_AS(sh.openTopic("mytopic2"), mofka::Exception);
 
         SECTION("Create a consumer from the topic") {
             mofka::Consumer consumer;

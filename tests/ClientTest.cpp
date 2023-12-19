@@ -7,6 +7,7 @@
 #include <catch2/catch_all.hpp>
 #include <bedrock/Server.hpp>
 #include <mofka/Client.hpp>
+#include <mofka/TopicHandle.hpp>
 #include "BedrockConfig.hpp"
 
 TEST_CASE("Client test", "[client]") {
@@ -29,6 +30,19 @@ TEST_CASE("Client test", "[client]") {
             REQUIRE(!static_cast<bool>(sh));
             REQUIRE_NOTHROW(sh = client.connect(mofka::SSGGroupID{gid}));
             REQUIRE(static_cast<bool>(sh));
+
+            SECTION("Create a topic") {
+                mofka::TopicHandle topic;
+                REQUIRE(!static_cast<bool>(topic));
+                REQUIRE_NOTHROW(sh.createTopic("mytopic"));
+                REQUIRE_THROWS_AS(sh.createTopic("mytopic"), mofka::Exception);
+
+                REQUIRE_NOTHROW(sh.addPartition("mytopic", 0));
+
+                REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
+                REQUIRE(static_cast<bool>(topic));
+                REQUIRE_THROWS_AS(sh.openTopic("mytopic2"), mofka::Exception);
+            }
         }
     }
 
