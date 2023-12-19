@@ -8,11 +8,12 @@
 #include <bedrock/Server.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
-#include "BedrockConfig.hpp"
+#include "Configs.hpp"
 
 TEST_CASE("Event producer test", "[event-producer]") {
 
     spdlog::set_level(spdlog::level::from_str("critical"));
+    auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
     auto remove_file = EnsureFileRemoved{"mofka.ssg"};
 
     auto server = bedrock::Server("na+sm", config);
@@ -27,7 +28,13 @@ TEST_CASE("Event producer test", "[event-producer]") {
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
         REQUIRE_NOTHROW(sh.createTopic("mytopic"));
-        REQUIRE_NOTHROW(sh.addPartition("mytopic", 0));
+        mofka::Metadata partition_config;
+        mofka::ServiceHandle::PartitionDependencies partition_dependencies;
+        getPartitionArguments(partition_type, partition_dependencies, partition_config);
+
+        REQUIRE_NOTHROW(sh.addPartition(
+                    "mytopic", 0, partition_type,
+                    partition_config, partition_dependencies));
         REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
 
