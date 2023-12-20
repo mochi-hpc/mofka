@@ -10,7 +10,7 @@
 #include <warabi/Client.hpp>
 #include <warabi/TargetHandle.hpp>
 #include <mofka/Result.hpp>
-#include <mofka/MetaData.hpp>
+#include <mofka/Metadata.hpp>
 #include <mofka/DataDescriptor.hpp>
 #include <mofka/BulkRef.hpp>
 #include <spdlog/spdlog.h>

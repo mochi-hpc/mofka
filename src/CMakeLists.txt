@@ -22,9 +22,6 @@ set (client-src-files
      Event.cpp
      PrioPool.cpp)
 
-set (dummy-src-files
-     dummy/DummyTopicManager.cpp)
-
 set (module-src-files
      BedrockModule.cpp)
 
