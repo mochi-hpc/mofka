@@ -21,6 +21,9 @@ spack:
       lib: [LD_LIBRARY_PATH]
       lib64: [LD_LIBRARY_PATH]
   packages:
+    all:
+      providers:
+        mpi: [mpich]
     mochi-yokan:
       require: "@0.4.0:"
     mochi-warabi:
