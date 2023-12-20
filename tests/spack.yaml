@@ -26,7 +26,7 @@ spack:
     mochi-warabi:
       require: "@0.2.0:"
     mochi-bedrock:
-      require: "@0.8.1:"
+      require: "@0.8.2:"
     mercury:
       require: "~checksum~boostsys"
     libfabric:

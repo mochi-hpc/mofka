@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2.1.1
+      uses: actions/checkout@v4
 
     - name: Setup spack
-      uses: spack/setup-spack@v2
+      uses: spack/setup-spack@v2.1.1
       with:
         ref: develop
 
