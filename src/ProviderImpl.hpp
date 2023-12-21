@@ -8,6 +8,7 @@
 
 #include "mofka/PartitionManager.hpp"
 #include "mofka/DataDescriptor.hpp"
+#include "mofka/Provider.hpp"
 #include "CerealArchiveAdaptor.hpp"
 #include "ConsumerHandleImpl.hpp"
 #include "MetadataImpl.hpp"
@@ -35,6 +36,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     tl::engine           m_engine;
     rapidjson::Document  m_config;
     UUID                 m_uuid;
+    std::string          m_topic;
     tl::pool             m_pool;
     // RPCs for PartitionManagers
     tl::auto_remote_procedure m_producer_send_batch;
@@ -52,7 +54,8 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     tl::condition_variable                           m_consumers_cv;
 
     ProviderImpl(const tl::engine& engine, uint16_t provider_id,
-                 const rapidjson::Value& config, const tl::pool& pool)
+                 const rapidjson::Value& config, const tl::pool& pool,
+                 const bedrock::ResolvedDependencyMap& dependencies)
     : tl::provider<ProviderImpl>(engine, provider_id)
     , m_engine(engine)
     , m_pool(pool)
@@ -63,23 +66,49 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_consumer_request_data(define("mofka_consumer_request_data", &ProviderImpl::requestData, pool))
     , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch"))
     {
+        /* Validate the configuration */
+        ValidateConfig(config);
+
+        /* Copy the configuration */
         m_config.CopyFrom(config, m_config.GetAllocator(), true);
-        if(m_config.HasMember("uuid") && m_config["uuid"].IsString()) {
-            m_uuid = UUID::from_string(m_config["uuid"].GetString());
-        } else {
-            m_uuid = UUID::generate();
-        }
-        auto uuid = m_uuid.to_string();
-        rapidjson::Value uuid_value;
-        uuid_value.SetString(uuid.c_str(), uuid.size(), m_config.GetAllocator());
-        m_config.AddMember("uuid", std::move(uuid_value), m_config.GetAllocator());
+        m_uuid = UUID::from_string(m_config["uuid"].GetString());
+        m_topic = m_config["topic"].GetString();
 
-        // FIXME
-        // For now we just instanciate a MemoryPartitionManager
+        std::string partition_type = m_config["type"].GetString();
+        auto partition_config = m_config.HasMember("partition") ? Metadata{m_config["partition"]}
+                                                                : Metadata{"{}"};
+
+        /* Create the partition manager */
         m_partition_manager = PartitionManagerFactory::create(
-            "memory", get_engine(), Metadata{"{}"});
+            partition_type, get_engine(), partition_config, dependencies);
 
-        spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), uuid);
+        spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), m_uuid.to_string());
+    }
+
+    static void ValidateConfig(const rapidjson::Value& config) {
+        /* Schema for any provider configuration */
+        static constexpr const char* configSchema = R"(
+        {
+            "$schema": "https://json-schema.org/draft/2019-09/schema",
+            "type": "object",
+            "properties": {
+                "uuid": { "type": "string" },
+                "type": { "type": "string" },
+                "topic": { "type": "string" },
+                "partition": { "type": "object" }
+            },
+            "required": ["uuid", "type", "topic"]
+        }
+        )";
+        static RapidJsonValidator jsonValidator{configSchema};
+
+        /* Validate configuration against schema */
+        auto errors = jsonValidator.validate(config);
+        if(!errors.empty()) {
+            spdlog::error("[mofka] Error(s) while validating JSON config for provider:");
+            for(auto& error : errors) spdlog::error("[mofka] \t{}", error);
+            throw Exception{"Error(s) while validating JSON config for provider"};
+        }
     }
 
     #define ENSURE_VALID_PARTITION_MANAGER(__result__) do { \
@@ -89,7 +118,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             return; \
         } \
     } while(0)
-
 
     void receiveBatch(const tl::request& req,
                       const std::string& producer_name,

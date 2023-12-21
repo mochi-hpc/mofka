@@ -124,12 +124,14 @@ class DefaultPartitionManager : public mofka::PartitionManager {
      *
      * @param engine Thallium engine
      * @param config Metadata configuration for the manager.
+     * @param dependencies Dependencies provided by Bedrock.
      *
      * @return a unique_ptr to a PartitionManager.
      */
     static std::unique_ptr<mofka::PartitionManager> create(
         const thallium::engine& engine,
-        const Metadata& config);
+        const Metadata& config,
+        const bedrock::ResolvedDependencyMap& dependencies);
 
 };
 

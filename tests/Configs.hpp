@@ -16,11 +16,6 @@ static inline const char* config = R"(
     },
     "providers" : [
         {
-            "name" : "my_mofka_provider",
-            "type" : "mofka",
-            "provider_id" : 0
-        },
-        {
             "name" : "my_warabi_provider",
             "type" : "warabi",
             "provider_id" : 1,
@@ -67,9 +62,9 @@ static inline void getPartitionArguments(
     } else if(partition_type == "default") {
         dependencies = {
             {"data", {"my_warabi_provider@local"}},
-            {"metadata", {"my_yokan_provider@local"}},
-            {"descriptors", {"my_yokan_provider@local"}}
+            {"metadata", {"my_yokan_provider@local"}}
         };
+        partition_config = mofka::Metadata{"{}"};
     }
 }
 

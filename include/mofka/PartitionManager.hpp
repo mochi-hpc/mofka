@@ -15,6 +15,7 @@
 #include <mofka/ConsumerHandle.hpp>
 #include <mofka/Factory.hpp>
 
+#include <bedrock/AbstractServiceFactory.hpp>
 #include <thallium.hpp>
 #include <unordered_map>
 #include <string_view>
@@ -140,11 +141,57 @@ class PartitionManager {
 
 };
 
+template <typename ManagerType>
+struct PartitionDependencyRegistrar;
+
+class PartitionManagerDependencyFactory {
+
+    public:
+
+    static inline std::vector<bedrock::Dependency> getDependencies(const std::string& type) {
+        auto& factory = instance();
+        auto it = factory.dependencies.find(type);
+        if(it == factory.dependencies.end()) return {};
+        return it->second;
+    }
+
+    private:
+
+    template<typename T>
+    friend struct PartitionDependencyRegistrar;
+
+    static PartitionManagerDependencyFactory& instance() {
+        static PartitionManagerDependencyFactory factory;
+        return factory;
+    }
+
+    std::unordered_map<std::string,
+                       std::vector<bedrock::Dependency>> dependencies;
+};
+
+template <typename ManagerType>
+struct PartitionDependencyRegistrar {
+
+    explicit PartitionDependencyRegistrar(
+            const std::string& key,
+            std::vector<bedrock::Dependency> deps)
+    {
+        PartitionManagerDependencyFactory::instance()
+            .dependencies[key] = std::move(deps);
+    }
+
+};
+
 using PartitionManagerFactory = Factory<PartitionManager,
-    const thallium::engine&, const Metadata&>;
+    const thallium::engine&, const Metadata&, const bedrock::ResolvedDependencyMap&>;
 
 #define MOFKA_REGISTER_PARTITION_MANAGER(__name__, __type__) \
     MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__)
+
+#define MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(__name__, __type__, ...) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__); \
+    static ::mofka::PartitionDependencyRegistrar<__type__> \
+        __mofkaDependencyRegistrarFor_ ## __type__ ## _ ## __name__{#__name__, {__VA_ARGS__}}
 
 } // namespace mofka
 

@@ -41,7 +41,6 @@ jobs:
         cd build
         cmake .. -DENABLE_TESTS=ON \
                  -DENABLE_EXAMPLES=ON \
-                 -DENABLE_BEDROCK=ON \
                  -DCMAKE_BUILD_TYPE=RelWithDebInfo
         make
         ctest --output-on-failure

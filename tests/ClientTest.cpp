@@ -12,8 +12,9 @@
 
 TEST_CASE("Client test", "[client]") {
 
-    spdlog::set_level(spdlog::level::from_str("critical"));
+    spdlog::set_level(spdlog::level::from_str("error"));
     auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
+    CAPTURE(partition_type);
 
     auto remove_file = EnsureFileRemoved{"mofka.ssg"};
 

@@ -14,6 +14,7 @@
 #include <mofka/PartitionSelector.hpp>
 #include <mofka/Metadata.hpp>
 
+#include <bedrock/DependencyMap.hpp>
 #include <thallium.hpp>
 #include <rapidjson/document.h>
 #include <memory>
@@ -106,7 +107,7 @@ class ServiceHandle {
      * Please refer to the partition type's documentation for more information
      * on its expected dependencies.
      */
-    typedef std::unordered_map<std::string, std::vector<std::string>> PartitionDependencies;
+    typedef bedrock::DependencyMap PartitionDependencies;
 
     /**
      * @brief Create a new partition at the given server rank and add it to the topic.

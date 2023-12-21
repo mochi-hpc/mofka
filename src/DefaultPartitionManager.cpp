@@ -16,7 +16,10 @@
 
 namespace mofka {
 
-MOFKA_REGISTER_PARTITION_MANAGER(default, DefaultPartitionManager);
+MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(
+    default, DefaultPartitionManager,
+    {"data", "warabi", BEDROCK_REQUIRED},
+    {"metadata", "yokan", BEDROCK_REQUIRED});
 
 Result<EventID> DefaultPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
@@ -200,28 +203,14 @@ Result<bool> DefaultPartitionManager::destroy() {
 }
 
 std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
-        const thallium::engine& engine, const Metadata& config) {
+        const thallium::engine& engine, const Metadata& config,
+        const bedrock::ResolvedDependencyMap& dependencies) {
 
     static constexpr const char* configSchema = R"(
     {
         "$schema": "https://json-schema.org/draft/2019-09/schema",
         "type": "object",
-        "properties":{
-            "data":{"$ref":"#/$defs/__provider_handle__"},
-            "metadata":{"$ref":"#/$defs/__provider_handle__"},
-            "descriptors":{"$ref":"#/$defs/__provider_handle__"}
-        },
-        "required":["data", "metadata", "descriptors"],
-        "$defs":{
-            "__provider_handle__":{
-                "type":"object",
-                "properties":{
-                    "__address__":{"type":"string"},
-                    "__provider_id__":{"type":"integer","minimum":0,"exclusiveMaximum":65535}
-                },
-                "required":["__address__", "__provider_id__"]
-            }
-        }
+        "properties":{}
     }
     )";
 
@@ -234,19 +223,28 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
         throw Exception{"Error(s) while validating JSON config for DefaultPartitionManager"};
     }
 
-    /* create the configuration Metadata for the datastore*/
-    rapidjson::Document datastore_config_doc;
-    datastore_config_doc.CopyFrom(config.json()["data"], datastore_config_doc.GetAllocator());
-    Metadata datastore_config{std::move(datastore_config_doc)};
+    /* check that the dependencies are there */
+    auto it = dependencies.find("data");
+    warabi::TargetHandle* warabi_target = nullptr;;
+    if(it == dependencies.end()) {
+        throw Exception{"Warabi TargetHandle not provided as dependency"};
+    } else {
+        warabi_target = it->second.dependencies[0]->getHandle<warabi::TargetHandle*>();
+    }
+    if(dependencies.count("metadata") == 0)
+        throw Exception{"Yokan DatabaseHandle not provided as dependency"};
 
     /* create data store */
-    auto data_store = WarabiDataStore::create(engine, std::move(datastore_config));
+    auto data_store = WarabiDataStore::create(engine, std::move(*warabi_target));
+
+    /* create the metadata store */
+    // TODO
 
     /* create topic manager */
     return std::unique_ptr<mofka::PartitionManager>(
         new DefaultPartitionManager(std::move(config),
-                                std::move(data_store),
-                                engine));
+                                    std::move(data_store),
+                                    engine));
 }
 
 }

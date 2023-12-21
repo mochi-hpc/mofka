@@ -28,7 +28,6 @@ class WarabiDataStore {
     };
 
     thallium::engine     m_engine;
-    Metadata             m_config;
     warabi::TargetHandle m_target;
 
     public:
@@ -128,39 +127,12 @@ class WarabiDataStore {
 
     WarabiDataStore(
             thallium::engine engine,
-            Metadata config,
             warabi::TargetHandle target)
     : m_engine(std::move(engine))
-    , m_config(std::move(config))
     , m_target(std::move(target)) {}
 
-    static std::unique_ptr<WarabiDataStore> create(thallium::engine engine, Metadata config) {
-
-        /* Schema to validate the configuration of a WarabiDataStore */
-        static constexpr const char* configSchema = R"(
-        {
-            "$schema": "https://json-schema.org/draft/2019-09/schema",
-            "type": "object"
-        }
-        )";
-        static RapidJsonValidator validator{configSchema};
-
-        const auto& jsonConfig = config.json();
-
-        /* Validate configuration against schema */
-        auto errors = validator.validate(jsonConfig);
-        if(!errors.empty()) {
-            spdlog::error("[mofka] Error(s) while validating JSON config for WarabiDataStore:");
-            for(auto& error : errors) spdlog::error("[mofka] \t{}", error);
-            throw Exception{"Error(s) while validating JSON config for WarabiDataStore"};
-        }
-
-        auto client      = warabi::Client{engine};
-        auto address     = jsonConfig["__address__"].GetString();
-        auto provider_id = jsonConfig["__provider_id__"].GetUint();
-        auto target      = client.makeTargetHandle(address, provider_id);
-
-        return std::make_unique<WarabiDataStore>(std::move(engine), std::move(config), std::move(target));
+    static std::unique_ptr<WarabiDataStore> create(thallium::engine engine, warabi::TargetHandle target) {
+        return std::make_unique<WarabiDataStore>(std::move(engine), std::move(target));
     }
 
 };

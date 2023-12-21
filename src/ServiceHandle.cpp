@@ -255,7 +255,7 @@ void ServiceHandle::addPartition(
     } catch(const bedrock::Exception& ex) {
         throw Exception{
             fmt::format(
-                "Could not create partition for topic \"{}\"."
+                "Could not create partition for topic \"{}\". "
                 "Bedrock error: {}", topic_name, ex.what())
         };
     }

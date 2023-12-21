@@ -12,9 +12,24 @@
 
 namespace mofka {
 
-Provider::Provider(const tl::engine& engine, uint16_t provider_id, const rapidjson::Value& config, const thallium::pool& p)
-: self(std::make_shared<ProviderImpl>(engine, provider_id, config, p)) {
+Provider::Provider(
+        const tl::engine& engine,
+        uint16_t provider_id,
+        const rapidjson::Value& config,
+        const thallium::pool& pool,
+        const bedrock::ResolvedDependencyMap& dependencies)
+: self(std::make_shared<ProviderImpl>(engine, provider_id, config, pool, dependencies)) {
     self->get_engine().push_finalize_callback(this, [p=this]() { p->self.reset(); });
+}
+
+std::vector<bedrock::Dependency> Provider::getDependencies(const Metadata& metadata) {
+    auto& json = metadata.json();
+    if(json.IsObject() && json.HasMember("type") && json["type"].IsString()) {
+        return PartitionManagerDependencyFactory::getDependencies(
+            json["type"].GetString()
+        );
+    }
+    return {};
 }
 
 Provider::Provider(Provider&& other) {
