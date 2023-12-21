@@ -9,15 +9,17 @@
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
 #include "Configs.hpp"
+#include "Ensure.hpp"
 
 TEST_CASE("Event consumer test", "[event-consumer]") {
 
-    spdlog::set_level(spdlog::level::from_str("critical"));
+    spdlog::set_level(spdlog::level::from_str("trace"));
     auto partition_type = GENERATE(as<std::string>{}, "memory");//, "default");
     CAPTURE(partition_type);
     auto remove_file = EnsureFileRemoved{"mofka.ssg"};
 
     auto server = bedrock::Server("na+sm", config);
+    ENSURE(server.finalize());
     auto gid = server.getSSGManager().getGroup("mofka_group")->getHandle<uint64_t>();
     auto engine = server.getMargoManager().getThalliumEngine();
 
@@ -64,7 +66,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 auto& doc = event.metadata().json();
                 REQUIRE(doc["event_num"].GetInt64() == i);
                 if(i % 5 == 0)
-                    event.acknowledge();
+                    REQUIRE_NOTHROW(event.acknowledge());
             }
         }
 
@@ -98,7 +100,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 auto& doc = event.metadata().json();
                 REQUIRE(doc["event_num"].GetInt64() == i);
                 if(i % 5 == 0)
-                    event.acknowledge();
+                    REQUIRE_NOTHROW(event.acknowledge());
                 if(i % 2 == 0) {
                     REQUIRE(event.data().segments().size() == 1);
                     auto data_str = std::string{
@@ -113,6 +115,4 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
             }
         }
     }
-
-    server.finalize();
 }

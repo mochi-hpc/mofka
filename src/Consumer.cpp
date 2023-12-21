@@ -101,7 +101,7 @@ void ConsumerImpl::start() {
 }
 
 void ConsumerImpl::join() {
-    // send a message to all the partition requesting to disconnect
+    // send a message to all the partitions requesting to disconnect
     auto& rpc = m_topic->m_service->m_client->m_consumer_remove_consumer;
     for(auto& partition : m_partitions) {
         auto& ph = partition.self->m_ph;

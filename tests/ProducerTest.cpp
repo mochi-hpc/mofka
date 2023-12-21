@@ -9,6 +9,7 @@
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
 #include "Configs.hpp"
+#include "Ensure.hpp"
 
 TEST_CASE("Producer test", "[producer]") {
 
@@ -18,6 +19,7 @@ TEST_CASE("Producer test", "[producer]") {
     auto remove_file = EnsureFileRemoved{"mofka.ssg"};
 
     auto server = bedrock::Server("na+sm", config);
+    ENSURE(server.finalize());
     auto gid = server.getSSGManager().getGroup("mofka_group")->getHandle<uint64_t>();
     auto engine = server.getMargoManager().getThalliumEngine();
 
@@ -49,6 +51,4 @@ TEST_CASE("Producer test", "[producer]") {
             REQUIRE(producer.topic().name() == "mytopic");
         }
     }
-
-    server.finalize();
 }
