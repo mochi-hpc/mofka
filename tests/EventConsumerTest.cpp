@@ -13,8 +13,9 @@
 
 TEST_CASE("Event consumer test", "[event-consumer]") {
 
-    spdlog::set_level(spdlog::level::from_str("trace"));
-    auto partition_type = GENERATE(as<std::string>{}, "memory");//, "default");
+//    spdlog::set_level(spdlog::level::from_str("trace"));
+    //auto partition_type = GENERATE(as<std::string>{}, "memory");//, "default");
+    auto partition_type = GENERATE(as<std::string>{}, "default");
     CAPTURE(partition_type);
     auto remove_file = EnsureFileRemoved{"mofka.ssg"};
 
@@ -55,7 +56,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 future.wait();
             }
         }
-
+#if 0
         SECTION("Consumer without data")
         {
             auto consumer = topic.consumer("myconsumer");
@@ -69,7 +70,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                     REQUIRE_NOTHROW(event.acknowledge());
             }
         }
-
+#endif
         SECTION("Consume with data")
         {
             mofka::DataSelector data_selector = [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {

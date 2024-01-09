@@ -32,7 +32,7 @@ class EventImpl {
 
     EventID               m_id;
     SP<PartitionInfoImpl> m_partition;
-    SP<ConsumerImpl>      m_consumer;
+    WP<ConsumerImpl>      m_consumer;
     SP<MetadataImpl>      m_metadata;
     SP<DataImpl>          m_data;
 };

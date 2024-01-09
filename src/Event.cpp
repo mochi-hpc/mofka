@@ -32,10 +32,13 @@ EventID Event::id() const {
 }
 
 void Event::acknowledge() const {
-    auto& rpc = self->m_consumer->m_topic->m_service->m_client->m_consumer_ack_event;
+    auto consumer = self->m_consumer.lock();
+    if(!consumer) {
+        throw Exception{"Consumer of this Event has disappeared"};
+    }
+    auto& rpc = consumer->m_topic->m_service->m_client->m_consumer_ack_event;
     auto& ph  = self->m_partition->m_ph;
-    rpc.on(ph)(self->m_consumer->m_name,
-               self->m_id);
+    rpc.on(ph)(consumer->m_name, self->m_id);
 }
 
 }
