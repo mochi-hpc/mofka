@@ -33,8 +33,8 @@ void ConsumerHandle::feed(
 {
     try {
         self->m_send_batch.on(self->m_consumer_endpoint)(
-            self->m_consumer_ctx,
-            self->m_target_info_index,
+            self->m_consumer_ptr,
+            self->m_partition_index,
             count,
             firstID,
             metadata_sizes,

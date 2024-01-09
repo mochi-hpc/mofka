@@ -18,6 +18,8 @@
 
 namespace mofka {
 
+class ConsumerImpl;
+
 namespace tl = thallium;
 
 class ClientImpl {
@@ -34,6 +36,11 @@ class ClientImpl {
     tl::remote_procedure m_consumer_recv_batch;
 
     bedrock::Client      m_bedrock_client;
+
+    // note: using unordered_map mapping the raw pointer to its weak_ptr version
+    // because std::unordered_set<std::weak_ptr<...>> is not possible.
+    std::unordered_map<ConsumerImpl*, std::weak_ptr<ConsumerImpl>> m_consumers;
+    tl::mutex                                                      m_consumers_mtx;
 
     ClientImpl(const tl::engine& engine)
     : m_engine(engine)

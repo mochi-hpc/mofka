@@ -30,7 +30,6 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
 
     thallium::engine                       m_engine;
     const std::string                      m_name;
-    const UUID                             m_uuid;
     const BatchSize                        m_batch_size;
     const SP<ThreadPoolImpl>               m_thread_pool;
     const DataBroker                       m_data_broker;
@@ -62,12 +61,6 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     bool                                                 m_futures_credit;
     thallium::mutex                                      m_futures_mtx;
 
-    /**
-     * Vector of eventuals that will be set on completion of the
-     * ULTs that pull events from each target.
-     */
-    std::vector<thallium::eventual<void>> m_pulling_ult_completed;
-
     ConsumerImpl(thallium::engine engine,
                  std::string_view name,
                  BatchSize batch_size,
@@ -78,31 +71,21 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
                  std::shared_ptr<TopicHandleImpl> topic)
     : m_engine(std::move(engine))
     , m_name(name)
-    , m_uuid(UUID::generate())
     , m_batch_size(batch_size)
     , m_thread_pool(std::move(thread_pool))
     , m_data_broker(std::move(broker))
     , m_data_selector(std::move(selector))
     , m_partitions(std::move(partitions))
     , m_topic(std::move(topic))
-    , m_self_addr(m_engine.self())
-    {
-        start();
-    }
+    , m_self_addr(m_engine.self()) {}
 
     ~ConsumerImpl() {
-        join();
+        unsubscribe();
     }
 
-    private:
+    void subscribe();
 
-    void start();
-
-    void join();
-
-    void pullFrom(
-        size_t target_info_index,
-        thallium::eventual<void>& ev);
+    void unsubscribe();
 
     void recvBatch(
         size_t target_info_index,

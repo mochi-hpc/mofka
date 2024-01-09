@@ -49,9 +49,11 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     // PartitionManager
     SP<PartitionManager> m_partition_manager;
     // Active consumers
-    std::unordered_map<UUID, SP<ConsumerHandleImpl>> m_consumers;
-    tl::mutex                                        m_consumers_mtx;
-    tl::condition_variable                           m_consumers_cv;
+    std::unordered_map<ConsumerKey,
+                       SP<ConsumerHandleImpl>,
+                       ConsumerKey::Hash>      m_consumers;
+    tl::mutex                                  m_consumers_mtx;
+    tl::condition_variable                     m_consumers_cv;
 
     ProviderImpl(const tl::engine& engine, uint16_t provider_id,
                  const rapidjson::Value& config, const tl::pool& pool,
@@ -135,29 +137,34 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
     void requestEvents(const tl::request& req,
                        intptr_t consumer_ctx,
-                       size_t target_info_index,
-                       const UUID& consumer_id,
+                       size_t partition_index,
                        const std::string& consumer_name,
                        size_t count,
                        size_t batch_size) {
         spdlog::trace("[mofka:{}] Received requestEvents request", id());
-        Result<void> result;
-        tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        ENSURE_VALID_PARTITION_MANAGER(result);
-        auto consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
-            consumer_ctx, target_info_index,
-            consumer_name, count, m_partition_manager,
-            req.get_endpoint(),
-            m_consumer_recv_batch);
+        SP<ConsumerHandleImpl> consumer_handle_impl;
+        auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
+
+        {
+            Result<void> result;
+            tl::auto_respond<decltype(result)> ensureResponse(req, result);
+            ENSURE_VALID_PARTITION_MANAGER(result);
+            consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
+                consumer_ctx, partition_index,
+                consumer_name, count, m_partition_manager,
+                req.get_endpoint(),
+                m_consumer_recv_batch);
+            {
+                auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
+                m_consumers.emplace(consumer_key, consumer_handle_impl);
+            }
+            m_consumers_cv.notify_all();
+        } // response is sent here
+
+        m_partition_manager->feedConsumer(consumer_handle_impl, BatchSize{batch_size});
         {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
-            m_consumers.emplace(consumer_id, consumer_handle_impl);
-        }
-        m_consumers_cv.notify_all();
-        result = m_partition_manager->feedConsumer(consumer_handle_impl, BatchSize{batch_size});
-        {
-            auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
-            m_consumers.erase(consumer_id);
+            m_consumers.erase(consumer_key);
         }
         spdlog::trace("[mofka:{}] Successfully executed requestEvents", id());
     }
@@ -174,14 +181,16 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     }
 
     void removeConsumer(const tl::request& req,
-                        const UUID& consumer_id) {
+                        intptr_t consumer_ctx,
+                        size_t partition_index) {
         spdlog::trace("[mofka:{}] Received removeConsumer request", id());
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
+        auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
         SP<ConsumerHandleImpl> consumer_handle_impl;
         while(!consumer_handle_impl) {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
-            auto it = m_consumers.find(consumer_id);
+            auto it = m_consumers.find(consumer_key);
             if(it != m_consumers.end()) {
                 consumer_handle_impl = it->second;
                 m_consumers.erase(it);

@@ -43,10 +43,12 @@ Consumer TopicHandle::makeConsumer(
         DataBroker data_broker,
         DataSelector data_selector,
         const std::vector<PartitionInfo>& targets) const {
-    return std::make_shared<ConsumerImpl>(
+    auto consumer = std::make_shared<ConsumerImpl>(
             self->m_service->m_client->m_engine,
             name, batch_size, thread_pool.self,
             data_broker, data_selector, targets, self);
+    consumer->subscribe();
+    return consumer;
 }
 
 const std::vector<PartitionInfo>& TopicHandle::partitions() const {

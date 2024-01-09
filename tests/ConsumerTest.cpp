@@ -49,7 +49,7 @@ TEST_CASE("Consumer test", "[consumer]") {
         SECTION("Create a consumer from the topic") {
             mofka::Consumer consumer;
             REQUIRE(!static_cast<bool>(consumer));
-            consumer = topic.consumer("myconsumer");
+            REQUIRE_NOTHROW(consumer = topic.consumer("myconsumer"));
             REQUIRE(static_cast<bool>(consumer));
             REQUIRE(consumer.name() == "myconsumer");
             REQUIRE(static_cast<bool>(consumer.topic()));

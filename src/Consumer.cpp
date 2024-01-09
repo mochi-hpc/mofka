@@ -88,44 +88,61 @@ NumEvents NumEvents::Infinity() {
     return NumEvents{std::numeric_limits<size_t>::max()};
 }
 
-void ConsumerImpl::start() {
-    // for each partition, submit a ULT that pulls from that partition
+void ConsumerImpl::subscribe() {
+    // add this ConsumerImpl to the Client's active consumers
+    auto& client               = m_topic->m_service->m_client;
+    auto& active_consumers     = client->m_consumers;
+    auto& active_consumers_mtx = client->m_consumers_mtx;
+    {
+        std::unique_lock g{active_consumers_mtx};
+        active_consumers[this] = shared_from_this();
+    }
+    // for each partition, send a subscription RPC to that partition
     auto n = m_partitions.size();
-    m_pulling_ult_completed.resize(n);
+    std::vector<thallium::eventual<void>> ult_completed(n);
     for(size_t i=0; i < n; ++i) {
         m_thread_pool->pushWork(
-            [this, i](){
-                pullFrom(i, m_pulling_ult_completed[i]);
-        });
-    }
-}
-
-void ConsumerImpl::join() {
-    // send a message to all the partitions requesting to disconnect
-    auto& rpc = m_topic->m_service->m_client->m_consumer_remove_consumer;
-    for(auto& partition : m_partitions) {
-        auto& ph = partition.self->m_ph;
-        rpc.on(ph)(m_uuid);
+            [this, i, &ult_completed, &client](){
+                auto& partition = m_partitions[i];
+                auto& rpc = client->m_consumer_request_events;
+                auto& ph = partition.self->m_ph;
+                auto consumer_ptr = reinterpret_cast<intptr_t>(this);
+                Result<void> result = rpc.on(ph)(consumer_ptr, i, m_name, 0, 0);
+                ult_completed[i].set_value();
+            }
+        );
     }
     // wait for the ULTs to complete
-    for(auto& ev : m_pulling_ult_completed)
+    for(auto& ev : ult_completed)
         ev.wait();
 }
 
-void ConsumerImpl::pullFrom(size_t partition_info_index,
-                            thallium::eventual<void>& ev) {
-    auto& partition = m_partitions[partition_info_index];
-    auto& rpc = m_topic->m_service->m_client->m_consumer_request_events;
-    auto& ph = partition.self->m_ph;
-    auto consumer_ctx = reinterpret_cast<intptr_t>(this);
-    Result<void> result =
-        rpc.on(ph)(consumer_ctx,
-                   partition_info_index,
-                   m_uuid,
-                   m_name,
-                   0, 0);
-    // TODO use max_item, batch_size (and some more options)
-    ev.set_value();
+void ConsumerImpl::unsubscribe() {
+    // send a message to all the partitions requesting to disconnect
+    auto& rpc = m_topic->m_service->m_client->m_consumer_remove_consumer;
+    auto n = m_partitions.size();
+    std::vector<thallium::eventual<void>> ult_completed(n);
+    for(size_t i=0; i < n; ++i) {
+        m_thread_pool->pushWork(
+            [this, i, &ult_completed, &rpc](){
+                auto& partition = m_partitions[i];
+                auto& ph = partition.self->m_ph;
+                auto consumer_ptr = reinterpret_cast<intptr_t>(this);
+                Result<void> result = rpc.on(ph)(consumer_ptr, i);
+                ult_completed[i].set_value();
+            }
+        );
+    }
+    // wait for the ULTs to complete
+    for(auto& ev : ult_completed)
+        ev.wait();
+    // remove from client's active consumers
+    auto& active_consumers     = m_topic->m_service->m_client->m_consumers;
+    auto& active_consumers_mtx = m_topic->m_service->m_client->m_consumers_mtx;
+    {
+        std::unique_lock g{active_consumers_mtx};
+        active_consumers.erase(this);
+    }
 }
 
 void ConsumerImpl::recvBatch(size_t partition_info_index,
