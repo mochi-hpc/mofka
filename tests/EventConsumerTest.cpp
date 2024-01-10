@@ -14,8 +14,7 @@
 TEST_CASE("Event consumer test", "[event-consumer]") {
 
 //    spdlog::set_level(spdlog::level::from_str("trace"));
-    //auto partition_type = GENERATE(as<std::string>{}, "memory");//, "default");
-    auto partition_type = GENERATE(as<std::string>{}, "default");
+    auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
     CAPTURE(partition_type);
     auto remove_file = EnsureFileRemoved{"mofka.ssg"};
 
