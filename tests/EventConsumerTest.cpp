@@ -56,13 +56,15 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 future.wait();
             }
         }
-#if 0
+
         SECTION("Consumer without data")
         {
-            auto consumer = topic.consumer("myconsumer");
+            mofka::Consumer consumer;
+            REQUIRE_NOTHROW(consumer = topic.consumer("myconsumer"));
             REQUIRE(static_cast<bool>(consumer));
             for(unsigned i=0; i < 100; ++i) {
-                auto event = consumer.pull().wait();
+                mofka::Event event;
+                REQUIRE_NOTHROW(event = consumer.pull().wait());
                 REQUIRE(event.id() == i);
                 auto& doc = event.metadata().json();
                 REQUIRE(doc["event_num"].GetInt64() == i);
@@ -70,7 +72,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                     REQUIRE_NOTHROW(event.acknowledge());
             }
         }
-#endif
+
         SECTION("Consume with data")
         {
             mofka::DataSelector data_selector = [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
@@ -85,7 +87,8 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
             mofka::DataBroker data_broker = [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
                 auto size = descriptor.size();
                 auto& doc = metadata.json();
-                if(doc["event_num"].GetInt64() % 2 == 0) {
+                auto event_id = doc["event_num"].GetInt64();
+                if(event_id % 2 == 0) {
                     auto data = new char[size];
                     return mofka::Data{data, size};
                 } else {

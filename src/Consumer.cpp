@@ -234,19 +234,27 @@ SP<DataImpl> ConsumerImpl::requestData(
         SP<PartitionInfoImpl> partition,
         SP<MetadataImpl> metadata,
         SP<DataDescriptorImpl> descriptor) {
+
     // run data selector
-    auto requested_descriptor = (m_data_selector && m_data_broker)
+    DataDescriptor requested_descriptor = m_data_selector
         ? m_data_selector(metadata, descriptor)
         : DataDescriptor::Null();
-    if(requested_descriptor.size() == 0)
-        return Data{}.self;
+
     // run data broker
-    auto data = m_data_broker(metadata, requested_descriptor);
+    auto data = m_data_broker
+        ? m_data_broker(metadata, requested_descriptor)
+        : Data{};
+
+    // check the size of the allocated data
     if(data.size() != requested_descriptor.size()) {
         throw Exception(
                 "DataBroker returned a Data object with a "
-                "size different from the DataDescriptor size");
+                "size different from the selected DataDescriptor size");
     }
+    if(data.size() == 0) {
+        return data.self;
+    }
+
     // expose the local_data_partition for RDMA
     std::vector<std::pair<void*, size_t>> segments;
     segments.reserve(data.segments().size());
@@ -258,6 +266,7 @@ SP<DataImpl> ConsumerImpl::requestData(
             0, data.size(),
             m_self_addr
     };
+
     // request data
     auto& rpc = m_topic->m_service->m_client->m_consumer_request_data;
     auto& ph  = partition->m_ph;
