@@ -203,7 +203,10 @@ Result<bool> DefaultPartitionManager::destroy() {
 }
 
 std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
-        const thallium::engine& engine, const Metadata& config,
+        const thallium::engine& engine,
+        const std::string& topic_name,
+        const UUID& partition_uuid,
+        const Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies) {
 
     static constexpr const char* configSchema = R"(
@@ -223,7 +226,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
         throw Exception{"Error(s) while validating JSON config for DefaultPartitionManager"};
     }
 
-    /* check that the dependencies are there */
+    /* Check that the dependencies are there */
     auto it = dependencies.find("data");
     warabi::TargetHandle* warabi_target = nullptr;;
     if(it == dependencies.end()) {
@@ -231,19 +234,26 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     } else {
         warabi_target = it->second.dependencies[0]->getHandle<warabi::TargetHandle*>();
     }
-    if(dependencies.count("metadata") == 0)
-        throw Exception{"Yokan DatabaseHandle not provided as dependency"};
+
+    yk_database_handle_t yokan_db = nullptr;
+    it = dependencies.find("metadata");
+    if(it == dependencies.end()) {
+        throw Exception{"Yokan Database not provided as dependency"};
+    } else {
+        yokan_db = it->second.dependencies[0]->getHandle<yk_database_handle_t>();
+    }
 
     /* create data store */
     auto data_store = WarabiDataStore::create(engine, std::move(*warabi_target));
 
-    /* create the metadata store */
-    // TODO
+    /* create event store */
+    auto event_store = YokanEventStore::create(engine, topic_name, partition_uuid, yokan_db);
 
     /* create topic manager */
     return std::unique_ptr<mofka::PartitionManager>(
         new DefaultPartitionManager(std::move(config),
                                     std::move(data_store),
+                                    std::move(event_store),
                                     engine));
 }
 

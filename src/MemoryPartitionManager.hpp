@@ -136,6 +136,8 @@ class MemoryPartitionManager : public mofka::PartitionManager {
      * create a MemoryPartitionManager.
      *
      * @param engine Thallium engine
+     * @param topic_name Topic name
+     * @param partition_uuid Partition UUID
      * @param config Metadata configuration for the manager.
      * @param dependencies Dependencies provided by Bedrock.
      *
@@ -143,6 +145,8 @@ class MemoryPartitionManager : public mofka::PartitionManager {
      */
     static std::unique_ptr<mofka::PartitionManager> create(
         const thallium::engine& engine,
+        const std::string& topic_name,
+        const UUID& partition_uuid,
         const Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies);
 

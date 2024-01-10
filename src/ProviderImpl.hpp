@@ -82,7 +82,8 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
         /* Create the partition manager */
         m_partition_manager = PartitionManagerFactory::create(
-            partition_type, get_engine(), partition_config, dependencies);
+            partition_type, get_engine(), m_topic, m_uuid,
+            partition_config, dependencies);
 
         spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), m_uuid.to_string());
     }

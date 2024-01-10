@@ -9,6 +9,7 @@
 #include <mofka/UUID.hpp>
 #include <mofka/PartitionManager.hpp>
 #include "WarabiDataStore.hpp"
+#include "YokanEventStore.hpp"
 
 namespace mofka {
 
@@ -18,7 +19,9 @@ namespace mofka {
 class DefaultPartitionManager : public mofka::PartitionManager {
 
     Metadata m_config;
+
     std::unique_ptr<WarabiDataStore> m_data_store;
+    std::unique_ptr<YokanEventStore> m_event_store;
 
     thallium::engine m_engine;
 
@@ -44,9 +47,11 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     DefaultPartitionManager(
         const Metadata& config,
         std::unique_ptr<WarabiDataStore> data_store,
+        std::unique_ptr<YokanEventStore> event_store,
         thallium::engine engine)
     : m_config(config)
     , m_data_store(std::move(data_store))
+    , m_event_store(std::move(event_store))
     , m_engine(engine) {}
 
     /**
@@ -122,7 +127,9 @@ class DefaultPartitionManager : public mofka::PartitionManager {
      * @brief Static factory function used by the TopicFactory to
      * create a DefaultPartitionManager.
      *
-     * @param engine Thallium engine
+     * @param engine Thallium engine.
+     * @param topic_name Topic name.
+     * @param partition_uuid Partition UUID..
      * @param config Metadata configuration for the manager.
      * @param dependencies Dependencies provided by Bedrock.
      *
@@ -130,6 +137,8 @@ class DefaultPartitionManager : public mofka::PartitionManager {
      */
     static std::unique_ptr<mofka::PartitionManager> create(
         const thallium::engine& engine,
+        const std::string& topic_name,
+        const UUID& partition_uuid,
         const Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies);
 

@@ -239,9 +239,13 @@ Result<bool> MemoryPartitionManager::destroy() {
 
 std::unique_ptr<mofka::PartitionManager> MemoryPartitionManager::create(
         const thallium::engine& engine,
+        const std::string& topic_name,
+        const UUID& partition_uuid,
         const Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies) {
     (void)dependencies;
+    (void)topic_name;
+    (void)partition_uuid;
     return std::unique_ptr<mofka::PartitionManager>(
         new MemoryPartitionManager(config, engine));
 }

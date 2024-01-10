@@ -183,7 +183,11 @@ struct PartitionDependencyRegistrar {
 };
 
 using PartitionManagerFactory = Factory<PartitionManager,
-    const thallium::engine&, const Metadata&, const bedrock::ResolvedDependencyMap&>;
+    const thallium::engine&,
+    const std::string&,   /* topic name */
+    const UUID&,          /* partition UUID */
+    const Metadata&,      /* partition config */
+    const bedrock::ResolvedDependencyMap&>;
 
 #define MOFKA_REGISTER_PARTITION_MANAGER(__name__, __type__) \
     MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__)
