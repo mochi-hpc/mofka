@@ -8,12 +8,15 @@
 
 #include "RapidJsonUtil.hpp"
 #include <yokan/cxx/collection.hpp>
+#include <mofka/ConsumerHandle.hpp>
+#include <mofka/BatchSize.hpp>
 #include <mofka/UUID.hpp>
 #include <mofka/EventID.hpp>
 #include <mofka/Result.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/DataDescriptor.hpp>
 #include <mofka/BulkRef.hpp>
+#include <mofka/BufferWrapperArchive.hpp>
 #include <spdlog/spdlog.h>
 #include <cstddef>
 #include <string_view>
@@ -35,9 +38,25 @@ class YokanEventStore {
             const BulkRef& remoteBulk) {
 
         Result<EventID> result;
+        std::vector<yk_id_t> ids(count);
 
-        /* lookup the sender. */
-        const auto source = m_engine.lookup(remoteBulk.address);
+        try {
+            m_metadata_coll.storeBulk(
+                count,
+                remoteBulk.handle.get_bulk(),
+                remoteBulk.offset,
+                remoteBulk.size,
+                ids.data(),
+                remoteBulk.address.c_str(),
+                YOKAN_MODE_DEFAULT);
+        } catch(const yokan::Exception& ex) {
+            result.success() = false;
+            result.error() = fmt::format(
+                "Yokan Collection::storeBulk failed: {}",
+                ex.what());
+        }
+
+        result.value() = ids[0];
 
         return result;
     }
@@ -46,6 +65,45 @@ class YokanEventStore {
         EventID firstID,
         const std::vector<DataDescriptor>& descriptors) {
 
+        Result<void> result;
+
+        const auto count = descriptors.size();
+        std::vector<size_t> descriptorSizes(count);
+        std::vector<yk_id_t> ids(count);
+        for(size_t i = 0; i < count; ++i) ids[i] = firstID + i;
+
+        std::vector<char> serializedDescriptors;
+        BufferWrapperOutputArchive outputArchive{serializedDescriptors};
+
+        size_t offset = 0;
+        for(size_t i = 0; i < count; ++i) {
+            auto& descriptor = descriptors[i];
+            descriptor.save(outputArchive);
+            descriptorSizes[i] = serializedDescriptors.size() - offset;
+            offset = serializedDescriptors.size();
+        }
+
+        try {
+            m_descriptors_coll.updatePacked(
+                count, ids.data(),
+                serializedDescriptors.data(),
+                descriptorSizes.data(),
+                YOKAN_MODE_UPDATE_NEW);
+        } catch(const yokan::Exception& ex) {
+            result.success() = false;
+            result.error() = fmt::format(
+                "Yokan Collection::updatePacked failed: {}",
+                ex.what());
+        }
+
+        return result;
+    }
+
+    Result<void> feed(
+            ConsumerHandle consumerHandle,
+            EventID firstID,
+            BatchSize batchSize) {
+        // TODO
     }
 
     YokanEventStore(

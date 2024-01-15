@@ -22,7 +22,7 @@ spack:
       lib64: [LD_LIBRARY_PATH]
   packages:
     mochi-yokan:
-      require: "@0.4.0:"
+      require: "@0.4.1:"
     mochi-warabi:
       require: "@0.2.0:"
     mochi-bedrock:
