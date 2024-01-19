@@ -12,7 +12,7 @@ spack:
   - mochi-bedrock+ssg
   - argobots@1.2rc1
   - mochi-warabi+bedrock
-  - mochi-yokan@main+bedrock
+  - mochi-yokan+bedrock
   concretizer:
     unify: true
     reuse: true
@@ -25,7 +25,7 @@ spack:
       providers:
         mpi: [mpich]
     mochi-yokan:
-      require: "@0.4.0:"
+      require: "@0.4.2:"
     mochi-warabi:
       require: "@0.2.0:"
     mochi-bedrock:
