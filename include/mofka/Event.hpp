@@ -10,7 +10,7 @@
 #include <mofka/Data.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Exception.hpp>
-#include <mofka/TargetSelector.hpp>
+#include <mofka/PartitionSelector.hpp>
 #include <mofka/EventID.hpp>
 
 #include <memory>
@@ -76,7 +76,7 @@ class Event {
      * @brief Returns information about the partition
      * this Event originates from.
      */
-    PartitionTargetInfo partition() const;
+    PartitionInfo partition() const;
 
     /**
      * @brief Returns the EventID.

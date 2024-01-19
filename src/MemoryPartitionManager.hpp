@@ -3,18 +3,18 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MEMORY_TOPIC_MANAGER_HPP
-#define MEMORY_TOPIC_MANAGER_HPP
+#ifndef MEMORY_PARTITION_MANAGER_HPP
+#define MEMORY_PARTITION_MANAGER_HPP
 
-#include <mofka/TopicManager.hpp>
+#include <mofka/PartitionManager.hpp>
 #include <mofka/DataDescriptor.hpp>
 
 namespace mofka {
 
 /**
- * Memory implementation of a mofka TopicManager.
+ * Memory implementation of a mofka PartitionManager.
  */
-class MemoryTopicManager : public mofka::TopicManager {
+class MemoryPartitionManager : public mofka::PartitionManager {
 
     struct OffsetSize {
 
@@ -32,9 +32,6 @@ class MemoryTopicManager : public mofka::TopicManager {
     };
 
     Metadata m_config;
-    Metadata m_validator;
-    Metadata m_selector;
-    Metadata m_serializer;
 
     thallium::engine m_engine;
 
@@ -59,57 +56,36 @@ class MemoryTopicManager : public mofka::TopicManager {
     /**
      * @brief Constructor.
      */
-    MemoryTopicManager(
+    MemoryPartitionManager(
         const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer,
         thallium::engine engine)
     : m_config(config)
-    , m_validator(validator)
-    , m_selector(selector)
-    , m_serializer(serializer)
     , m_engine(engine) {}
 
     /**
      * @brief Move-constructor.
      */
-    MemoryTopicManager(MemoryTopicManager&&) = default;
+    MemoryPartitionManager(MemoryPartitionManager&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    MemoryTopicManager(const MemoryTopicManager&) = delete;
+    MemoryPartitionManager(const MemoryPartitionManager&) = delete;
 
     /**
      * @brief Move-assignment operator.
      */
-    MemoryTopicManager& operator=(MemoryTopicManager&&) = default;
+    MemoryPartitionManager& operator=(MemoryPartitionManager&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    MemoryTopicManager& operator=(const MemoryTopicManager&) = delete;
+    MemoryPartitionManager& operator=(const MemoryPartitionManager&) = delete;
 
     /**
      * @brief Destructor.
      */
-    virtual ~MemoryTopicManager() = default;
-
-    /**
-     * @brief Get the Metadata of the Validator associated with this topic.
-     */
-    virtual Metadata getValidatorMetadata() const override;
-
-    /**
-     * @brief Get the Metadata of the TargetSelector associated with this topic.
-     */
-    virtual Metadata getTargetSelectorMetadata() const override;
-
-    /**
-     * @brief Get the Metadata of the Serializer associated with this topic.
-     */
-    virtual Metadata getSerializerMetadata() const override;
+    virtual ~MemoryPartitionManager() = default;
 
     /**
      * @brief Receives a batch.
@@ -122,26 +98,26 @@ class MemoryTopicManager : public mofka::TopicManager {
             const BulkRef& data_bulk) override;
 
     /**
-     * @brief Wake up the TopicManager's blocked ConsumerHandles.
+     * @brief Wake up the PartitionManager's blocked ConsumerHandles.
      */
     void wakeUp() override;
 
     /**
-     * @see TopicManager::feedConsumer.
+     * @see PartitionManager::feedConsumer.
      */
     Result<void> feedConsumer(
             ConsumerHandle consumerHandle,
             BatchSize batchSize) override;
 
     /**
-     * @see TopicManager::acknowledge.
+     * @see PartitionManager::acknowledge.
      */
     Result<void> acknowledge(
           std::string_view consumer_name,
           EventID event_id) override;
 
     /**
-     * @see TopicManager::getData.
+     * @see PartitionManager::getData.
      */
     Result<std::vector<Result<void>>> getData(
           const std::vector<DataDescriptor>& descriptors,
@@ -157,21 +133,22 @@ class MemoryTopicManager : public mofka::TopicManager {
 
     /**
      * @brief Static factory function used by the TopicFactory to
-     * create a MemoryTopicManager.
+     * create a MemoryPartitionManager.
      *
      * @param engine Thallium engine
+     * @param topic_name Topic name
+     * @param partition_uuid Partition UUID
      * @param config Metadata configuration for the manager.
-     * @param validator Metadata of the topic's Validator.
-     * @param serializer Metadata of the topic's Serializer.
+     * @param dependencies Dependencies provided by Bedrock.
      *
-     * @return a unique_ptr to a TopicManager.
+     * @return a unique_ptr to a PartitionManager.
      */
-    static std::unique_ptr<mofka::TopicManager> create(
+    static std::unique_ptr<mofka::PartitionManager> create(
         const thallium::engine& engine,
+        const std::string& topic_name,
+        const UUID& partition_uuid,
         const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer);
+        const bedrock::ResolvedDependencyMap& dependencies);
 
 };
 

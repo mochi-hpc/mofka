@@ -28,6 +28,11 @@ class MetadataImpl {
     : m_json(std::move(doc))
     , m_type(Type::ActualJson) {}
 
+    explicit MetadataImpl(const rapidjson::Value& doc)
+    : m_type(Type::ActualJson) {
+        m_json.CopyFrom(doc, m_json.GetAllocator());
+    }
+
     MetadataImpl(std::string str, bool validate)
     : m_string(std::move(str))
     , m_type(Type::String) {
@@ -47,7 +52,7 @@ class MetadataImpl {
     }
 
     void ensureJson() {
-        if(m_type & Type::ActualJson) return;
+        if((m_type & Type::ActualJson) == Type::ActualJson) return;
         m_json = rapidjson::Document{};
         rapidjson::ParseResult ok = m_json.Parse(m_string.c_str(), m_string.size());
         if(!ok) {

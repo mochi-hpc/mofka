@@ -121,7 +121,7 @@ struct RapidJsonValidator {
         return validate(config);
     }
 
-    ErrorList validate(const rapidjson::Document& config) const {
+    ErrorList validate(const rapidjson::Value& config) const {
         valijson::Validator validator;
         valijson::ValidationResults validationResults;
         valijson::adapters::RapidJsonAdapter jsonAdapter(config);

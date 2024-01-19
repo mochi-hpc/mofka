@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2.1.1
+      uses: actions/checkout@v4
 
     - name: Setup spack
-      uses: spack/setup-spack@v2
+      uses: spack/setup-spack@v2.1.1
       with:
         ref: develop
 
@@ -41,7 +41,15 @@ jobs:
         cd build
         cmake .. -DENABLE_TESTS=ON \
                  -DENABLE_EXAMPLES=ON \
-                 -DENABLE_BEDROCK=ON \
                  -DCMAKE_BUILD_TYPE=RelWithDebInfo
         make
         ctest --output-on-failure
+
+    - name: Push packages to buildcache and update index
+      if: ${{ !cancelled() }}
+      run: |
+        spack -e ubuntu-22.04 mirror set --push \
+          --oci-username ${{ github.actor }} \
+          --oci-password "${{ secrets.GITHUB_TOKEN }}" mochi-buildcache
+        spack -e ubuntu-22.04 buildcache push --base-image ubuntu:22.04 \
+          --unsigned --update-index mochi-buildcache

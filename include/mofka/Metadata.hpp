@@ -47,6 +47,14 @@ class Metadata {
     Metadata(rapidjson::Document json);
 
     /**
+     * @brief Constructor taking an already formed JSON document.
+     * The rapidjson::Value object will be copied.
+     *
+     * @param json
+     */
+    Metadata(const rapidjson::Value& json);
+
+    /**
      * @brief Copy-constructor.
      */
     Metadata(const Metadata&);

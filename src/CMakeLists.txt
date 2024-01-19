@@ -1,8 +1,8 @@
 # set source files
 set (server-src-files
      Provider.cpp
-     DefaultTopicManager.cpp
-     MemoryTopicManager.cpp)
+     DefaultPartitionManager.cpp
+     MemoryPartitionManager.cpp)
 
 set (client-src-files
      Client.cpp
@@ -15,15 +15,12 @@ set (client-src-files
      DataDescriptor.cpp
      Metadata.cpp
      Serializer.cpp
-     TargetSelector.cpp
-     PartitionTargetInfo.cpp
+     PartitionSelector.cpp
+     PartitionInfo.cpp
      Validator.cpp
      ThreadPool.cpp
      Event.cpp
      PrioPool.cpp)
-
-set (dummy-src-files
-     dummy/DummyTopicManager.cpp)
 
 set (module-src-files
      BedrockModule.cpp)
@@ -41,7 +38,7 @@ set (mofka-vers "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}")
 add_library (mofka-client ${client-src-files})
 target_link_libraries (mofka-client
     PUBLIC thallium PkgConfig::uuid rapidjson valijson bedrock-client
-    PRIVATE spdlog::spdlog fmt::fmt coverage_config warnings_config)
+    PRIVATE yokan::client spdlog::spdlog fmt::fmt coverage_config warnings_config)
 target_include_directories (mofka-client PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (mofka-client BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)

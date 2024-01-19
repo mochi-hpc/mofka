@@ -80,13 +80,13 @@ class DataDescriptor {
 
     /**
      * @brief Returns the root location (interpretable by the
-     * TopicManager that created this DataDescriptor).
+     * PartitionManager that created this DataDescriptor).
      */
     const std::vector<char>& location() const;
 
     /**
      * @brief Returns the root location (interpretable by the
-     * TopicManager that created this DataDescriptor).
+     * PartitionManager that created this DataDescriptor).
      */
     std::vector<char>& location();
 

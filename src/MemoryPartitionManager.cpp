@@ -3,34 +3,17 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "RapidJsonUtil.hpp"
-#include "DefaultTopicManager.hpp"
+#include "MemoryPartitionManager.hpp"
 #include "mofka/DataDescriptor.hpp"
 #include "mofka/BufferWrapperArchive.hpp"
-#include "RapidJsonUtil.hpp"
-#include <rapidjson/writer.h>
-#include <spdlog/spdlog.h>
 #include <numeric>
 #include <iostream>
 
-
 namespace mofka {
 
-MOFKA_REGISTER_TOPIC_MANAGER(default, DefaultTopicManager);
+MOFKA_REGISTER_PARTITION_MANAGER(memory, MemoryPartitionManager);
 
-Metadata DefaultTopicManager::getValidatorMetadata() const {
-    return m_validator;
-}
-
-Metadata DefaultTopicManager::getSerializerMetadata() const {
-    return m_serializer;
-}
-
-Metadata DefaultTopicManager::getTargetSelectorMetadata() const {
-    return m_selector;
-}
-
-Result<EventID> DefaultTopicManager::receiveBatch(
+Result<EventID> MemoryPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -73,15 +56,38 @@ Result<EventID> DefaultTopicManager::receiveBatch(
             m_events_metadata_offsets[i] = metadata_offset;
             metadata_offset += m_events_metadata_sizes[i];
         }
-        // --------- transfer the data to the DataStore
-        auto descriptors = m_data_store->store(num_events, data_bulk);
-        if(!descriptors.success()) {
-            result.success() = false;
-            result.error() = descriptors.error();
-            return result;
+        // --------- transfer the data
+        std::unique_lock<thallium::mutex> data_lock{m_events_data_mtx};
+        auto data_size = data_bulk.size - num_events*sizeof(size_t);
+        // resize the sizes and offsets arrays, and data array
+        if(m_events_data_sizes.capacity() < first_id + num_events) {
+            m_events_data_sizes.reserve(2*(first_id + num_events));
         }
-
-        // update the list of DataDescriptors
+        if(m_events_data_offsets.capacity() < first_id + num_events) {
+            m_events_data_offsets.reserve(2*(first_id + num_events));
+        }
+        m_events_data_sizes.resize(first_id + num_events);
+        m_events_data_offsets.resize(first_id + num_events);
+        size_t first_data_offset = m_events_data.size();
+        if(m_events_data.capacity() < first_data_offset + data_size) {
+            m_events_data.reserve(2*(first_data_offset + data_size));
+        }
+        m_events_data.resize(first_data_offset + data_size);
+        // transfer the data sizes and content
+        auto local_data_bulk = m_engine.expose(
+            {{(char*)(m_events_data_sizes.data() + first_id), num_events*sizeof(size_t)},
+             {m_events_data.data() + first_data_offset, data_size}},
+            thallium::bulk_mode::write_only);
+        local_data_bulk << data_bulk.handle.on(sender).select(
+            data_bulk.offset, data_bulk.size);
+        // TODO check that data_size = sum of m_events_data_sizes recveived
+        // update the data offsets vector
+        auto data_offset = first_data_offset;
+        for(size_t i = first_id; i < m_events_data_sizes.size(); ++i) {
+            m_events_data_offsets[i] = data_offset;
+            data_offset += m_events_data_sizes[i];
+        }
+        // update the DataDescriptor information
         size_t data_desc_offset = 0;
         if(!m_events_data_desc_offsets.empty())
             data_desc_offset = m_events_data_desc_offsets.back() + m_events_data_desc_sizes.back();
@@ -89,7 +95,8 @@ Result<EventID> DefaultTopicManager::receiveBatch(
         m_events_data_desc_offsets.resize(first_id + num_events);
         BufferWrapperOutputArchive output_archive{m_events_data_desc};
         for(size_t i = first_id; i < m_events_data_desc_sizes.size(); ++i) {
-            const auto& data_descriptor = descriptors.value()[i - first_id];
+            auto offset_size = OffsetSize{m_events_data_offsets[i], m_events_data_sizes[i]};
+            auto data_descriptor = DataDescriptor::From(offset_size.toString(), offset_size.size);
             size_t m_events_data_desc_size = m_events_data_desc.size();
             data_descriptor.save(output_archive);
             auto data_descriptor_size = m_events_data_desc.size() - m_events_data_desc_size;
@@ -103,11 +110,11 @@ Result<EventID> DefaultTopicManager::receiveBatch(
     return result;
 }
 
-void DefaultTopicManager::wakeUp() {
+void MemoryPartitionManager::wakeUp() {
     m_events_cv.notify_all();
 }
 
-Result<void> DefaultTopicManager::feedConsumer(
+Result<void> MemoryPartitionManager::feedConsumer(
     ConsumerHandle consumerHandle,
     BatchSize batchSize) {
     Result<void> result;
@@ -188,7 +195,7 @@ Result<void> DefaultTopicManager::feedConsumer(
     return result;
 }
 
-Result<void> DefaultTopicManager::acknowledge(
+Result<void> MemoryPartitionManager::acknowledge(
     std::string_view consumer_name,
     EventID event_id) {
     Result<void> result;
@@ -198,74 +205,49 @@ Result<void> DefaultTopicManager::acknowledge(
     return result;
 }
 
-Result<std::vector<Result<void>>> DefaultTopicManager::getData(
+Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
-    return m_data_store->load(descriptors, bulk);
+    Result<std::vector<Result<void>>> result;
+    result.value().resize(descriptors.size());
+
+    OffsetSize location;
+    location.fromDataDescriptor(descriptors[0]);
+
+    auto client = m_engine.lookup(bulk.address);
+
+    std::unique_lock<thallium::mutex> lock{m_events_data_mtx};
+    auto local_data_bulk = m_engine.expose(
+        {{m_events_data.data() + location.offset, location.size}},
+        thallium::bulk_mode::read_only);
+    bulk.handle.on(client) << local_data_bulk;
+
+    if(descriptors.size() != 1) {
+        result.error() = "Expected 1 descriptor";
+        result.success() = false;
+        return result;
+    }
+    return result;
 }
 
-Result<bool> DefaultTopicManager::destroy() {
+Result<bool> MemoryPartitionManager::destroy() {
     Result<bool> result;
     // TODO wait for all the consumers to be done consuming
     result.value() = true;
     return result;
 }
 
-std::unique_ptr<mofka::TopicManager> DefaultTopicManager::create(
+std::unique_ptr<mofka::PartitionManager> MemoryPartitionManager::create(
         const thallium::engine& engine,
+        const std::string& topic_name,
+        const UUID& partition_uuid,
         const Metadata& config,
-        const Metadata& validator,
-        const Metadata& selector,
-        const Metadata& serializer) {
-
-    static constexpr const char* configSchema = R"(
-    {
-        "$schema": "https://json-schema.org/draft/2019-09/schema",
-        "type": "object",
-        "properties":{
-            "data":{"$ref":"#/$defs/__provider_handle__"},
-            "metadata":{"$ref":"#/$defs/__provider_handle__"},
-            "descriptors":{"$ref":"#/$defs/__provider_handle__"}
-        },
-        "required":["data", "metadata", "descriptors"],
-        "$defs":{
-            "__provider_handle__":{
-                "type":"object",
-                "properties":{
-                    "__address__":{"type":"string"},
-                    "__provider_id__":{"type":"integer","minimum":0,"exclusiveMaximum":65535}
-                },
-                "required":["__address__", "__provider_id__"]
-            }
-        }
-    }
-    )";
-
-    /* Validate configuration against schema */
-    static RapidJsonValidator schemaValidator{configSchema};
-    auto validationErrors = schemaValidator.validate(config.json());
-    if(!validationErrors.empty()) {
-        spdlog::error("[mofka] Error(s) while validating JSON config for DefaultTopicManager:");
-        for(auto& error : validationErrors) spdlog::error("[mofka] \t{}", error);
-        throw Exception{"Error(s) while validating JSON config for DefaultTopicManager"};
-    }
-
-    /* create the configuration Metadata for the datastore*/
-    rapidjson::Document datastore_config_doc;
-    datastore_config_doc.CopyFrom(config.json()["data"], datastore_config_doc.GetAllocator());
-    Metadata datastore_config{std::move(datastore_config_doc)};
-
-    /* create data store */
-    auto data_store = WarabiDataStore::create(engine, std::move(datastore_config));
-
-    /* create topic manager */
-    return std::unique_ptr<mofka::TopicManager>(
-        new DefaultTopicManager(std::move(config),
-                                validator,
-                                selector,
-                                serializer,
-                                std::move(data_store),
-                                engine));
+        const bedrock::ResolvedDependencyMap& dependencies) {
+    (void)dependencies;
+    (void)topic_name;
+    (void)partition_uuid;
+    return std::unique_ptr<mofka::PartitionManager>(
+        new MemoryPartitionManager(config, engine));
 }
 
 }

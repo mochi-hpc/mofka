@@ -11,8 +11,8 @@ spack:
   - tclap
   - mochi-bedrock+ssg
   - argobots@1.2rc1
-  - mochi-warabi
-  - mochi-yokan
+  - mochi-warabi+bedrock
+  - mochi-yokan+bedrock
   concretizer:
     unify: true
     reuse: true
@@ -21,12 +21,15 @@ spack:
       lib: [LD_LIBRARY_PATH]
       lib64: [LD_LIBRARY_PATH]
   packages:
+    all:
+      providers:
+        mpi: [mpich]
     mochi-yokan:
-      require: "@0.4.0:"
+      require: "@0.4.2:"
     mochi-warabi:
       require: "@0.2.0:"
     mochi-bedrock:
-      require: "@0.8.1:"
+      require: "@0.8.3:"
     mercury:
       require: "~checksum~boostsys"
     libfabric:

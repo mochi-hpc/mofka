@@ -88,48 +88,64 @@ NumEvents NumEvents::Infinity() {
     return NumEvents{std::numeric_limits<size_t>::max()};
 }
 
-void ConsumerImpl::start() {
-    // for each target, submit a ULT that pulls from that target
-    auto n = m_targets.size();
-    m_pulling_ult_completed.resize(n);
+void ConsumerImpl::subscribe() {
+    // add this ConsumerImpl to the Client's active consumers
+    auto& client               = m_topic->m_service->m_client;
+    auto& active_consumers     = client->m_consumers;
+    auto& active_consumers_mtx = client->m_consumers_mtx;
+    {
+        std::unique_lock g{active_consumers_mtx};
+        active_consumers[this] = shared_from_this();
+    }
+    // for each partition, send a subscription RPC to that partition
+    auto n = m_partitions.size();
+    std::vector<thallium::eventual<void>> ult_completed(n);
     for(size_t i=0; i < n; ++i) {
         m_thread_pool->pushWork(
-            [this, i](){
-                pullFrom(i, m_pulling_ult_completed[i]);
-        });
-    }
-}
-
-void ConsumerImpl::join() {
-    // send a message to all the targets requesting to disconnect
-    auto& rpc = m_topic->m_service->m_client->m_consumer_remove_consumer;
-    for(auto& target : m_targets) {
-        auto& ph = target.self->m_ph;
-        rpc.on(ph)(m_uuid);
+            [this, i, &ult_completed, &client](){
+                auto& partition = m_partitions[i];
+                auto& rpc = client->m_consumer_request_events;
+                auto& ph = partition.self->m_ph;
+                auto consumer_ptr = reinterpret_cast<intptr_t>(this);
+                Result<void> result = rpc.on(ph)(consumer_ptr, i, m_name, 0, 0);
+                ult_completed[i].set_value();
+            }
+        );
     }
     // wait for the ULTs to complete
-    for(auto& ev : m_pulling_ult_completed)
+    for(auto& ev : ult_completed)
         ev.wait();
 }
 
-void ConsumerImpl::pullFrom(size_t target_info_index,
-                            thallium::eventual<void>& ev) {
-    auto& target = m_targets[target_info_index];
-    auto& rpc = m_topic->m_service->m_client->m_consumer_request_events;
-    auto& ph = target.self->m_ph;
-    auto consumer_ctx = reinterpret_cast<intptr_t>(this);
-    Result<void> result =
-        rpc.on(ph)(m_topic->m_name,
-                   consumer_ctx,
-                   target_info_index,
-                   m_uuid,
-                   m_name,
-                   0, 0);
-    // TODO use max_item, batch_size (and some more options)
-    ev.set_value();
+void ConsumerImpl::unsubscribe() {
+    // send a message to all the partitions requesting to disconnect
+    auto& rpc = m_topic->m_service->m_client->m_consumer_remove_consumer;
+    auto n = m_partitions.size();
+    std::vector<thallium::eventual<void>> ult_completed(n);
+    for(size_t i=0; i < n; ++i) {
+        m_thread_pool->pushWork(
+            [this, i, &ult_completed, &rpc](){
+                auto& partition = m_partitions[i];
+                auto& ph = partition.self->m_ph;
+                auto consumer_ptr = reinterpret_cast<intptr_t>(this);
+                Result<void> result = rpc.on(ph)(consumer_ptr, i);
+                ult_completed[i].set_value();
+            }
+        );
+    }
+    // wait for the ULTs to complete
+    for(auto& ev : ult_completed)
+        ev.wait();
+    // remove from client's active consumers
+    auto& active_consumers     = m_topic->m_service->m_client->m_consumers;
+    auto& active_consumers_mtx = m_topic->m_service->m_client->m_consumers_mtx;
+    {
+        std::unique_lock g{active_consumers_mtx};
+        active_consumers.erase(this);
+    }
 }
 
-void ConsumerImpl::recvBatch(size_t target_info_index,
+void ConsumerImpl::recvBatch(size_t partition_info_index,
                              size_t count,
                              EventID startID,
                              const BulkRef &metadata_sizes,
@@ -137,7 +153,7 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
                              const BulkRef &data_desc_sizes,
                              const BulkRef &data_desc) {
 
-    auto& target = m_targets[target_info_index];
+    auto& partition = m_partitions[partition_info_index];
 
     auto batch = std::make_shared<ConsumerBatchImpl>(
         m_engine, count, metadata.size, data_desc.size);
@@ -173,7 +189,7 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
         }
         // create new event instance
         auto event_impl = std::make_shared<EventImpl>(
-            eventID, target.self, shared_from_this());
+            eventID, partition.self, shared_from_this());
         // create the ULT
         auto ult = [this, &batch, i, event_impl, promise,
                     metadata_offset, data_desc_offset,
@@ -184,18 +200,18 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
                 BufferWrapperInputArchive metadata_archive{
                     std::string_view{
                         batch->m_meta_buffer.data() + metadata_offset,
-                            batch->m_meta_sizes[i]}};
+                        batch->m_meta_sizes[i]}};
                 serializer.deserialize(metadata_archive, metadata);
                 // deserialize the data descriptors
                 BufferWrapperInputArchive descriptors_archive{
                     std::string_view{
                         batch->m_data_desc_buffer.data() + data_desc_offset,
-                            batch->m_data_desc_sizes[i]}};
+                        batch->m_data_desc_sizes[i]}};
                 DataDescriptor descriptor;
                 descriptor.load(descriptors_archive);
                 // request Data associated with the event
                 event_impl->m_data = requestData(
-                        event_impl->m_target,
+                        event_impl->m_partition,
                         event_impl->m_metadata,
                         descriptor.self);
                 // set the promise
@@ -215,23 +231,31 @@ void ConsumerImpl::recvBatch(size_t target_info_index,
 }
 
 SP<DataImpl> ConsumerImpl::requestData(
-        SP<PartitionTargetInfoImpl> target,
+        SP<PartitionInfoImpl> partition,
         SP<MetadataImpl> metadata,
         SP<DataDescriptorImpl> descriptor) {
+
     // run data selector
-    auto requested_descriptor = (m_data_selector && m_data_broker)
+    DataDescriptor requested_descriptor = m_data_selector
         ? m_data_selector(metadata, descriptor)
         : DataDescriptor::Null();
-    if(requested_descriptor.size() == 0)
-        return Data{}.self;
+
     // run data broker
-    auto data = m_data_broker(metadata, requested_descriptor);
+    auto data = m_data_broker
+        ? m_data_broker(metadata, requested_descriptor)
+        : Data{};
+
+    // check the size of the allocated data
     if(data.size() != requested_descriptor.size()) {
         throw Exception(
                 "DataBroker returned a Data object with a "
-                "size different from the DataDescriptor size");
+                "size different from the selected DataDescriptor size");
     }
-    // expose the local_data_target for RDMA
+    if(data.size() == 0) {
+        return data.self;
+    }
+
+    // expose the local_data_partition for RDMA
     std::vector<std::pair<void*, size_t>> segments;
     segments.reserve(data.segments().size());
     for(auto& s : data.segments()) {
@@ -242,12 +266,12 @@ SP<DataImpl> ConsumerImpl::requestData(
             0, data.size(),
             m_self_addr
     };
+
     // request data
     auto& rpc = m_topic->m_service->m_client->m_consumer_request_data;
-    auto& ph  = target->m_ph;
+    auto& ph  = partition->m_ph;
 
     Result<std::vector<Result<void>>> result = rpc.on(ph)(
-            m_topic->m_name,
             Cerealized<DataDescriptor>(descriptor),
             local_bulk_ref);
 

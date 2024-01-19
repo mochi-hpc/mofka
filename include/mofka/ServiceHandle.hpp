@@ -11,9 +11,10 @@
 #include <mofka/Exception.hpp>
 #include <mofka/Serializer.hpp>
 #include <mofka/Validator.hpp>
-#include <mofka/TargetSelector.hpp>
+#include <mofka/PartitionSelector.hpp>
 #include <mofka/Metadata.hpp>
 
+#include <bedrock/DependencyMap.hpp>
 #include <thallium.hpp>
 #include <rapidjson/document.h>
 #include <memory>
@@ -22,14 +23,6 @@
 namespace mofka {
 
 class ServiceHandleImpl;
-
-struct TopicBackendConfig : public Metadata {
-
-    template<typename ... Args>
-    TopicBackendConfig(Args&&... args)
-    : Metadata(std::forward<Args>(args)...) {}
-
-};
 
 /**
  * @brief A ServiceHandle object is a handle for a Mofka service
@@ -83,21 +76,22 @@ class ServiceHandle {
     operator bool() const;
 
     /**
+     * @brief Returns the number of servers this service currently has.
+     */
+    size_t numServers() const;
+
+    /**
      * @brief Create a topic with a given name, if it does not exist yet.
      *
      * @param name Name of the topic.
-     * @param config Json configuration of the topic's backend.
      * @param validator Validator object to validate events pushed to the topic.
-     * @param selector TargetSelector object of the topic.
+     * @param selector PartitionSelector object of the topic.
      * @param serializer Serializer to use for all the events in the topic.
-     *
-     * @return a TopicHandle representing the topic.
      */
-    TopicHandle createTopic(std::string_view name,
-                            TopicBackendConfig config = TopicBackendConfig{},
-                            Validator validator = Validator{},
-                            TargetSelector selector = TargetSelector{},
-                            Serializer serializer = Serializer{});
+    void createTopic(std::string_view name,
+                     Validator validator = Validator{},
+                     PartitionSelector selector = PartitionSelector{},
+                     Serializer serializer = Serializer{});
 
     /**
      * @brief Open an existing topic with the given name.
@@ -107,6 +101,30 @@ class ServiceHandle {
      * @return a TopicHandle representing the topic.
      */
     TopicHandle openTopic(std::string_view name);
+
+    /**
+     * @brief Map of dependency descriptors for the partition.
+     * Please refer to the partition type's documentation for more information
+     * on its expected dependencies.
+     */
+    typedef bedrock::DependencyMap PartitionDependencies;
+
+    /**
+     * @brief Create a new partition at the given server rank and add it to the topic.
+     *
+     * @param topic_name Name of the topic.
+     * @param server_rank Rank of the server.
+     * @param partition_type Type of partition.
+     * @param partition_config Configuration for the partition.
+     * @param dependencies Map of dependencies expected by the partition.
+     * @param pool_name Pool name in the server.
+     */
+    void addPartition(std::string_view topic_name,
+                      size_t server_rank,
+                      std::string_view partition_type = "memory",
+                      const Metadata& partition_config = Metadata{"{}"},
+                      const PartitionDependencies& dependencies = {},
+                      std::string_view pool_name = "");
 
     private:
 

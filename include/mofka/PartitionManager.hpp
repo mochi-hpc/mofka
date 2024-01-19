@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_TOPIC_MANAGER_HPP
-#define MOFKA_TOPIC_MANAGER_HPP
+#ifndef MOFKA_PARTITION_MANAGER_HPP
+#define MOFKA_PARTITION_MANAGER_HPP
 
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Result.hpp>
@@ -15,75 +15,53 @@
 #include <mofka/ConsumerHandle.hpp>
 #include <mofka/Factory.hpp>
 
+#include <bedrock/AbstractServiceFactory.hpp>
 #include <thallium.hpp>
 #include <unordered_map>
 #include <string_view>
 #include <functional>
 
-#if 0
-/**
- * @brief Helper class to register backend types into the backend factory.
- */
-template<typename TopicManagerType>
-class __MofkaTopicManagerRegistration;
-#endif
-
 namespace mofka {
 
 /**
  * @brief Interface for topic backends. To build a new backend,
- * implement a class MyTopicManager that inherits from TopicManager, and put
- * MOFKA_REGISTER_BACKEND(mybackend, MyTopicManager); in a cpp file
+ * implement a class MyPartitionManager that inherits from PartitionManager, and put
+ * MOFKA_REGISTER_PARTITION_MANAGER(mybackend, MyPartitionManager); in a cpp file
  * that includes your backend class' header file.
  */
-class TopicManager {
+class PartitionManager {
 
     public:
 
     /**
      * @brief Constructor.
      */
-    TopicManager() = default;
+    PartitionManager() = default;
 
     /**
      * @brief Move-constructor.
      */
-    TopicManager(TopicManager&&) = default;
+    PartitionManager(PartitionManager&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    TopicManager(const TopicManager&) = default;
+    PartitionManager(const PartitionManager&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    TopicManager& operator=(TopicManager&&) = default;
+    PartitionManager& operator=(PartitionManager&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    TopicManager& operator=(const TopicManager&) = default;
+    PartitionManager& operator=(const PartitionManager&) = default;
 
     /**
      * @brief Destructor.
      */
-    virtual ~TopicManager() = default;
-
-    /**
-     * @brief Get the Metadata of the Validator associated with this topic.
-     */
-    virtual Metadata getValidatorMetadata() const = 0;
-
-    /**
-     * @brief Get the Metadata of the TargetSelector associated with this topic.
-     */
-    virtual Metadata getTargetSelectorMetadata() const = 0;
-
-    /**
-     * @brief Get the Metadata of the Serializer associated with this topic.
-     */
-    virtual Metadata getSerializerMetadata() const = 0;
+    virtual ~PartitionManager() = default;
 
     /**
      * @brief Receive a batch of events from a sender.
@@ -119,13 +97,13 @@ class TopicManager {
 
     /**
      * @brief Attach a ConsumerHandle to the topic, i.e. make the
-     * TopicManager feed the ConsumerHandle batches of events.
+     * PartitionManager feed the ConsumerHandle batches of events.
      *
      * The feedConsumer function should keep feeding the ConsumerHandle
      * with events (blocking if there is no new events yet) until its
      * feed() function returns false.
      *
-     * Multiple ConsumderHandle may be fed in parallel. The TopicManager
+     * Multiple ConsumderHandle may be fed in parallel. The PartitionManager
      * is responsible for feeding each event only once.
      *
      * @param consumerHandle ConsumerHandle to feed event batches.
@@ -163,15 +141,61 @@ class TopicManager {
 
 };
 
-using TopicManagerFactory = Factory<TopicManager,
-    const thallium::engine&,
-    const Metadata&,
-    const Metadata&,
-    const Metadata&,
-    const Metadata&>;
+template <typename ManagerType>
+struct PartitionDependencyRegistrar;
 
-#define MOFKA_REGISTER_TOPIC_MANAGER(__name__, __type__) \
-    MOFKA_REGISTER_IMPLEMENTATION_FOR(TopicManagerFactory, __type__, __name__)
+class PartitionManagerDependencyFactory {
+
+    public:
+
+    static inline std::vector<bedrock::Dependency> getDependencies(const std::string& type) {
+        auto& factory = instance();
+        auto it = factory.dependencies.find(type);
+        if(it == factory.dependencies.end()) return {};
+        return it->second;
+    }
+
+    private:
+
+    template<typename T>
+    friend struct PartitionDependencyRegistrar;
+
+    static PartitionManagerDependencyFactory& instance() {
+        static PartitionManagerDependencyFactory factory;
+        return factory;
+    }
+
+    std::unordered_map<std::string,
+                       std::vector<bedrock::Dependency>> dependencies;
+};
+
+template <typename ManagerType>
+struct PartitionDependencyRegistrar {
+
+    explicit PartitionDependencyRegistrar(
+            const std::string& key,
+            std::vector<bedrock::Dependency> deps)
+    {
+        PartitionManagerDependencyFactory::instance()
+            .dependencies[key] = std::move(deps);
+    }
+
+};
+
+using PartitionManagerFactory = Factory<PartitionManager,
+    const thallium::engine&,
+    const std::string&,   /* topic name */
+    const UUID&,          /* partition UUID */
+    const Metadata&,      /* partition config */
+    const bedrock::ResolvedDependencyMap&>;
+
+#define MOFKA_REGISTER_PARTITION_MANAGER(__name__, __type__) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__)
+
+#define MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(__name__, __type__, ...) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__); \
+    static ::mofka::PartitionDependencyRegistrar<__type__> \
+        __mofkaDependencyRegistrarFor_ ## __type__ ## _ ## __name__{#__name__, {__VA_ARGS__}}
 
 } // namespace mofka
 

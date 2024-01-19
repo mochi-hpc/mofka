@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_TARGET_SELECTOR_HPP
-#define MOFKA_TARGET_SELECTOR_HPP
+#ifndef MOFKA_PARTITION_SELECTOR_HPP
+#define MOFKA_PARTITION_SELECTOR_HPP
 
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/UUID.hpp>
@@ -18,21 +18,21 @@
 
 namespace mofka {
 
-class PartitionTargetInfoImpl;
+class PartitionInfoImpl;
 class TopicHandleImpl;
 class ClientImpl;
 class ServiceHandle;
 class ConsumerImpl;
 
 /**
- * @brief The PartitionTargetInfo structure holds information about
+ * @brief The PartitionInfo structure holds information about
  * a particular Mofka provider holding a partition of a topic. The
  * public interface allows accessing a server address, provider id,
  * and a UUID. Contrary to the address and provider id, the UUID
  * is meant not to change when the service is restarted or when
  * the partition migrates to another server.
  */
-class PartitionTargetInfo {
+class PartitionInfo {
 
     public:
 
@@ -55,27 +55,27 @@ class PartitionTargetInfo {
     /**
      * @brief Move constructor.
      */
-    PartitionTargetInfo(PartitionTargetInfo&&);
+    PartitionInfo(PartitionInfo&&);
 
     /**
      * @brief Copy constructor.
      */
-    PartitionTargetInfo(const PartitionTargetInfo&);
+    PartitionInfo(const PartitionInfo&);
 
     /**
      * @brief Move-assignment operator.
      */
-    PartitionTargetInfo& operator=(PartitionTargetInfo&&);
+    PartitionInfo& operator=(PartitionInfo&&);
 
     /**
      * @brief Copy-assignment operator.
      */
-    PartitionTargetInfo& operator=(const PartitionTargetInfo&);
+    PartitionInfo& operator=(const PartitionInfo&);
 
     /**
      * @brief Destructor.
      */
-    ~PartitionTargetInfo();
+    ~PartitionInfo();
 
     /**
      * @brief Checks for the validity of the internal self pointer.
@@ -84,11 +84,11 @@ class PartitionTargetInfo {
 
     private:
 
-    std::shared_ptr<PartitionTargetInfoImpl> self;
+    std::shared_ptr<PartitionInfoImpl> self;
 
-    PartitionTargetInfo(const std::shared_ptr<PartitionTargetInfoImpl>& impl);
+    PartitionInfo(const std::shared_ptr<PartitionInfoImpl>& impl);
 
-    friend class std::hash<PartitionTargetInfo>;
+    friend class std::hash<PartitionInfo>;
     friend class TopicHandleImpl;
     friend class ClientImpl;
     friend class Producer;
@@ -98,36 +98,36 @@ class PartitionTargetInfo {
 };
 
 /**
- * @brief The TargetSelectorInterface class provides an interface for
+ * @brief The PartitionSelectorInterface class provides an interface for
  * objects that decide how which target server will receive each
  * event.
  *
- * A TargetSelectorInterface must also provide functions to convert
+ * A PartitionSelectorInterface must also provide functions to convert
  * itself into a Metadata object an back, so that its internal
  * configuration can be stored.
  */
-class TargetSelectorInterface {
+class PartitionSelectorInterface {
 
     public:
 
     /**
      * @brief Destructor.
      */
-    virtual ~TargetSelectorInterface() = default;
+    virtual ~PartitionSelectorInterface() = default;
 
     /**
      * @brief Sets the list of targets that are available to store events.
      *
-     * @param targets Vector of PartitionTargetInfo.
+     * @param targets Vector of PartitionInfo.
      */
-    virtual void setTargets(const std::vector<PartitionTargetInfo>& targets) = 0;
+    virtual void setPartitions(const std::vector<PartitionInfo>& targets) = 0;
 
     /**
      * @brief Selects a partition target to use to store the given event.
      *
      * @param metadata Metadata of the event.
      */
-    virtual PartitionTargetInfo selectTargetFor(const Metadata& metadata) = 0;
+    virtual PartitionInfo selectPartitionFor(const Metadata& metadata) = 0;
 
     /**
      * @brief Convert the underlying validator implementation into a Metadata
@@ -137,48 +137,48 @@ class TargetSelectorInterface {
     virtual Metadata metadata() const = 0;
 
     /**
-     * @note A TargetSelectorInterface class must also provide a static create
+     * @note A PartitionSelectorInterface class must also provide a static create
      * function with the following prototype, instanciating a shared_ptr of
      * the class from the provided Metadata:
      *
-     * static std::shared_ptr<TargetSelectorInterface> create(const Metadata&);
+     * static std::shared_ptr<PartitionSelectorInterface> create(const Metadata&);
      */
 };
 
-class TargetSelector {
+class PartitionSelector {
 
     public:
 
     /**
-     * @brief Constructor. Will construct a valid TargetSelector that accepts
+     * @brief Constructor. Will construct a valid PartitionSelector that accepts
      * any Metadata correctly formatted in JSON.
      */
-    TargetSelector();
+    PartitionSelector();
 
     /**
      * @brief Copy-constructor.
      */
-    TargetSelector(const TargetSelector&);
+    PartitionSelector(const PartitionSelector&);
 
     /**
      * @brief Move-constructor.
      */
-    TargetSelector(TargetSelector&&);
+    PartitionSelector(PartitionSelector&&);
 
     /**
      * @brief copy-assignment operator.
      */
-    TargetSelector& operator=(const TargetSelector&);
+    PartitionSelector& operator=(const PartitionSelector&);
 
     /**
      * @brief Move-assignment operator.
      */
-    TargetSelector& operator=(TargetSelector&&);
+    PartitionSelector& operator=(PartitionSelector&&);
 
     /**
      * @brief Destructor.
      */
-    ~TargetSelector();
+    ~PartitionSelector();
 
     /**
      * @brief Checks for the validity of the underlying pointer.
@@ -188,16 +188,16 @@ class TargetSelector {
     /**
      * @brief Sets the list of targets that are available to store events.
      *
-     * @param targets Vector of PartitionTargetInfo.
+     * @param targets Vector of PartitionInfo.
      */
-    void setTargets(const std::vector<PartitionTargetInfo>& targets);
+    void setPartitions(const std::vector<PartitionInfo>& targets);
 
     /**
      * @brief Selects a partition target to use to store the given event.
      *
      * @param metadata Metadata of the event.
      */
-    PartitionTargetInfo selectTargetFor(const Metadata& metadata);
+    PartitionInfo selectPartitionFor(const Metadata& metadata);
 
     /**
      * @brief Convert the underlying validator implementation into a Metadata
@@ -207,26 +207,26 @@ class TargetSelector {
     Metadata metadata() const;
 
     /**
-     * @brief Factory function to create a TargetSelector instance
+     * @brief Factory function to create a PartitionSelector instance
      * when the underlying implementation is not known.
      *
-     * @param metadata Metadata of the TargetSelector.
+     * @param metadata Metadata of the PartitionSelector.
      *
-     * @return TargetSelector instance.
+     * @return PartitionSelector instance.
      */
-    static TargetSelector FromMetadata(const Metadata& metadata);
+    static PartitionSelector FromMetadata(const Metadata& metadata);
 
     private:
 
-    std::shared_ptr<TargetSelectorInterface> self;
+    std::shared_ptr<PartitionSelectorInterface> self;
 
-    TargetSelector(const std::shared_ptr<TargetSelectorInterface>& impl);
+    PartitionSelector(const std::shared_ptr<PartitionSelectorInterface>& impl);
 };
 
-using TargetSelectorFactory = Factory<TargetSelectorInterface, const Metadata&>;
+using PartitionSelectorFactory = Factory<PartitionSelectorInterface, const Metadata&>;
 
-#define MOFKA_REGISTER_TARGET_SELECTOR(__name__, __type__) \
-    MOFKA_REGISTER_IMPLEMENTATION_FOR(TargetSelectorFactory, __type__, __name__)
+#define MOFKA_REGISTER_PARTITION_SELECTOR(__name__, __type__) \
+    MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionSelectorFactory, __type__, __name__)
 
 }
 

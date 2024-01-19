@@ -29,55 +29,55 @@ const thallium::engine& Client::engine() const {
     return self->m_engine;
 }
 
-std::vector<PartitionTargetInfo> ClientImpl::discoverMofkaTargets(
-        const tl::engine& engine,
-        const bedrock::ServiceGroupHandle bsgh) {
+std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
+        const bedrock::ServiceGroupHandle& bsgh) {
     std::string configs;
-    bsgh.getConfig(&configs);
+    constexpr const char* script = R"(
+        $result = [];
+        foreach($__config__.providers as $p) {
+            if($p.type != "yokan") continue;
+            foreach($p.tags as $tag) {
+                if($tag != "mofka:master") continue;
+                array_push($result, $p.provider_id);
+            }
+        }
+        return $result;
+    )";
+    bsgh.queryConfig(script, &configs);
     rapidjson::Document doc;
     doc.Parse(configs.c_str(), configs.size());
-    std::vector<PartitionTargetInfo> mofka_targets;
+    std::vector<std::pair<std::string, uint16_t>> masters;
     for(auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
         const auto& address = it->name.GetString();
-        const auto endpoint = engine.lookup(address);
-        const auto& config  = it->value;
-        const auto& providers = config["providers"];
-        for(auto& provider : providers.GetArray()) {
-            if(provider["type"] != "mofka") continue;
-            uint16_t provider_id = provider["provider_id"].GetInt();
-            auto uuid = UUID::from_string(provider["config"]["uuid"].GetString());
-            auto target_impl = std::make_shared<PartitionTargetInfoImpl>(
-                uuid, tl::provider_handle(endpoint, provider_id));
-            mofka_targets.emplace_back(PartitionTargetInfo(target_impl));
+        auto& provider_ids = it->value;
+        for(auto jt = provider_ids.Begin(); jt != provider_ids.End(); ++jt) {
+            masters.push_back({address, jt->GetUint()});
         }
     }
-    return mofka_targets;
+    if(masters.empty()) throw Exception{"Could not find a Yokan provider with the \"mofka:master\" tag"};
+    // note: if multiple yokan databases have the mofka:master tag,
+    // it is assume that they are linked together via RAFT to replicate the same content
+    return masters[0];
+}
+
+template<typename T>
+static auto makeServiceHandle(std::shared_ptr<ClientImpl> self, const T& ssgArg) {
+    if(!self) throw Exception("Uninitialized ServiceHandle instance");
+    try {
+        auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(ssgArg);
+        auto master = discoverMofkaServiceMaster(bsgh);
+        return std::make_shared<ServiceHandleImpl>(self, std::move(bsgh), master);
+    } catch(const std::exception& ex) {
+        throw Exception(ex.what());
+    }
 }
 
 ServiceHandle Client::connect(SSGFileName ssgfile) const {
-    if(!self) throw Exception("Uninitialized ServiceHandle instance");
-    try {
-        auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(std::string{ssgfile});
-        auto mofka_phs = ClientImpl::discoverMofkaTargets(self->m_engine, bsgh);
-        auto service_handle_impl = std::make_shared<ServiceHandleImpl>(
-            self, std::move(bsgh), std::move(mofka_phs));
-        return ServiceHandle(std::move(service_handle_impl));
-    } catch(const std::exception& ex) {
-        throw Exception(ex.what());
-    }
+    return makeServiceHandle(self, std::string{ssgfile});
 }
 
 ServiceHandle Client::connect(SSGGroupID gid) const {
-    if(!self) throw Exception("Uninitialized ServiceHandle instance");
-    try {
-        auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(gid.value);
-        auto mofka_targets = ClientImpl::discoverMofkaTargets(self->m_engine, bsgh);
-        auto service_handle_impl = std::make_shared<ServiceHandleImpl>(
-            self, std::move(bsgh), std::move(mofka_targets));
-        return ServiceHandle(std::move(service_handle_impl));
-    } catch(const std::exception& ex) {
-        throw Exception(ex.what());
-    }
+    return makeServiceHandle(self, gid.value);
 }
 
 const rapidjson::Value& Client::getConfig() const {

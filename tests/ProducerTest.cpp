@@ -8,14 +8,18 @@
 #include <bedrock/Server.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
-#include "BedrockConfig.hpp"
+#include "Configs.hpp"
+#include "Ensure.hpp"
 
 TEST_CASE("Producer test", "[producer]") {
 
     spdlog::set_level(spdlog::level::from_str("critical"));
+    auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
+    CAPTURE(partition_type);
     auto remove_file = EnsureFileRemoved{"mofka.ssg"};
 
     auto server = bedrock::Server("na+sm", config);
+    ENSURE(server.finalize());
     auto gid = server.getSSGManager().getGroup("mofka_group")->getHandle<uint64_t>();
     auto engine = server.getMargoManager().getThalliumEngine();
 
@@ -26,8 +30,15 @@ TEST_CASE("Producer test", "[producer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        auto topic_config = mofka::TopicBackendConfig{};
-        topic = sh.createTopic("mytopic", topic_config);
+        REQUIRE_NOTHROW(sh.createTopic("mytopic"));
+        mofka::Metadata partition_config;
+        mofka::ServiceHandle::PartitionDependencies partition_dependencies;
+        getPartitionArguments(partition_type, partition_dependencies, partition_config);
+
+        REQUIRE_NOTHROW(sh.addPartition(
+                    "mytopic", 0, partition_type,
+                    partition_config, partition_dependencies));
+        REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
 
         SECTION("Create a producer from the topic") {
@@ -40,6 +51,4 @@ TEST_CASE("Producer test", "[producer]") {
             REQUIRE(producer.topic().name() == "mytopic");
         }
     }
-
-    server.finalize();
 }

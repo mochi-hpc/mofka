@@ -8,14 +8,18 @@
 #include <bedrock/Server.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
-#include "BedrockConfig.hpp"
+#include "Configs.hpp"
+#include "Ensure.hpp"
 
 TEST_CASE("Event consumer test", "[event-consumer]") {
 
-    spdlog::set_level(spdlog::level::from_str("critical"));
+//    spdlog::set_level(spdlog::level::from_str("trace"));
+    auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
+    CAPTURE(partition_type);
     auto remove_file = EnsureFileRemoved{"mofka.ssg"};
 
     auto server = bedrock::Server("na+sm", config);
+    ENSURE(server.finalize());
     auto gid = server.getSSGManager().getGroup("mofka_group")->getHandle<uint64_t>();
     auto engine = server.getMargoManager().getThalliumEngine();
 
@@ -26,15 +30,15 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        auto topic_config = mofka::TopicBackendConfig{};/*R"(
-            {
-                "__type__":"default",
-                "data_store": {
-                    "__type__": "memory"
-                }
-            })"
-        };*/
-        topic = sh.createTopic("mytopic", topic_config);
+        REQUIRE_NOTHROW(sh.createTopic("mytopic"));
+        mofka::Metadata partition_config;
+        mofka::ServiceHandle::PartitionDependencies partition_dependencies;
+        getPartitionArguments(partition_type, partition_dependencies, partition_config);
+
+        REQUIRE_NOTHROW(sh.addPartition(
+                    "mytopic", 0, partition_type,
+                    partition_config, partition_dependencies));
+        REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
 
         {
@@ -54,15 +58,17 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
 
         SECTION("Consumer without data")
         {
-            auto consumer = topic.consumer("myconsumer");
+            mofka::Consumer consumer;
+            REQUIRE_NOTHROW(consumer = topic.consumer("myconsumer"));
             REQUIRE(static_cast<bool>(consumer));
             for(unsigned i=0; i < 100; ++i) {
-                auto event = consumer.pull().wait();
+                mofka::Event event;
+                REQUIRE_NOTHROW(event = consumer.pull().wait());
                 REQUIRE(event.id() == i);
                 auto& doc = event.metadata().json();
                 REQUIRE(doc["event_num"].GetInt64() == i);
                 if(i % 5 == 0)
-                    event.acknowledge();
+                    REQUIRE_NOTHROW(event.acknowledge());
             }
         }
 
@@ -80,7 +86,8 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
             mofka::DataBroker data_broker = [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
                 auto size = descriptor.size();
                 auto& doc = metadata.json();
-                if(doc["event_num"].GetInt64() % 2 == 0) {
+                auto event_id = doc["event_num"].GetInt64();
+                if(event_id % 2 == 0) {
                     auto data = new char[size];
                     return mofka::Data{data, size};
                 } else {
@@ -96,7 +103,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 auto& doc = event.metadata().json();
                 REQUIRE(doc["event_num"].GetInt64() == i);
                 if(i % 5 == 0)
-                    event.acknowledge();
+                    REQUIRE_NOTHROW(event.acknowledge());
                 if(i % 2 == 0) {
                     REQUIRE(event.data().segments().size() == 1);
                     auto data_str = std::string{
@@ -111,6 +118,4 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
             }
         }
     }
-
-    server.finalize();
 }

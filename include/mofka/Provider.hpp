@@ -9,6 +9,7 @@
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Json.hpp>
 
+#include <bedrock/AbstractServiceFactory.hpp>
 #include <thallium.hpp>
 #include <memory>
 #include <string_view>
@@ -32,11 +33,18 @@ class Provider {
      * @param provider_id Provider id.
      * @param config JSON configuration.
      * @param pool Argobots pool to use to handle RPCs.
+     * @param dependencies Dependencies resolved by Bedrock or manually.
      */
     Provider(const thallium::engine& engine,
              uint16_t provider_id = 0,
              const rapidjson::Value& config = rapidjson::Value{},
-             const thallium::pool& pool = thallium::pool{});
+             const thallium::pool& pool = thallium::pool{},
+             const bedrock::ResolvedDependencyMap& dependencies = {});
+
+    /**
+     * @brief Get the dependencies mandated by the provided configuration.
+     */
+    static std::vector<bedrock::Dependency> getDependencies(const mofka::Metadata& config);
 
     /**
      * @brief Copy-constructor is deleted.

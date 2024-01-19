@@ -10,7 +10,7 @@
 #include <warabi/Client.hpp>
 #include <warabi/TargetHandle.hpp>
 #include <mofka/Result.hpp>
-#include <mofka/MetaData.hpp>
+#include <mofka/Metadata.hpp>
 #include <mofka/DataDescriptor.hpp>
 #include <mofka/BulkRef.hpp>
 #include <spdlog/spdlog.h>
@@ -28,7 +28,6 @@ class WarabiDataStore {
     };
 
     thallium::engine     m_engine;
-    Metadata             m_config;
     warabi::TargetHandle m_target;
 
     public:
@@ -37,7 +36,8 @@ class WarabiDataStore {
             size_t count,
             const BulkRef& remoteBulk) {
 
-        /* prepare the result array and its content */
+        /* prepare the result array and its content by resizing the location
+         * field to be able to hold a WarabiDataDescriptor. */
         Result<std::vector<DataDescriptor>> result;
         result.value().resize(count);
         for(auto& descriptor : result.value()) {
@@ -45,22 +45,23 @@ class WarabiDataStore {
             location.resize(sizeof(WarabiDataDescriptor));
         }
 
-        auto getWarabiDataDescriptor = [&result](size_t i) {
-            return reinterpret_cast<WarabiDataDescriptor*>(
-                result.value()[i].location().data()
-            );
-        };
-
+        /* lookup the sender. */
         const auto source = m_engine.lookup(remoteBulk.address);
 
-        /* transfer size of each data piece */
+        /* compute the offset at which the data start in the bulk handle
+         * (the first count*sizeof(size_t) bytes hold the data sizes). */
         const auto dataOffset = count*sizeof(size_t);
 
+        /* create a local buffer to receive the sizes (these sizes are
+         * needed later to make the DataDescriptors). */
         std::vector<size_t> sizes(count);
         auto sizesBulk = m_engine.expose(
             {{sizes.data(), dataOffset}},
             thallium::bulk_mode::write_only);
 
+        // FIXME: the two following steps could be done in parallel.
+
+        /* transfer size of each region */
         sizesBulk << remoteBulk.handle.on(source)(remoteBulk.offset, dataOffset);
 
         /* forward data as region into Warabi */
@@ -70,12 +71,15 @@ class WarabiDataStore {
             remoteBulk.offset + dataOffset, remoteBulk.size - dataOffset, true);
 
         /* update the result vector */
-        size_t currentOffset = 0;
+        WarabiDataDescriptor wdescriptor{0, region_id};
         for(size_t j = 0; j < count; ++j) {
-            auto descriptor = getWarabiDataDescriptor(j);
-            descriptor->region_id = region_id;
-            descriptor->offset = currentOffset;
-            currentOffset += sizes[j];
+            result.value()[j] = DataDescriptor::From(
+                std::string_view{
+                    reinterpret_cast<char*>(&wdescriptor),
+                    sizeof(wdescriptor)
+                },
+                sizes[j]);
+            wdescriptor.offset += sizes[j];
         }
 
         return result;
@@ -128,39 +132,12 @@ class WarabiDataStore {
 
     WarabiDataStore(
             thallium::engine engine,
-            Metadata config,
             warabi::TargetHandle target)
     : m_engine(std::move(engine))
-    , m_config(std::move(config))
     , m_target(std::move(target)) {}
 
-    static std::unique_ptr<WarabiDataStore> create(thallium::engine engine, Metadata config) {
-
-        /* Schema to validate the configuration of a WarabiDataStore */
-        static constexpr const char* configSchema = R"(
-        {
-            "$schema": "https://json-schema.org/draft/2019-09/schema",
-            "type": "object"
-        }
-        )";
-        static RapidJsonValidator validator{configSchema};
-
-        const auto& jsonConfig = config.json();
-
-        /* Validate configuration against schema */
-        auto errors = validator.validate(jsonConfig);
-        if(!errors.empty()) {
-            spdlog::error("[mofka] Error(s) while validating JSON config for WarabiDataStore:");
-            for(auto& error : errors) spdlog::error("[mofka] \t{}", error);
-            throw Exception{"Error(s) while validating JSON config for WarabiDataStore"};
-        }
-
-        auto client      = warabi::Client{engine};
-        auto address     = jsonConfig["__address__"].GetString();
-        auto provider_id = jsonConfig["__provider_id__"].GetUint();
-        auto target      = client.makeTargetHandle(address, provider_id);
-
-        return std::make_unique<WarabiDataStore>(std::move(engine), std::move(config), std::move(target));
+    static std::unique_ptr<WarabiDataStore> create(thallium::engine engine, warabi::TargetHandle target) {
+        return std::make_unique<WarabiDataStore>(std::move(engine), std::move(target));
     }
 
 };

@@ -20,6 +20,9 @@ Metadata::Metadata(std::string json, bool validate)
 Metadata::Metadata(rapidjson::Document json)
 : self(std::make_unique<MetadataImpl>(std::move(json))) {}
 
+Metadata::Metadata(const rapidjson::Value& json)
+: self(std::make_unique<MetadataImpl>(json)) {}
+
 const std::string& Metadata::string() const {
     self->ensureString();
     return self->m_string;
