@@ -231,11 +231,13 @@ class YokanEventStore {
         thallium::engine engine,
         yokan::Database db,
         yokan::Collection metadata_coll,
-        yokan::Collection descriptors_coll)
+        yokan::Collection descriptors_coll,
+        size_t num_events)
     : m_engine(std::move(engine))
     , m_database(std::move(db))
     , m_metadata_coll(std::move(metadata_coll))
-    , m_descriptors_coll(std::move(descriptors_coll)) {}
+    , m_descriptors_coll(std::move(descriptors_coll))
+    , m_num_events(num_events) {}
 
     static std::unique_ptr<YokanEventStore> create(
             thallium::engine engine,
@@ -253,11 +255,13 @@ class YokanEventStore {
         }
         auto metadata_coll = yokan::Collection{metadataCollName.c_str(), database};
         auto descriptors_coll = yokan::Collection{descriptorsCollName.c_str(), database};
+        auto num_events = metadata_coll.size();
         return std::make_unique<YokanEventStore>(
             std::move(engine),
             std::move(database),
             std::move(metadata_coll),
-            std::move(descriptors_coll));
+            std::move(descriptors_coll),
+            num_events);
     }
 
 };
