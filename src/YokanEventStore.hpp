@@ -21,17 +21,25 @@
 #include <cstddef>
 #include <string_view>
 #include <unordered_map>
+#include <numeric>
 
 namespace mofka {
 
 class YokanEventStore {
 
-    thallium::engine  m_engine;
-    yokan::Database   m_database;
-    yokan::Collection m_metadata_coll;
-    yokan::Collection m_descriptors_coll;
+    thallium::engine             m_engine;
+    yokan::Database              m_database;
+    yokan::Collection            m_metadata_coll;
+    yokan::Collection            m_descriptors_coll;
+    size_t                       m_num_events = 0;
+    thallium::mutex              m_num_events_mtx;
+    thallium::condition_variable m_num_events_cv;
 
     public:
+
+    void wakeUp() {
+        m_num_events_cv.notify_all();
+    };
 
     Result<EventID> appendMetadata(
             size_t count,
@@ -57,6 +65,11 @@ class YokanEventStore {
         }
 
         result.value() = ids[0];
+        {
+            auto g = std::unique_lock{m_num_events_mtx};
+            m_num_events += count;
+        }
+        m_num_events_cv.notify_all();
 
         return result;
     }
@@ -103,7 +116,115 @@ class YokanEventStore {
             ConsumerHandle consumerHandle,
             EventID firstID,
             BatchSize batchSize) {
-        // TODO
+
+        Result<void> result;
+
+        if(batchSize.value == 0 || batchSize == BatchSize::Adaptive())
+            batchSize = BatchSize{32};
+
+        auto c = batchSize.value;
+
+        // buffers to hold the metadata and descriptors
+        std::vector<yk_id_t> ids(c);
+        std::vector<size_t>  metadata_sizes(c);
+        std::vector<char>    metadata_buffer(c * 1024);
+
+        // note: because we are using docLoad for descriptors, we need
+        // the sizes and documents to be contiguous even if the number
+        // of items requested varies.
+        std::vector<char> descriptors_sizes_and_data(c*(sizeof(size_t)+1024));
+
+        // TODO: change 1024 to an actually good estimation of metadata size
+        // TODO: properly add Adaptive support
+
+        // expose these buffers as bulk handles
+        auto local_metadata_bulk = m_engine.expose(
+            {{metadata_sizes.data(),  c*sizeof(metadata_sizes[0])},
+             {ids.data(),             c*sizeof(ids[0])},
+             {metadata_buffer.data(), metadata_buffer.size()*sizeof(metadata_buffer[0])}},
+            thallium::bulk_mode::read_write);
+        auto local_descriptors_bulk = m_engine.expose(
+            {{descriptors_sizes_and_data.data(),  descriptors_sizes_and_data.size()}},
+            thallium::bulk_mode::read_write);
+
+        // create the BulkRef objects
+        auto self_addr = static_cast<std::string>(m_engine.self());
+        auto metadata_sizes_bulk_ref = BulkRef{
+            local_metadata_bulk,
+            0,
+            c*sizeof(size_t),
+            self_addr
+        };
+        auto metadata_bulk_ref = BulkRef{
+            local_metadata_bulk,
+            c*(sizeof(size_t) + sizeof(yk_id_t)),
+            metadata_buffer.size(),
+            self_addr
+        };
+        auto descriptors_sizes_bulk_ref = BulkRef{
+            local_descriptors_bulk,
+            0,
+            c*sizeof(size_t),
+            self_addr
+        };
+        auto descriptors_bulk_ref = BulkRef{
+            local_descriptors_bulk,
+            c*sizeof(size_t),
+            descriptors_sizes_and_data.size() - c*sizeof(size_t),
+            self_addr
+        };
+
+        while(!consumerHandle.shouldStop()) {
+
+            bool should_stop = false;
+            while(true) {
+                auto g = std::unique_lock{m_num_events_mtx};
+                // find the number of events we can send
+                auto num_available_events = m_num_events - firstID;
+                should_stop = consumerHandle.shouldStop();
+                if(num_available_events > 0 || should_stop) break;
+                m_num_events_cv.wait(g);
+            }
+            if(should_stop) break;
+
+            // list metadata documents
+            m_metadata_coll.listBulk(
+                    firstID, 0, local_metadata_bulk.get_bulk(),
+                    0, metadata_buffer.size(), true, batchSize.value);
+
+            // check how many we actually pulled
+            auto it = std::find_if(metadata_sizes.begin(),
+                                   metadata_sizes.end(),
+                                   [](auto size) {
+                                        return size > YOKAN_LAST_VALID_SIZE;
+                                   });
+
+            size_t num_events = it - metadata_sizes.begin();
+            metadata_bulk_ref.size = std::accumulate(metadata_sizes.begin(), it, (size_t)0);
+            metadata_sizes_bulk_ref.size = num_events*sizeof(size_t);
+
+            // load the corresponding descriptors
+            m_descriptors_coll.loadBulk(
+                    num_events, ids.data(), local_descriptors_bulk.get_bulk(),
+                    0, local_descriptors_bulk.size(), true);
+            auto descriptors_sizes = reinterpret_cast<size_t*>(descriptors_sizes_and_data.data());
+            descriptors_sizes_bulk_ref.size = num_events*sizeof(size_t);
+            descriptors_bulk_ref.offset = descriptors_sizes_bulk_ref.size;
+            descriptors_bulk_ref.size = std::accumulate(
+                descriptors_sizes, descriptors_sizes + num_events, (size_t)0);
+
+            // feed the consumer handle
+            consumerHandle.feed(
+                    num_events, firstID,
+                    metadata_sizes_bulk_ref,
+                    metadata_bulk_ref,
+                    descriptors_sizes_bulk_ref,
+                    descriptors_bulk_ref);
+
+            firstID += num_events;
+        }
+
+        return result;
     }
 
     YokanEventStore(

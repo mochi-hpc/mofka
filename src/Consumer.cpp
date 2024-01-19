@@ -200,13 +200,13 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
                 BufferWrapperInputArchive metadata_archive{
                     std::string_view{
                         batch->m_meta_buffer.data() + metadata_offset,
-                            batch->m_meta_sizes[i]}};
+                        batch->m_meta_sizes[i]}};
                 serializer.deserialize(metadata_archive, metadata);
                 // deserialize the data descriptors
                 BufferWrapperInputArchive descriptors_archive{
                     std::string_view{
                         batch->m_data_desc_buffer.data() + data_desc_offset,
-                            batch->m_data_desc_sizes[i]}};
+                        batch->m_data_desc_sizes[i]}};
                 DataDescriptor descriptor;
                 descriptor.load(descriptors_archive);
                 // request Data associated with the event

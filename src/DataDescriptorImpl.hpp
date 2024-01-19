@@ -10,6 +10,7 @@
 #include "mofka/Archive.hpp"
 #include "mofka/Exception.hpp"
 #include "VariantUtil.hpp"
+#include <iostream>
 #include <variant>
 #include <vector>
 #include <string>

@@ -66,32 +66,32 @@ class ConsumerBatchImpl {
             {m_data_desc_buffer.data(), m_data_desc_buffer.size()*sizeof(m_data_desc_buffer[0])}
         };
         auto local_bulk = m_engine.expose(segments, thallium::bulk_mode::write_only);
-        size_t offset = 0;
+        size_t local_offset = 0;
         auto pull_bulk_ref = [](thallium::bulk& local,
-                                size_t offset,
+                                size_t local_offset,
                                 thallium::endpoint& ep,
                                 const BulkRef& remote) {
             if(remote.size == 0) return;
-            local(offset, remote.size) << remote.handle.on(ep)(remote.offset, remote.size);
+            local(local_offset, remote.size) << remote.handle.on(ep)(remote.offset, remote.size);
         };
         // transfer metadata sizes
         thallium::endpoint remote_ep = m_engine.lookup(remote_meta_sizes.address);
-        pull_bulk_ref(local_bulk, offset, remote_ep, remote_meta_sizes);
-        offset += segments[0].second;
+        pull_bulk_ref(local_bulk, local_offset, remote_ep, remote_meta_sizes);
+        local_offset += segments[0].second;
         // transfer metadata
         if(remote_meta_buffer.address != remote_meta_sizes.address)
             remote_ep = m_engine.lookup(remote_meta_buffer.address);
-        pull_bulk_ref(local_bulk, offset, remote_ep, remote_meta_buffer);
-        offset += segments[1].second;
+        pull_bulk_ref(local_bulk, local_offset, remote_ep, remote_meta_buffer);
+        local_offset += segments[1].second;
         // transfer data descriptor sizes
         if(remote_desc_sizes.address != remote_meta_buffer.address)
             remote_ep = m_engine.lookup(remote_desc_sizes.address);
-        pull_bulk_ref(local_bulk, offset, remote_ep, remote_desc_sizes);
-        offset += segments[2].second;
+        pull_bulk_ref(local_bulk, local_offset, remote_ep, remote_desc_sizes);
+        local_offset += segments[2].second;
         // transfer data descriptors
         if(remote_desc_buffer.address != remote_desc_sizes.address)
             remote_ep = m_engine.lookup(remote_desc_buffer.address);
-        pull_bulk_ref(local_bulk, offset, remote_ep, remote_desc_buffer);
+        pull_bulk_ref(local_bulk, local_offset, remote_ep, remote_desc_buffer);
     }
 
     size_t count() const {
