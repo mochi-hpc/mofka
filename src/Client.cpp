@@ -24,6 +24,9 @@ PIMPL_DEFINE_COMMON_FUNCTIONS(Client);
 Client::Client(const thallium::engine& engine)
 : self(std::make_shared<ClientImpl>(engine)) {}
 
+Client::Client(margo_instance_id mid)
+: self(std::make_shared<ClientImpl>(thallium::engine{mid})) {}
+
 const thallium::engine& Client::engine() const {
     if(!self) throw Exception("Uninitialized ServiceHandle instance");
     return self->m_engine;

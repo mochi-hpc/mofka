@@ -43,6 +43,13 @@ class Client {
     Client(const thallium::engine& engine);
 
     /**
+     * @brief Constructor.
+     *
+     * @param margo_instance_id mid..
+     */
+    Client(margo_instance_id mid);
+
+    /**
      * @brief Copy constructor.
      */
     Client(const Client&);

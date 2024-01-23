@@ -12,6 +12,7 @@ add_library (warnings_config INTERFACE)
 option (ENABLE_TESTS    "Build tests" OFF)
 option (ENABLE_EXAMPLES "Build examples" OFF)
 option (ENABLE_COVERAGE "Build with coverage" OFF)
+option (ENABLE_PYTHON   "Build the Python module" OFF)
 
 # add our cmake module directory to the path
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
@@ -71,6 +72,12 @@ find_package (bedrock REQUIRED)
 find_package (warabi REQUIRED)
 # search for yokan
 find_package (yokan REQUIRED)
+
+if (ENABLE_PYTHON)
+    find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
+    find_package (pybind11 REQUIRED)
+    add_subdirectory (python)
+endif ()
 
 # library version set here (e.g. for shared libs).
 set (MOFKA_VERSION_MAJOR 0)

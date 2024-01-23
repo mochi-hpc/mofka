@@ -36,6 +36,7 @@ set (mofka-vers "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}")
 
 # client library
 add_library (mofka-client ${client-src-files})
+add_library (mofka::client ALIAS mofka-client)
 target_link_libraries (mofka-client
     PUBLIC thallium PkgConfig::uuid rapidjson valijson bedrock-client
     PRIVATE yokan::client spdlog::spdlog fmt::fmt coverage_config warnings_config)
@@ -50,6 +51,7 @@ set_target_properties (mofka-client
 
 # server library
 add_library (mofka-server ${server-src-files})
+add_library (mofka::server ALIAS mofka-server)
 target_link_libraries (mofka-server
     PUBLIC thallium PkgConfig::uuid fmt::fmt rapidjson
     PRIVATE mofka-client warabi-client spdlog::spdlog coverage_config warnings_config)
