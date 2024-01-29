@@ -15,4 +15,8 @@ PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(ThreadPool);
 ThreadPool::ThreadPool(mofka::ThreadCount tc)
 : self(std::make_shared<ThreadPoolImpl>(tc)) {}
 
+mofka::ThreadCount ThreadPool::threadCount() const{
+    return mofka::ThreadCount{self->managed_xstreams_size()};
+}
+
 }
