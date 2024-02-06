@@ -22,7 +22,7 @@ class TestClient(unittest.TestCase):
             os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
-        self.mid = self.bedrock_server.margo_instance_id
+        self.mid = self.bedrock_server.margo.mid
 
     def tearDown(self):
         self.bedrock_server.finalize()
