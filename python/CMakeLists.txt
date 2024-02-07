@@ -9,3 +9,12 @@ install (TARGETS pymofka_client
          EXPORT mofka-targets
          ARCHIVE DESTINATION lib/python${PY_VERSION}/site-packages
          LIBRARY DESTINATION lib/python${PY_VERSION}/site-packages)
+
+install (DIRECTORY mochi/mofka
+         DESTINATION lib/python${PY_VERSION}/site-packages/mochi)
+
+configure_file (mofkactl.in ${CMAKE_BINARY_DIR}/bin/mofkactl USE_SOURCE_PERMISSIONS @ONLY)
+
+install (FILES ${CMAKE_BINARY_DIR}/bin/mofkactl
+         DESTINATION bin
+         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)

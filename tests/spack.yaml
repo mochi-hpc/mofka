@@ -15,6 +15,8 @@ spack:
   - mochi-yokan+bedrock
   - py-pybind11
   - py-mochi-margo
+  - py-typer
+  - py-rich
   concretizer:
     unify: true
     reuse: true
