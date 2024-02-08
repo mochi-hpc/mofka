@@ -44,7 +44,18 @@ static auto get_buffer_info(const std::string& str) {
     }                                                 \
 } while(0)
 
-
+std::string stringify(const rapidjson::Value& v)
+{
+	if (v.IsString())
+		return { v.GetString(), v.GetStringLength() };
+	else
+	{
+		rapidjson::StringBuffer strbuf;
+		rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
+		v.Accept(writer);
+		return { strbuf.GetString(), strbuf.GetLength() };
+	}
+}
 
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the Mofka client library";
@@ -52,10 +63,10 @@ PYBIND11_MODULE(pymofka_client, m) {
     py::class_<mofka::Client>(m, "Client")
         .def(py::init<py_margo_instance_id>(), "mid"_a)
         .def("connect",
-             [](const mofka::Client& client, const std::string& ssgfile) -> mofka::ServiceHandle {
+             [](const mofka::Client& client, const std::string_view ssgfile) -> mofka::ServiceHandle {
                 return client.connect(mofka::SSGFileName{ssgfile});
              },
-            "filename"_a)
+            "ssgfile"_a)
         .def("connect",
              [](const mofka::Client& client, uint64_t ssgid) -> mofka::ServiceHandle {
                 return client.connect(mofka::SSGGroupID{ssgid});
@@ -63,8 +74,10 @@ PYBIND11_MODULE(pymofka_client, m) {
             "gid"_a)
         .def("get_config",
             [](const mofka::Client& client) -> const std::string {
-                return client.getConfig().GetString();
+                auto&  config = client.getConfig();
+                return stringify(config);
             })
+        .def_property_readonly("engine", &mofka::Client::engine)
     ;
 
     py::class_<mofka::Validator>(m, "Validator")
@@ -76,10 +89,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return validator.validate(metadata, data);
                },
             "metadata"_a, "data"_a)
-        .def("metadata",
-            [](const mofka::Validator& validator) -> mofka::Metadata {
-                return validator.metadata();
-            })
+        .def_property_readonly("metadata", &mofka::Validator::metadata)
         .def("from_metadata",
             [](mofka::Validator& validator, 
                const mofka::Metadata& metadata) -> mofka::Validator {
@@ -121,16 +131,19 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return deserializer.deserialize(archive, metadata);
                },
             "archive"_a, "matadata"_a)
-        .def("metadata",
-            [](const mofka::Serializer& serializer){
-                return serializer.metadata();
-            })
+        .def_property_readonly("metadata", &mofka::Serializer::metadata)
         .def("from_metadata",
             [](mofka::Serializer& serializer, 
                const mofka::Metadata& metadata) -> mofka::Serializer {
                 return serializer.FromMetadata(metadata);
                 },
             "metadata"_a)
+    ;
+
+    py::class_<mofka::PartitionInfo>(m, "PartitionInfo")
+        .def_property_readonly("uuid", &mofka::PartitionInfo::uuid)
+        .def_property_readonly("address", &mofka::PartitionInfo::address)
+        .def_property_readonly("provider_id", &mofka::PartitionInfo::providerID)
     ;
 
     py::class_<mofka::PartitionSelector>(m, "PartitionSelector")
@@ -146,10 +159,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return selector.selectPartitionFor(metadata);
                },
             "metadata"_a)
-        .def("matadata",
-            [](const mofka::PartitionSelector& selector) -> mofka::Metadata {
-                return selector.metadata();
-            })
+        .def_property_readonly("matadata", &mofka::PartitionSelector::metadata)
         .def("from_metadata",
             [](mofka::PartitionSelector& selector, 
                const mofka::Metadata& metadata) -> mofka::PartitionSelector {
@@ -191,14 +201,7 @@ PYBIND11_MODULE(pymofka_client, m) {
             "topic_name"_a, "server_rank"_a, "partition_type"_a="memory",
             "partition_config"_a="{}", "dependencies"_a=mofka::ServiceHandle::PartitionDependencies{},
             "pool_name"_a="")
-        .def("client",
-            [](const mofka::ServiceHandle& service) -> mofka::Client {
-                return service.client();
-            })
-        .def("get_num_servers",
-            [](const mofka::ServiceHandle& service) -> std::size_t {
-                return service.numServers();
-            })
+        .def_property_readonly("client", &mofka::ServiceHandle::client)
     ;
 
     py::class_<mofka::TopicHandle>(m, "TopicHandle")
