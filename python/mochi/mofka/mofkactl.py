@@ -1,92 +1,126 @@
 import uuid
+from enum import Enum
+from pathlib import Path
 import typer
 from typing import Optional
 from typing_extensions import Annotated
-import pymargo.core as pymargo
-import mochi.bedrock.client as bedrock
-import mochi.bedrock.spec as spec
+import json
+#import pymargo.core as pymargo
+#import mochi.bedrock.client as bedrock
+
+
+class SSGBootstrapMethod(str, Enum):
+    mpi  = "mpi"
+    init = "init"
+    pmix = "pmix"
+
+
+class YokanDatabaseType(str, Enum):
+    map          = "map"
+    unoreder_map = "unoreder_map"
+    berkeleydb   = "berkeleydb"
+    gdbm         = "gdbm"
+    leveldb      = "leveldb"
+    lmdb         = "lmdb"
+    rocksdb      = "rocksdb"
+    tkrzw        = "tkrzw"
+    unqlite      = "unqlite"
 
 
 app = typer.Typer(help="Mofka controller CLI.")
+topic_app = typer.Typer()
+app.add_typer(topic_app, name="topic")
 
 
-def _get_protocol_from_address(address: str) -> str:
-    protocol = address.split(":")[0]
-    return protocol
-
-
-@app.command()
-def init(
-        address: Annotated[
-            str,
-            typer.Argument(help="Address of the master process")],
+@app.command("init")
+def init_config(
+        output: Annotated[
+            Path,
+            typer.Option(
+                "-o", "--output",
+                help="Name of the JSON configuration file to produce")] = "mofka.json",
         db_type: Annotated[
-            str,
-            typer.Option(help="Type of the master database")] = "map",
+            YokanDatabaseType,
+            typer.Option(help="Type of the master database")] = YokanDatabaseType.map,
         db_path: Annotated[
-            str,
+            Path,
             typer.Option(help="Path to the database")] = "",
         db_provider_id: Annotated[
             int,
-            typer.Option(help="Provider Id of the master database provider")] = 65535,
+            typer.Option(help="Provider ID of the master database provider")] = 1,
         db_provider_name: Annotated[
-            Optional[str],
-            typer.Option(help="Name to give the database provider")] = None,
-        db_pool: Annotated[
             str,
-            typer.Option(help="Pool that the database provider should use")] = "__primary__"
+            typer.Option(help="Name to give the database provider")] = "mofka_master_database",
+        ssg_group_file: Annotated[
+            Path,
+            typer.Option(help="Name of the SSG group file")] = "mofka.ssg",
+        ssg_group_name: Annotated[
+            str,
+            typer.Option(help="Name of the SSG group")] = "mofka",
+        ssg_enable_swim: Annotated[
+            bool,
+            typer.Option("--ssg-enable-swim/--ssg-disable-swim",
+                         help="Whether to enable SWIM in SSG")] = False,
+        ssg_bootstrap: Annotated[
+            SSGBootstrapMethod,
+            typer.Option(help="Bootstrap method for SSG")] = SSGBootstrapMethod.mpi,
+        yokan_library_path: Annotated[
+            Optional[Path],
+            typer.Option(help="Path to libyokan-bedrock-module.so")] = "libyokan-bedrock-module.so",
+        _print: Annotated[
+            bool,
+            typer.Option("-p", "--print",
+                         help="Print the configuration to STDOUT")] = False
         ):
     """
-    Initialize a Mofka service.
+    Create a JSON configuration for a new Mofka service.
     """
-    protocol = _get_protocol_from_address(address)
-    engine   = pymargo.Engine(addr=protocol, mode=pymargo.client)
-    service  = bedrock.Client(engine).make_service_handle(address)
-    # Create a provider name if needed
-    if db_provider_name is None:
-        uuid.uuid4()
-        db_provider_name = "mofka_master_" + str(uuid.uuid4())[:8]
-    # Fetch the current configuration of the process
-    config = service.spec
-    # Check if there is already a Yokan database marked with "mofka:master"
-    # and if there isn't already a provider with the same name or ID
-    for provider in config.providers:
-        if provider.type == "yokan" and "mofka:master" in provider.tags:
-            raise RuntimeError("Target process already has master database.")
-        if provider.provider_id == db_provider_id:
-            raise RuntimeError(f"Target process already has a provider with id {db_provider_id}.")
-        if provider.name == db_provider_name:
-            raise RuntimeError(f"Target process already has a provider named \"{db_provider_name}\".")
-    # Check if the Yokan module is loaded
-    if "yokan" not in config.libraries:
-        raise RuntimeError("Target process does not have a Yokan module loaded.")
-    # Check that the requested pool exists
-    if config.margo.argobots.pools.count(db_pool) == 0:
-        raise RuntimeError("Target process does not have a pool named \"{db_pool}\".")
-    # Create a Yokan provider with the specified database type
-    service.add_provider(
-        config={
-            "name": db_provider_name,
-            "provider_id": db_provider_id,
-            "type": "yokan",
-            "pool": db_pool,
-            "tags": ["mofka:master"],
-            "config": {
-                "database":{
+    import mochi.bedrock.spec as spec
+    proc = spec.ProcSpec(margo="?")
+    primary_pool = proc.margo.argobots.pools[0]
+    proc.ssg.append(
+        spec.SSGSpec(
+            name=ssg_group_name,
+            pool=primary_pool,
+            group_file=str(ssg_group_file),
+            bootstrap=ssg_bootstrap, #+"|join",
+            swim=spec.SwimSpec(
+                disabled=not ssg_enable_swim
+            )
+        ))
+    proc.libraries["yokan"] = str(yokan_library_path)
+    proc.providers.append(
+        spec.ProviderSpec(
+            name=db_provider_name,
+            provider_id=db_provider_id,
+            type="yokan",
+            tags=["mofka:master"],
+            config={
+                "database": {
                     "type": db_type,
-                    "path": db_path
+                    "path": str(db_path),
+                    "create_if_missing": True
                 }
-            }
-        }
-    )
+            },
+            pool=primary_pool))
+    config = proc.to_dict()
+    config["providers"][0]["__if__"] = f"$__ssg__[\"{ssg_group_name}\"].rank == 0"
+    config = json.dumps(config, indent=4)
+    if _print:
+        from rich import print_json
+        print_json(config)
+    with open(output, "w+") as f:
+        f.write(config)
 
 
-@app.command(name="ct")
-@app.command()
-def create_topic(
+@topic_app.command(name="create")
+def topic_create(
         name: Annotated[
             str,
             typer.Argument(help="Name of the topic to create")],
+        ssg_group_file: Annotated[
+            str,
+            typer.Option(help="Name of the SSG group file of the service")] = "mofka.ssg",
         validator: Annotated[
             Optional[str],
             typer.Option(help="Validator")] = None,
@@ -100,21 +134,10 @@ def create_topic(
     """
     Create a topic.
     """
-
-
-@app.command(name="ap")
-@app.command()
-def add_partition(
-        name: Annotated[
-            str,
-            typer.Argument(help="Name of the topic to create")],
-        address: Annotated[
-            str,
-            typer.Argument(help="Address of the process in which to create the partition")]):
-    """
-    Add a partition to a topic.
-    """
-
+    from .client import Client
+    protocol = Client.get_protocol_from_ssg_file(ssg_group_file)
+    client = Client(protocol)
+    # TODO
 
 if __name__ == "__main__":
     app()

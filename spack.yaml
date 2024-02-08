@@ -9,7 +9,7 @@ spack:
   - spdlog+fmt_external
   - fmt
   - tclap
-  - mochi-bedrock+ssg+python
+  - mochi-bedrock+ssg+python+mpi
   - argobots@1.2rc1
   - mochi-warabi+bedrock
   - mochi-yokan+bedrock
@@ -17,6 +17,7 @@ spack:
   - py-mochi-margo
   - py-typer
   - py-rich
+  - py-mochi-ssg
   concretizer:
     unify: true
     reuse: true
@@ -30,4 +31,4 @@ spack:
     mochi-warabi:
       require: "@0.2.0:"
     mochi-bedrock:
-      require: "@0.9.0:"
+      require: "@0.9.1:"
