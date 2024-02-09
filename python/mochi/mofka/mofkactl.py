@@ -5,8 +5,6 @@ import typer
 from typing import Optional
 from typing_extensions import Annotated
 import json
-#import pymargo.core as pymargo
-#import mochi.bedrock.client as bedrock
 
 
 class SSGBootstrapMethod(str, Enum):
@@ -119,7 +117,7 @@ def topic_create(
             str,
             typer.Argument(help="Name of the topic to create")],
         ssg_group_file: Annotated[
-            str,
+            Path,
             typer.Option(help="Name of the SSG group file of the service")] = "mofka.ssg",
         validator: Annotated[
             Optional[str],
@@ -135,9 +133,16 @@ def topic_create(
     Create a topic.
     """
     from .client import Client
-    protocol = Client.get_protocol_from_ssg_file(ssg_group_file)
-    client = Client(protocol)
-    # TODO
+    import pyssg
+    import pymargo.core
+    protocol = pyssg.get_group_transport_from_file(str(ssg_group_file))
+    with pymargo.core.Engine(protocol) as engine:
+        pyssg.init()
+        service_handle = Client(engine).connect(str(ssg_group_file))
+        service_handle.create_topic(name)
+        del service_handle
+        pyssg.finalize()
+
 
 if __name__ == "__main__":
     app()

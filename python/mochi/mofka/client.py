@@ -1,26 +1,26 @@
+from typing import Optional
 import pymargo.core
+
+
+class ServiceHandle:
+
+    def __init__(self, client, internal):
+        self._client = client
+        self._internal = internal
+
+    def create_topic(self, name: str,
+                     validator: Optional[str] = None,
+                     partition_selector: Optional[str] = None,
+                     serializer: Optional[str] = None):
+        self._internal.create_topic(name)
 
 
 class Client:
 
-    def __init__(self, arg):
-        if isinstance(arg, pymargo.core.Engine):
-            self._engine = arg
-            self._owns_engine = False
-        elif isinstance(arg, str):
-            self._engine = pymargo.core.Engine(arg, pymargo.client)
-            self._owns_engine = True
-        else:
-            raise TypeError(f'Invalid argument type {type(arg)}')
+    def __init__(self, engine: pymargo.core.Engine):
         import pymofka_client
-        self._internal = pymofka_client.Client(self._engine.get_internal_mid())
+        self._internal = pymofka_client.Client(engine.get_internal_mid())
 
-    def __del__(self):
-        if self._owns_engine:
-            self._engine.finalize()
-            del self._engine
-
-    @staticmethod
-    def get_protocol_from_ssg_file(group_file: str) -> str:
-        import pyssg
-        return pyssg.get_group_transport_from_file(group_file)
+    def connect(self, *args, **kwargs) -> ServiceHandle:
+        return ServiceHandle(
+            self, self._internal.connect(*args, **kwargs))
