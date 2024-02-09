@@ -82,6 +82,7 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::Validator>(m, "Validator")
         .def(py::init<>())
+        .def(py::init(&mofka::Validator::FromMetadata))
         .def("validate",
             [](const mofka::Validator& validator, 
                const mofka::Metadata& metadata, 
@@ -90,12 +91,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                },
             "metadata"_a, "data"_a)
         .def_property_readonly("metadata", &mofka::Validator::metadata)
-        .def("from_metadata",
-            [](mofka::Validator& validator, 
-               const mofka::Metadata& metadata) -> mofka::Validator {
-                return validator.FromMetadata(metadata);
-                },
-            "metadata"_a)
+        
     ;
 
     py::class_<mofka::ThreadPool>(m, "ThreadPool")
@@ -117,6 +113,7 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::Serializer>(m, "Serializer")
         .def(py::init<>())
+        .def(py::init(&mofka::Serializer::FromMetadata))
         .def("serialize",
             [](const mofka::Serializer& serializer, 
                mofka::Archive& archive, 
@@ -132,12 +129,6 @@ PYBIND11_MODULE(pymofka_client, m) {
                },
             "archive"_a, "matadata"_a)
         .def_property_readonly("metadata", &mofka::Serializer::metadata)
-        .def("from_metadata",
-            [](mofka::Serializer& serializer, 
-               const mofka::Metadata& metadata) -> mofka::Serializer {
-                return serializer.FromMetadata(metadata);
-                },
-            "metadata"_a)
     ;
 
     py::class_<mofka::PartitionInfo>(m, "PartitionInfo")
@@ -148,6 +139,7 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::PartitionSelector>(m, "PartitionSelector")
         .def(py::init<>())
+        .def(py::init(&mofka::PartitionSelector::FromMetadata))
         .def("set_partitions", 
             [](mofka::PartitionSelector& selector, const std::vector<mofka::PartitionInfo>& targets) {
                 return selector.setPartitions(targets);                
@@ -160,12 +152,6 @@ PYBIND11_MODULE(pymofka_client, m) {
                },
             "metadata"_a)
         .def_property_readonly("matadata", &mofka::PartitionSelector::metadata)
-        .def("from_metadata",
-            [](mofka::PartitionSelector& selector, 
-               const mofka::Metadata& metadata) -> mofka::PartitionSelector {
-                return selector.FromMetadata(metadata);
-               },
-            "metadata"_a)
     ;
 
     py::class_<mofka::ServiceHandle>(m, "ServiceHandle")
@@ -205,7 +191,6 @@ PYBIND11_MODULE(pymofka_client, m) {
     ;
 
     py::class_<mofka::TopicHandle>(m, "TopicHandle")
-        .def(py::init<>())
         .def("producer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,
@@ -312,13 +297,7 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::DataDescriptor>(m, "DataDescriptor")
         .def(py::init<>())
-        .def("from",
-            [](mofka::DataDescriptor& data_descriptor, 
-               std::string_view location, 
-               std::size_t size) -> mofka::DataDescriptor {
-                return data_descriptor.From(location, size);
-            },
-            "location"_a, "size"_a)
+        .def(py::init(&mofka::DataDescriptor::From))
         .def_property_readonly("size", &mofka::DataDescriptor::size)
         .def("location",
             py::overload_cast<>(&mofka::DataDescriptor::location))
