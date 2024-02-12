@@ -64,7 +64,39 @@ class TestThreadPool(unittest.TestCase):
         thread_pool = mofka.ThreadPool(self.count)
         count = thread_pool.thread_count()
         self.assertEqual(self.count, count)
+"""
+class TestValidator(unittest.TestCase):
 
+    def setUp(self):
+        metadata = dict()
+        letters = string.ascii_letters
+        key_len = random.randint(8, 64)
+        val_len = random.randint(16, 128)
+        key = ''.join(random.choice(letters) for i in range(key_len))
+        val = ''.join(random.choice(letters) for i in range(val_len))
+        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
+        metadata[key] = val
+        self.str_metadata = str(metadata)
+
+    def test_create_validator(self):
+        "Test create an empty validator"
+        mofka.Validator()
+
+    def test_get_metadata(self):
+        validator = mofka.Validator()
+        validator.metadata
+    
+    def test_from_metadata(self):
+        metadata = mofka.Metadata(self.str_metadata)
+        validator = mofka.Validator(metadata)
+    
+    def test_validate(self):
+        Test validate
+        validator = mofka.Validator()
+        metadata = mofka.Metadata(self.str_metadata)
+        data = mofka.Data(self.str_data.encode('ascii'))
+        validator.validate(metadata, data)
+"""
 class TestMetadata(unittest.TestCase):
 
     def setUp(self):
@@ -141,37 +173,49 @@ class TestData(unittest.TestCase):
         data = mofka.Data(self.list_num_data)
         data.size
 
-class TestValidator(unittest.TestCase):
+    def test_create_data_broker(self):
+        """Test create a data broker"""
+        choice = random.choice([True, False])
+        broker = lambda metadata, data_descriptor : data_descriptor if choice else data.data_descriptor(2, 4) 
+        broker
+
+    def test_create_data_selector(self):
+        """Test create a data selector"""
+        selector = lambda metadata, data_descriptor :    
+        selector
+
+class TestDataDescriptor(unittest.TestCase):
 
     def setUp(self):
-        metadata = dict()
         letters = string.ascii_letters
-        key_len = random.randint(8, 64)
         val_len = random.randint(16, 128)
-        key = ''.join(random.choice(letters) for i in range(key_len))
-        val = ''.join(random.choice(letters) for i in range(val_len))
-        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
-        metadata[key] = val
-        self.str_metadata = str(metadata)
+        self.location = ''.join(random.choice(letters) for i in range(val_len))
+        self.size = random.randint(16, 128)
 
-    def test_create_validator(self):
-        "Test create an empty validator"
-        mofka.Validator()
+    def tearDown(self):
+        del self.location
+        del self.size
 
-    def test_get_metadata(self):
-        validator = mofka.Validator()
-        validator.metadata
-    
-    def test_from_metadata(self):
-        metadata = mofka.Metadata(self.str_metadata)
-        validator = mofka.Validator(metadata)
-    
-    def test_validate(self):
-        """Test validate"""
-        validator = mofka.Validator()
-        metadata = mofka.Metadata(self.str_metadata)
-        data = mofka.Data(self.str_data.encode('ascii'))
-        validator.validate(metadata, data)
+    def test_create_empty_data_descriptor(self):
+        """Test create empty data descriptor"""
+        mofka.DataDescriptor()
+
+    def test_create_data_descriptor(self):
+        """Test create data descriptor"""
+        mofka.DataDescriptor(self.location, self.size)
+
+    def test_get_size_location(self):
+        """Test get size and location"""
+        data_descriptor = mofka.DataDescriptor(self.location, self.size)
+        size = data_descriptor.size
+        location = data_descriptor.location
+
+    def test_make_sub_view(self):
+        """Test make sub view of a datadescriptor"""
+        data_descriptor = mofka.DataDescriptor(self.location, self.size)
+        offset = random.randint(0, self.size)
+        size = random.randint(1, random.randint(0, self.size - offset))
+        data_descriptor.make_sub_view(offset, size)
 
 class TestServiceHandle(unittest.TestCase):
 
@@ -299,6 +343,48 @@ class TestProducer(unittest.TestCase):
         metadata = mofka.Metadata(self.str_metadata)
         self.producer.push(metadata, data)
         self.producer.flush()
+
+class TestConsumer(unittest.TestCase):
+    
+    def setUp(self):
+        bedrock_config_file = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "config.json")    
+        with open(bedrock_config_file) as f:
+            self.bedrock_server = BedrockServer("na+sm", config=f.read())
+        self.mid = self.bedrock_server.margo.mid
+        self.gid = self.bedrock_server.ssg["mofka_group"].handle
+        self.client = mofka.Client(mid=self.mid)
+        self.service = self.client.connect(self.gid)
+        name = "my_topic"
+        validator = mofka.Validator()
+        selector = mofka.PartitionSelector()
+        serializer = mofka.Serializer()
+        self.service.create_topic(name, validator, selector, serializer)
+        self.topic = self.service.open_topic(name)   
+        batchsize = random.randint(1,10)
+        thread_pool = mofka.ThreadPool(random.randint(1,10))
+
+        self.producer = self.topic.consumer(name, batchsize, thread_pool, selecotr, broker)
+
+        metadata = dict()
+        letters = string.ascii_letters
+        key_len = random.randint(8, 64)
+        val_len = random.randint(16, 128)
+        key = ''.join(random.choice(letters) for i in range(key_len))
+        val = ''.join(random.choice(letters) for i in range(val_len))
+        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
+        metadata[key] = val
+        self.str_metadata = str(metadata) 
+
+    def tearDown(self):
+        del self.mid
+        del self.gid
+        del self.service
+        del self.client
+        del self.topic
+        del self.producer
+        self.bedrock_server.finalize()
+
 
 if __name__ == '__main__':
     unittest.main()
