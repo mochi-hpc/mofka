@@ -65,38 +65,6 @@ class TestThreadPool(unittest.TestCase):
         count = thread_pool.thread_count()
         self.assertEqual(self.count, count)
 
-class TestValidator(unittest.TestCase):
-
-    def setUp(self):
-        metadata = dict()
-        letters = string.ascii_letters
-        key_len = random.randint(8, 64)
-        val_len = random.randint(16, 128)
-        key = ''.join(random.choice(letters) for i in range(key_len))
-        val = ''.join(random.choice(letters) for i in range(val_len))
-        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
-        metadata[key] = val
-        self.str_metadata = str(metadata)
-
-    def test_create_validator(self):
-        "Test create an empty validator"
-        mofka.Validator()
-
-    def test_get_metadata(self):
-        validator = mofka.Validator()
-        validator.metadata
-    
-    def test_from_metadata(self):
-        metadata = mofka.Metadata(self.str_metadata)
-        validator = mofka.Validator(metadata)
-    
-    def test_validate(self):
-        """Test validate"""
-        validator = mofka.Validator()
-        metadata = mofka.Metadata(self.str_metadata)
-        data = mofka.Data(self.str_data.encode('ascii'))
-        validator.validate(metadata, data)
-
 class TestMetadata(unittest.TestCase):
 
     def setUp(self):
@@ -172,6 +140,38 @@ class TestData(unittest.TestCase):
         """Test get data size"""
         data = mofka.Data(self.list_num_data)
         data.size
+
+class TestValidator(unittest.TestCase):
+
+    def setUp(self):
+        metadata = dict()
+        letters = string.ascii_letters
+        key_len = random.randint(8, 64)
+        val_len = random.randint(16, 128)
+        key = ''.join(random.choice(letters) for i in range(key_len))
+        val = ''.join(random.choice(letters) for i in range(val_len))
+        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
+        metadata[key] = val
+        self.str_metadata = str(metadata)
+
+    def test_create_validator(self):
+        "Test create an empty validator"
+        mofka.Validator()
+
+    def test_get_metadata(self):
+        validator = mofka.Validator()
+        validator.metadata
+    
+    def test_from_metadata(self):
+        metadata = mofka.Metadata(self.str_metadata)
+        validator = mofka.Validator(metadata)
+    
+    def test_validate(self):
+        """Test validate"""
+        validator = mofka.Validator()
+        metadata = mofka.Metadata(self.str_metadata)
+        data = mofka.Data(self.str_data.encode('ascii'))
+        validator.validate(metadata, data)
 
 class TestServiceHandle(unittest.TestCase):
 
@@ -249,11 +249,56 @@ class TestTopicHandle(unittest.TestCase):
     def test_create_producer(self):
         """Test create a producer associated with a topic"""
         name = "myproducer"
-        batchsize = random.randint(2,8)
-        thread_pool = mofka.ThreadPool(random.randint(2,8))
+        batchsize = random.randint(1,8)
+        thread_pool = mofka.ThreadPool(random.randint(1,8))
         ordering = mofka.Ordering.Strict
         producer = self.topic.producer(name, batchsize, thread_pool, ordering)
 
+class TestProducer(unittest.TestCase):
+    def setUp(self):
+        bedrock_config_file = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "config.json")    
+        with open(bedrock_config_file) as f:
+            self.bedrock_server = BedrockServer("na+sm", config=f.read())
+        self.mid = self.bedrock_server.margo.mid
+        self.gid = self.bedrock_server.ssg["mofka_group"].handle
+        self.client = mofka.Client(mid=self.mid)
+        self.service = self.client.connect(self.gid)
+        name = "my_topic"
+        validator = mofka.Validator()
+        selector = mofka.PartitionSelector()
+        serializer = mofka.Serializer()
+        self.service.create_topic(name, validator, selector, serializer)
+        self.topic = self.service.open_topic(name)   
+        batchsize = random.randint(1,10)
+        thread_pool = mofka.ThreadPool(random.randint(1,10))
+        ordering = mofka.Ordering.Strict
+        self.producer = self.topic.producer(name, batchsize, thread_pool, ordering)
+
+        metadata = dict()
+        letters = string.ascii_letters
+        key_len = random.randint(8, 64)
+        val_len = random.randint(16, 128)
+        key = ''.join(random.choice(letters) for i in range(key_len))
+        val = ''.join(random.choice(letters) for i in range(val_len))
+        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
+        metadata[key] = val
+        self.str_metadata = str(metadata) 
+
+    def tearDown(self):
+        del self.mid
+        del self.gid
+        del self.service
+        del self.client
+        del self.topic
+        del self.producer
+        self.bedrock_server.finalize()
+
+    def test_push_flush(self):
+        data = mofka.Data(self.str_data.encode('ascii'))
+        metadata = mofka.Metadata(self.str_metadata)
+        self.producer.push(metadata, data)
+        self.producer.flush()
 
 if __name__ == '__main__':
     unittest.main()
