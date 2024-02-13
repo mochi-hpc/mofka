@@ -23,6 +23,10 @@ static auto get_buffer_info(const py::buffer& buf) {
     return buf.request();
 }
 
+static auto get_buffer_info(const std::string& str) {
+    return py::buffer_info{ str.data(), (ssize_t)str.size(), false };
+}
+
 #define CHECK_BUFFER_IS_CONTIGUOUS(__buf_info__) do { \
     ssize_t __stride__ = (__buf_info__).itemsize;     \
     for(ssize_t i=0; i < (__buf_info__).ndim; i++) {  \
@@ -179,6 +183,13 @@ PYBIND11_MODULE(pymofka_client, m) {
     py::class_<mofka::TopicHandle>(m, "TopicHandle")
         .def("producer",
             [](const mofka::TopicHandle& topic,
+               std::string_view name) -> mofka::Producer {
+                return topic.producer(
+                    name);
+            },
+            "name"_a)
+        .def("producer",
+            [](const mofka::TopicHandle& topic,
                std::string_view name,
                std::size_t batch_size,
                mofka::ThreadPool thread_pool,
@@ -187,6 +198,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                     name, mofka::BatchSize(batch_size), thread_pool, ordering);
             },
             "name"_a, "batch_size"_a, "thread_pool"_a, "ordering"_a)
+        
         .def("consumer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,
@@ -201,6 +213,14 @@ PYBIND11_MODULE(pymofka_client, m) {
                },
             "name"_a, "batch_size"_a, "thread_pool"_a, "data_broker"_a,
             "data_selector"_a, "targets"_a)
+            
+        .def("consumer",
+            [](const mofka::TopicHandle& topic,
+               std::string_view name) -> mofka::Consumer {
+                return topic.consumer(
+                    name);
+               },
+            "name"_a)
         .def_property_readonly("name", &mofka::TopicHandle::name)
         .def_property_readonly("service", &mofka::TopicHandle::service)
         .def_property_readonly("partitions", &mofka::TopicHandle::partitions)
