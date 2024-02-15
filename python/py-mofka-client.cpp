@@ -13,6 +13,7 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
+
 typedef py::capsule py_margo_instance_id;
 typedef py::capsule py_hg_addr_t;
 
@@ -36,8 +37,64 @@ static auto get_buffer_info(const std::string& str) {
     }                                                 \
 } while(0)
 
+#define CHECK_BUFFER_IS_WRITABLE(__buf_info__) do { \
+    if((__buf_info__).readonly)                     \
+        throw mofka::Exception("MOFKA_ERR_READONLY");     \
+} while(0)
 
-std::string stringify(const rapidjson::Value& v){
+
+template <typename DataType>
+auto data_helper(const DataType& data){
+    auto data_info = get_buffer_info(data);
+    CHECK_BUFFER_IS_CONTIGUOUS(data_info);
+    return mofka::Data(data_info.ptr, data_info.size);
+}
+
+template<typename DataType>
+static auto data_helper(const std::vector<DataType>& buffers) {
+    std::vector<mofka::Data::Segment> segments;
+    for (auto buff : buffers){
+        auto buff_info = get_buffer_info(buff);
+        CHECK_BUFFER_IS_CONTIGUOUS(buff_info);
+        CHECK_BUFFER_IS_WRITABLE(buff_info);
+        segments.push_back(mofka::Data::Segment(buff_info.ptr, 
+                                                buff_info.size));
+    }
+    return mofka::Data(segments);
+}
+
+static auto metadata_helper(const py::dict metadata) {
+    py::module_ json = py::module_::import("json");
+    std::string str_metadata = json.attr("dumps")(metadata).cast<std::string>();
+    return mofka::Metadata(str_metadata);
+}
+
+static auto data_broker_helper(const std::function<py::buffer(py::dict, mofka::DataDescriptor descriptor)> &broker,
+                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"}, 
+                                 const mofka::DataDescriptor data_descriptor = mofka::DataDescriptor()) {
+    return [broker](mofka::Metadata metadata, 
+                     mofka::DataDescriptor data_descriptor) -> mofka::Data {
+        py::module_ json = py::module_::import("json");
+        py::dict d_metadata = json.attr("loads")(metadata.string());
+        py::buffer data_buffer = broker(d_metadata, data_descriptor).cast<py::buffer>();
+        return data_helper(data_buffer);
+    };
+}
+
+static auto data_selector_helper(const std::function<mofka::DataDescriptor(py::dict, mofka::DataDescriptor descriptor)> &selector,
+                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"}, 
+                                 const mofka::DataDescriptor data_descriptor = mofka::DataDescriptor()) {
+    return  [selector](mofka::Metadata metadata, 
+                       mofka::DataDescriptor data_descriptor) -> mofka::DataDescriptor {
+        py::module_ json = py::module_::import("json");
+        py::dict d_metadata = json.attr("loads")(metadata.string());
+        return selector(d_metadata, data_descriptor);
+    };
+
+}
+           
+
+std::string stringify(const rapidjson::Value& v) {
 	if (v.IsString())
 		return { v.GetString(), v.GetStringLength() };
 	else {
@@ -74,6 +131,20 @@ PYBIND11_MODULE(pymofka_client, m) {
     py::class_<mofka::Validator>(m, "Validator")
         .def(py::init<>())
         .def(py::init(&mofka::Validator::FromMetadata))
+        .def(py::init(
+            [](const py::dict d_metadata){
+                mofka::Metadata metadata = metadata_helper(d_metadata);
+                return mofka::Validator::FromMetadata(metadata);
+            }))
+        .def("validate",
+            [](const mofka::Validator& validator, 
+               const py::dict& d_metadata, 
+               const py::buffer& b_data){
+                mofka::Metadata metadata = metadata_helper(d_metadata);
+                mofka::Data data = data_helper(b_data);            
+                return validator.validate(metadata, data);
+               },
+            "metadata"_a, "data"_a)
         .def("validate",
             [](const mofka::Validator& validator, 
                const mofka::Metadata& metadata, 
@@ -104,11 +175,32 @@ PYBIND11_MODULE(pymofka_client, m) {
     py::class_<mofka::Serializer>(m, "Serializer")
         .def(py::init<>())
         .def(py::init(&mofka::Serializer::FromMetadata))
+        .def(py::init(
+            [](const py::dict d_metadata){
+                mofka::Metadata metadata = metadata_helper(d_metadata);
+                return mofka::Serializer::FromMetadata(metadata);
+            }))
+        .def("serialize",
+            [](const mofka::Serializer& serializer, 
+               mofka::Archive& archive, 
+               const py::dict d_metadata){
+                mofka::Metadata metadata = metadata_helper(d_metadata);
+                return serializer.serialize(archive, metadata);
+               },
+            "archive"_a, "matadata"_a)
         .def("serialize",
             [](const mofka::Serializer& serializer, 
                mofka::Archive& archive, 
                const mofka::Metadata& metadata){
                 return serializer.serialize(archive, metadata);
+               },
+            "archive"_a, "matadata"_a)
+        .def("deserialize",
+            [](const mofka::Serializer& deserializer, 
+               mofka::Archive& archive, 
+               py::dict d_metadata){
+                mofka::Metadata metadata = metadata_helper(d_metadata);
+                return deserializer.deserialize(archive, metadata);
                },
             "archive"_a, "matadata"_a)
         .def("deserialize",
@@ -130,6 +222,11 @@ PYBIND11_MODULE(pymofka_client, m) {
     py::class_<mofka::PartitionSelector>(m, "PartitionSelector")
         .def(py::init<>())
         .def(py::init(&mofka::PartitionSelector::FromMetadata))
+        .def(py::init(
+            [](const py::dict d_metadata){
+                mofka::Metadata metadata = metadata_helper(d_metadata);
+                return mofka::PartitionSelector::FromMetadata(metadata);
+            }))
         .def("set_partitions", 
             [](mofka::PartitionSelector& selector, const std::vector<mofka::PartitionInfo>& targets) {
                 return selector.setPartitions(targets);                
@@ -141,7 +238,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return selector.selectPartitionFor(metadata);
                },
             "metadata"_a)
-        .def_property_readonly("matadata", &mofka::PartitionSelector::metadata)
+        .def_property_readonly("metadata", &mofka::PartitionSelector::metadata)
     ;
 
     py::class_<mofka::ServiceHandle>(m, "ServiceHandle")
@@ -193,12 +290,13 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::string_view name,
                std::size_t batch_size,
                mofka::ThreadPool thread_pool,
-               mofka::Ordering ordering) -> mofka::Producer {
+               std::string s_ordering) -> mofka::Producer {
+                mofka::Ordering ordering = (s_ordering == "Loose") ? mofka::Ordering::Loose : mofka::Ordering::Strict;
                 return topic.producer(
                     name, mofka::BatchSize(batch_size), thread_pool, ordering);
             },
             "name"_a, "batch_size"_a, "thread_pool"_a, "ordering"_a)
-        
+
         .def("consumer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,
@@ -207,6 +305,23 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::function<mofka::Data(const mofka::Metadata&, const mofka::DataDescriptor&)> data_broker,
                std::function<mofka::DataDescriptor(const mofka::Metadata&, const mofka::DataDescriptor&)> data_selector,
                const std::vector<mofka::PartitionInfo>& targets) -> mofka::Consumer {
+                return topic.consumer(
+                    name, mofka::BatchSize(batch_size), thread_pool, data_broker, 
+                    data_selector, targets);
+               },
+            "name"_a, "batch_size"_a, "thread_pool"_a, "data_broker"_a,
+            "data_selector"_a, "targets"_a)
+
+        .def("consumer",
+            [](const mofka::TopicHandle& topic,
+               std::string_view name,
+               std::size_t batch_size,
+               mofka::ThreadPool thread_pool,
+               std::function<py::buffer(const py::dict, const mofka::DataDescriptor&)> broker,
+               std::function<mofka::DataDescriptor(const py::dict, const mofka::DataDescriptor&)> selector,
+               const std::vector<mofka::PartitionInfo>& targets) -> mofka::Consumer {
+                auto data_broker = data_broker_helper(broker);
+                auto data_selector = data_selector_helper(selector);
                 return topic.consumer(
                     name, mofka::BatchSize(batch_size), thread_pool, data_broker, 
                     data_selector, targets);
@@ -228,10 +343,19 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::Producer>(m, "Producer")
         .def("push",
-            [](const mofka::Producer& producer, mofka::Metadata metadata, mofka::Data data) -> mofka::Future<std::uint64_t> {
+            [](const mofka::Producer& producer, 
+               mofka::Metadata metadata, 
+               mofka::Data data) -> mofka::Future<std::uint64_t> {
                 return producer.push(metadata, data);
             },
             "metadata"_a, "data"_a="{}")
+        .def("push",
+            [](const mofka::Producer& producer, 
+               py::dict metadata, 
+               py::buffer data) -> mofka::Future<std::uint64_t> {
+                return producer.push(metadata_helper(metadata), data_helper(data));
+            },
+            "metadata"_a, "data"_a)
         .def("flush",
             [](mofka::Producer& producer){
                 producer.flush();
@@ -271,7 +395,7 @@ PYBIND11_MODULE(pymofka_client, m) {
             "processor"_a, "threadPoll"_a, 
             "max_events"_a=std::numeric_limits<size_t>::max()
             )
-    ;        
+    ;
 
     py::class_<mofka::Data::Segment>(m, "Segment")
         .def_readwrite("ptr", &mofka::Data::Segment::ptr)
@@ -301,7 +425,7 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def(py::init<>())
         .def(py::init(&mofka::DataDescriptor::From))
         .def_property_readonly("size", &mofka::DataDescriptor::size)
-        .def("location",
+        .def_property_readonly("location",
             py::overload_cast<>(&mofka::DataDescriptor::location))
         .def_property_readonly("location",
             py::overload_cast<>(&mofka::DataDescriptor::location, py::const_))
