@@ -390,14 +390,14 @@ class TestTopicHandle(unittest.TestCase):
     def test_create_consumer_2(self):
         """Test Create a consumer associated with a topic"""
 
-        def selector(metadata = dict(), data_descriptor = DataDescriptor()):
+        def selector(metadata = dict(), data_descriptor = mofka.DataDescriptor()):
             choice = random.choice([True, False])
             if choice:
                 return data_descriptor
             else:
                 return mofka.DataDescriptor()
                 
-        def broker(metadata = dict(), data_descriptor = DataDescriptor() ):
+        def broker(metadata = dict(), data_descriptor = mofka.DataDescriptor() ):
             return np.random.random(random.randint(1024, 2048)).data
 
         name = "myconsumer"
