@@ -111,14 +111,11 @@ static auto data_selector_helper(const std::function<mofka::DataDescriptor(std::
 }
 
 std::string stringify(const rapidjson::Value& v) {
-	if (v.IsString())
-		return { v.GetString(), v.GetStringLength() };
-	else {
-        rapidjson::StringBuffer strbuf;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
-        v.Accept(writer);
-        return { strbuf.GetString(), strbuf.GetLength() };
-	}
+    std::string s;
+    mofka::StringWrapper strbuf(s);
+    rapidjson::Writer<mofka::StringWrapper> writer(strbuf);
+    v.Accept(writer);
+    return std::move(strbuf.String());
 }
 
 PYBIND11_MODULE(pymofka_client, m) {

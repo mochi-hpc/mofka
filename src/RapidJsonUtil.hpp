@@ -35,6 +35,10 @@ class StringWrapper {
         return;
     }
 
+    std::string& String() {
+        return m_str;
+    }
+
     private:
 
     std::string& m_str;
