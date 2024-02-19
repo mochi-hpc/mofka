@@ -129,6 +129,8 @@ std::string stringify(const rapidjson::Value& v) {
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the Mofka client library";
 
+    m.attr("AdaptiveBatchSize") = py::int_(mofka::BatchSize::Adaptive().value);
+
     py::class_<mofka::Client>(m, "Client")
         .def_property_readonly("config",
             [](const mofka::Client& client) -> const std::string {
@@ -176,7 +178,7 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::enum_<mofka::Ordering>(m, "Ordering")
         .value("Strict", mofka::Ordering::Strict)
-        .value("Loose", mofka::Ordering::Loose)    
+        .value("Loose", mofka::Ordering::Loose)
     ;
 
     py::class_<mofka::Serializer>(m, "Serializer")
@@ -215,7 +217,7 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def_property_readonly("client", &mofka::ServiceHandle::client)
         .def_property_readonly("num_servers", &mofka::ServiceHandle::numServers)
         .def("create_topic",
-             [](mofka::ServiceHandle& service, 
+             [](mofka::ServiceHandle& service,
                 const std::string& name,
                 mofka::Validator validator,
                 mofka::PartitionSelector selector,
@@ -279,7 +281,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 auto data_broker = data_broker_helper(broker);
                 auto data_selector = data_selector_helper(selector);
                 return topic.consumer(
-                    name, mofka::BatchSize(batch_size), thread_pool, data_broker, 
+                    name, mofka::BatchSize(batch_size), thread_pool, data_broker,
                     data_selector, targets);
                },
             "name"_a, "batch_size"_a, "thread_pool"_a, "data_broker"_a,
@@ -295,7 +297,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 auto data_broker = data_broker_helper(broker);
                 auto data_selector = data_selector_helper(selector);
                 return topic.consumer(
-                    name, mofka::BatchSize(batch_size), thread_pool, data_broker, 
+                    name, mofka::BatchSize(batch_size), thread_pool, data_broker,
                     data_selector, targets);
                },
             "name"_a, "batch_size"_a, "thread_pool"_a, "data_broker"_a,
@@ -314,16 +316,16 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def_property_readonly("threadPool", &mofka::Producer::threadPool)
         .def_property_readonly("topic", &mofka::Producer::topic)
         .def("push",
-            [](const mofka::Producer& producer, 
-               std::string s_metadata, 
+            [](const mofka::Producer& producer,
+               std::string s_metadata,
                py::buffer b_data) -> mofka::Future<mofka::EventID> {
                 mofka::Metadata metadata = mofka::Metadata(s_metadata);
                 return producer.push(metadata, data_helper(b_data));
             },
             "metadata"_a, "data"_a="{}")
         .def("push",
-            [](const mofka::Producer& producer, 
-               py::dict d_metadata, 
+            [](const mofka::Producer& producer,
+               py::dict d_metadata,
                py::buffer b_data) -> mofka::Future<mofka::EventID> {
                 return producer.push(metadata_helper(d_metadata), data_helper(b_data));
             },

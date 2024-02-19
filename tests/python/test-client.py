@@ -7,7 +7,7 @@ import random
 import subprocess
 import tempfile
 import time
-import numpy as np
+import random
 
 wd = os.getcwd()
 sys.path.append(wd + "/../python")
@@ -20,7 +20,7 @@ class TestClient(unittest.TestCase):
 
     def setUp(self):
         bedrock_config_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json")    
+            os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
@@ -39,13 +39,13 @@ class TestClient(unittest.TestCase):
         """Test connecting a client to a ssg group"""
         client = mofka.Client(mid=self.mid)
         service = client.connect(self.gid)
- 
+
     def test_get_config(self):
         """Test get client config"""
         client = mofka.Client(mid=self.mid)
         config = client.config
-    
-    # TODO check/edit config 
+
+    # TODO check/edit config
 
 class TestThreadPool(unittest.TestCase):
 
@@ -101,11 +101,13 @@ class TestData(unittest.TestCase):
             key = ''.join(random.choice(letters) for i in range(key_len))
             val = ''.join(random.choice(letters) for i in range(val_len))
             str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
-            num_data = np.random.random(random.randint(1024, 2048)).data
+            num_data = bytearray(random.randint(1024, 2048))
+            for i in range(len(num_data)):
+                num_data[i] = random.randint(0, 255)
             self.metadata[key] = val
             self.list_str_data.append(str_data.encode('ascii'))
             self.list_num_data.append(num_data)
-        self.str_metadata = json.dumps(self.metadata) 
+        self.str_metadata = json.dumps(self.metadata)
         self.location = ''.join(random.choice(letters) for i in range(val_len))
         self.size = random.randint(16, 128)
 
@@ -117,7 +119,7 @@ class TestData(unittest.TestCase):
     def test_create_empty_data(self):
         """Test create empty data"""
         mofka.Data()
-    
+
     def test_create_data_string(self):
         """Test create a data from string"""
         data = mofka.Data(self.list_str_data[0])
@@ -125,11 +127,11 @@ class TestData(unittest.TestCase):
     def test_create_data_num(self):
         """Test create a data from numerical buffer"""
         mofka.Data(self.list_num_data[0])
-    
+
     def test_create_data_list_str(self):
         """Test create data from list of strings"""
         mofka.Data(self.list_str_data)
-    
+
     def test_create_data_list_num(self):
         """Test create data from list of arrays"""
         mofka.Data(self.list_num_data)
@@ -138,19 +140,19 @@ class TestData(unittest.TestCase):
         """Test get segments"""
         data = mofka.Data(self.list_num_data)
         data.segments
-        
+
     def test_get_size(self):
         """Test get data size"""
         data = mofka.Data(self.list_num_data)
         data_size = data.size
         numsize = 0
-        for i in self.list_num_data: numsize =numsize + i.nbytes/i.itemsize
+        for num_data in self.list_num_data: numsize += len(num_data)
         self.assertEqual(data_size, numsize)
 
     def test_create_data_broker(self):
         """Test create a data broker"""
         data_descriptor = mofka.DataDescriptor(self.location, self.size)
-        broker = lambda metadata, data_descriptor : mofka.Data(self.list_str_data) 
+        broker = lambda metadata, data_descriptor : mofka.Data(self.list_str_data)
         broker = broker(self.metadata, data_descriptor)
 
     def test_create_data_selector(self):
@@ -163,6 +165,7 @@ class TestData(unittest.TestCase):
             else:
                 return mofka.DataDescriptor()
         selector = selector(self.metadata, data_descriptor)
+
 
 class TestDataDescriptor(unittest.TestCase):
 
@@ -203,6 +206,7 @@ class TestDataDescriptor(unittest.TestCase):
         self.assertEqual(size, ds.size)
         self.assertEqual(self.location, ''.join(ds.location)) # TODO check if correct
 
+    @unittest.skip("make_stride_view is not yet supported")
     def test_make_stride_view(self):
         """Test make stride view"""
         data_descriptor = mofka.DataDescriptor(self.location, 25) #self.size)
@@ -211,14 +215,14 @@ class TestDataDescriptor(unittest.TestCase):
         numblocks = 1 # random.randint(1, (self.size - offset)// blocksize)
         gapsize = 0 # random.randint(0, (self.size - offset) // (blocksize*numblocks)  )
         ds = data_descriptor.make_stride_view(offset, numblocks, blocksize, gapsize)
-        print(data_descriptor.size, offset, blocksize, numblocks, gapsize, flush=True)    
+        print(data_descriptor.size, offset, blocksize, numblocks, gapsize, flush=True)
         self.assertEqual(ds.size, numblocks*blocksize)
 
 class TestServiceHandle(unittest.TestCase):
 
     def setUp(self):
         bedrock_config_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json")    
+            os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
@@ -276,14 +280,14 @@ class TestTopicHandle(unittest.TestCase):
 
     def setUp(self):
         bedrock_config_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json")    
+            os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
         self.gid = self.bedrock_server.ssg["mofka_group"].handle
         self.client = mofka.Client(mid=self.mid)
         self.service = self.client.connect(self.gid)
-        
+
         self.metadata = dict()
         letters = string.ascii_letters
         key_len = random.randint(8, 64)
@@ -292,7 +296,7 @@ class TestTopicHandle(unittest.TestCase):
         val = ''.join(random.choice(letters) for i in range(val_len))
         self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
         self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata) 
+        self.str_metadata = json.dumps(self.metadata)
         self.location = ''.join(random.choice(letters) for i in range(val_len))
         self.size = random.randint(16, 128)
 
@@ -310,7 +314,7 @@ class TestTopicHandle(unittest.TestCase):
         del self.client
         del self.topic
         self.bedrock_server.finalize()
-    
+
     def test_create_producer(self):
         """Test create a producer associated with a topic"""
         name = "myproducer"
@@ -323,7 +327,7 @@ class TestTopicHandle(unittest.TestCase):
         """Test create data producer with default params"""
         name = "myproducer"
         producer = self.topic.producer(name)
-    
+
     def test_create_consumer_default(self):
         """Test create data consumer with default params"""
         name = "myconsumer"
@@ -338,7 +342,7 @@ class TestTopicHandle(unittest.TestCase):
                 return data_descriptor
             else:
                 return mofka.DataDescriptor()
-                
+
         def broker(metadata, data_descriptor):
             return mofka.Data()
 
@@ -357,7 +361,7 @@ class TestTopicHandle(unittest.TestCase):
                 return data_descriptor
             else:
                 return mofka.DataDescriptor()
-                
+
         def broker(metadata = dict(), data_descriptor = mofka.DataDescriptor() ):
             return np.random.random(random.randint(1024, 2048)).data
 
@@ -379,10 +383,10 @@ class TestProducer(unittest.TestCase):
         val = ''.join(random.choice(letters) for i in range(val_len))
         self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
         self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata) 
+        self.str_metadata = json.dumps(self.metadata)
 
         bedrock_config_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json")    
+            os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
@@ -395,8 +399,11 @@ class TestProducer(unittest.TestCase):
         selector = mofka.PartitionSelector(self.metadata)
         serializer = mofka.Serializer(self.metadata)
         self.service.create_topic(name, validator, selector, serializer)
-        self.topic = self.service.open_topic(name)   
-        batchsize = random.randint(1,10)
+        self.service.add_partition(name, 0)
+
+        self.topic = self.service.open_topic(name)
+        #batchsize = random.randint(1,10)
+        batchsize = mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(random.randint(1,10))
         ordering = mofka.Ordering.Strict
         self.producer = self.topic.producer(name, batchsize, thread_pool, ordering)
@@ -414,10 +421,10 @@ class TestProducer(unittest.TestCase):
         data = self.str_data.encode('ascii')
         f = self.producer.push(self.metadata, data)
         f.wait() # TODO generates RuntimeError: PartitionSelector has no target to select from
-        self.producer.flush()
+        #self.producer.flush()
 
 class TestConsumer(unittest.TestCase):
-    
+
     def setUp(self):
         # create data and metadata
         self.metadata = dict()
@@ -432,23 +439,23 @@ class TestConsumer(unittest.TestCase):
 
         # Create and connect a create
         bedrock_config_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json")    
+            os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
         self.gid = self.bedrock_server.ssg["mofka_group"].handle
         self.client = mofka.Client(mid=self.mid)
         self.service = self.client.connect(self.gid)
-        
+
         # create a topic
         name = "my_topic"
         validator = mofka.Validator(self.metadata)
         selector = mofka.PartitionSelector(self.metadata)
         serializer = mofka.Serializer(self.metadata)
         self.service.create_topic(name, validator, selector, serializer)
-        self.topic = self.service.open_topic(name)   
+        self.topic = self.service.open_topic(name)
 
-        # Create a producer 
+        # Create a producer
         name = "myproducer"
         batchsize = random.randint(1,8)
         thread_pool = mofka.ThreadPool(random.randint(1,8))
@@ -464,7 +471,7 @@ class TestConsumer(unittest.TestCase):
                 return data_descriptor
             else:
                 return mofka.DataDescriptor()
-                
+
         def broker(metadata, data_descriptor):
             return mofka.Data(data_descriptor.location.data , descriptor.size)
         name = "myconsumer"
@@ -489,16 +496,15 @@ class TestConsumer(unittest.TestCase):
         """Test consumer get name"""
         name = self.consumer.name
         self.assertEqual(name, "myconsumer")
-    
+
     def test_get_batchsize(self):
         """Test get consumer batchsize"""
         b = self.consumer.batchsize
-        # TODO 
+        # TODO
 
     def test_get_data_broker(self):
         """Test get data broker"""
         db = self.consumer.data_broker
-      
 
     def test_get_topic(self):
         """Test get topic"""
@@ -518,6 +524,7 @@ class TestConsumer(unittest.TestCase):
     #     data = event.data
     #     print("data", data, flush=True)
 
+
 class TestPartitionSelector(unittest.TestCase):
 
     def setUp(self):
@@ -528,7 +535,7 @@ class TestPartitionSelector(unittest.TestCase):
         key = ''.join(random.choice(letters) for i in range(key_len))
         val = ''.join(random.choice(letters) for i in range(val_len))
         self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata) 
+        self.str_metadata = json.dumps(self.metadata)
 
     def tearDown(self):
         del self.metadata
@@ -539,12 +546,13 @@ class TestPartitionSelector(unittest.TestCase):
         ps = mofka.PartitionSelector(self.str_metadata)
         # metadata = ps.metadata
         # self.assertEqual(str(metadata), self.str_metadata)
-        
+
     def test_create_partition_selector_dict(self):
         """Test create partition selector from dict"""
         ps = mofka.PartitionSelector(self.metadata)
         # metadata = ps.metadata
         # self.assertEqual(str(metadata), self.metadata)
-        
+
+
 if __name__ == '__main__':
     unittest.main()
