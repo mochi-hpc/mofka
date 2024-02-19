@@ -5,7 +5,7 @@
 #include <mofka/ServiceHandle.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <mofka/ThreadPool.hpp>
-
+#include "../src/RapidJsonUtil.hpp"
 
 #include <iostream>
 #include <numeric>
@@ -30,12 +30,8 @@ static auto get_buffer_info(const std::string& str) {
 
 // TODO: handle non-contiguous buffers
 #define CHECK_BUFFER_IS_CONTIGUOUS(__buf_info__) do { \
-    ssize_t __stride__ = (__buf_info__).itemsize;     \
-    for(ssize_t i=0; i < (__buf_info__).ndim; i++) {  \
-        if(__stride__ != (__buf_info__).strides[i])   \
-            throw mofka::Exception("MOFKA_ERR_NONCONTIG");  \
-        __stride__ *= (__buf_info__).shape[i];        \
-    }                                                 \
+    if (!(PyBuffer_IsContiguous((__buf_info__).view(), 'C') || PyBuffer_IsContiguous((__buf_info__).view(), 'F'))) \
+        throw mofka::Exception("MOFKA_ERR_NONCONTIG");     \
 } while(0)
 
 #define CHECK_BUFFER_IS_WRITABLE(__buf_info__) do { \
@@ -58,7 +54,7 @@ static auto data_helper(const std::vector<DataType>& buffers) {
         auto buff_info = get_buffer_info(buff);
         CHECK_BUFFER_IS_CONTIGUOUS(buff_info);
         CHECK_BUFFER_IS_WRITABLE(buff_info);
-        segments.push_back(mofka::Data::Segment(buff_info.ptr, 
+        segments.push_back(mofka::Data::Segment(buff_info.ptr,
                                                 buff_info.size));
     }
     return mofka::Data(segments);
@@ -71,9 +67,9 @@ static auto metadata_helper(const py::dict metadata) {
 }
 
 static auto data_broker_helper(const std::function<py::buffer(py::dict, mofka::DataDescriptor descriptor)> &broker,
-                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"}, 
+                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"},
                                  const mofka::DataDescriptor data_descriptor = mofka::DataDescriptor()) {
-    return [broker](mofka::Metadata metadata, 
+    return [broker](mofka::Metadata metadata,
                      mofka::DataDescriptor data_descriptor) -> mofka::Data {
         py::module_ json = py::module_::import("json");
         py::dict d_metadata = json.attr("loads")(metadata.string());
@@ -83,9 +79,9 @@ static auto data_broker_helper(const std::function<py::buffer(py::dict, mofka::D
 }
 
 static auto data_broker_helper(const std::function<py::buffer(std::string_view, mofka::DataDescriptor descriptor)> &broker,
-                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"}, 
+                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"},
                                  const mofka::DataDescriptor data_descriptor = mofka::DataDescriptor()) {
-    return [broker](mofka::Metadata metadata, 
+    return [broker](mofka::Metadata metadata,
                      mofka::DataDescriptor data_descriptor) -> mofka::Data {
         std::string_view s_metadata = metadata.string();
         py::buffer data_buffer = broker(s_metadata, data_descriptor).cast<py::buffer>();
@@ -93,11 +89,10 @@ static auto data_broker_helper(const std::function<py::buffer(std::string_view, 
     };
 }
 
-
 static auto data_selector_helper(const std::function<mofka::DataDescriptor(py::dict, mofka::DataDescriptor descriptor)> &selector,
-                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"}, 
+                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"},
                                  const mofka::DataDescriptor data_descriptor = mofka::DataDescriptor()) {
-    return  [selector](mofka::Metadata metadata, 
+    return  [selector](mofka::Metadata metadata,
                        mofka::DataDescriptor data_descriptor) -> mofka::DataDescriptor {
         py::module_ json = py::module_::import("json");
         py::dict d_metadata = json.attr("loads")(metadata.string());
@@ -106,14 +101,14 @@ static auto data_selector_helper(const std::function<mofka::DataDescriptor(py::d
 }
 
 static auto data_selector_helper(const std::function<mofka::DataDescriptor(std::string_view, mofka::DataDescriptor descriptor)> &selector,
-                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"}, 
+                                 const mofka::Metadata metadata = mofka::Metadata{"{\"type\":\"default\"}"},
                                  const mofka::DataDescriptor data_descriptor = mofka::DataDescriptor()) {
-    return  [selector](mofka::Metadata metadata, 
+    return  [selector](mofka::Metadata metadata,
                        mofka::DataDescriptor data_descriptor) -> mofka::DataDescriptor {
         std::string_view s_metadata = metadata.string();
         return selector(s_metadata, data_descriptor);
     };
-}        
+}
 
 std::string stringify(const rapidjson::Value& v) {
 	if (v.IsString())
@@ -128,9 +123,7 @@ std::string stringify(const rapidjson::Value& v) {
 
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the Mofka client library";
-
     m.attr("AdaptiveBatchSize") = py::int_(mofka::BatchSize::Adaptive().value);
-
     py::class_<mofka::Client>(m, "Client")
         .def_property_readonly("config",
             [](const mofka::Client& client) -> const std::string {
@@ -357,17 +350,17 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return consumer.pull();
             })
         .def("process",
-            [](const mofka::Consumer& consumer, 
+            [](const mofka::Consumer& consumer,
                mofka::EventProcessor processor,
                mofka::ThreadPool threadPool,
                std::size_t maxEvents) {
                 return consumer.process(processor, threadPool, mofka::NumEvents{maxEvents});
                },
-            "processor"_a, "threadPoll"_a, 
+            "processor"_a, "threadPoll"_a,
             "max_events"_a=std::numeric_limits<size_t>::max()
             )
     ;
-        
+
     py::class_<mofka::Data::Segment>(m, "Segment")
         .def_readwrite("ptr", &mofka::Data::Segment::ptr)
         .def_readwrite("size", &mofka::Data::Segment::size)
@@ -402,7 +395,7 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def_property_readonly("location",
             py::overload_cast<>(&mofka::DataDescriptor::location, py::const_))
         .def("make_stride_view",
-            [](const mofka::DataDescriptor& data_descriptor, 
+            [](const mofka::DataDescriptor& data_descriptor,
                std::size_t offset,
                std::size_t numblocks,
                std::size_t blocksize,
