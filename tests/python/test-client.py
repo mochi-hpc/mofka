@@ -15,6 +15,7 @@ sys.path.append(wd + "/../python")
 from pymargo.core import Engine
 from mochi.bedrock.server import Server as BedrockServer
 import pymofka_client as mofka
+import utils
 
 class TestClient(unittest.TestCase):
 
@@ -76,9 +77,12 @@ class TestValidator(unittest.TestCase):
         val_len = random.randint(16, 128)
         key = ''.join(random.choice(letters) for i in range(key_len))
         val = ''.join(random.choice(letters) for i in range(val_len))
-        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
         self.metadata[key] = val
         self.str_metadata = json.dumps(self.metadata)
+
+    def tearDown(self):
+        del self.metadata
+        del self.str_metadata
 
     def test_create_validator_from_string(self):
         """Test create validator from metadata"""
@@ -115,6 +119,9 @@ class TestData(unittest.TestCase):
         del self.list_num_data
         del self.list_str_data
         del self.str_metadata
+        del self.metadata
+        del self.location
+        del self.size
 
     def test_create_empty_data(self):
         """Test create empty data"""
@@ -148,24 +155,6 @@ class TestData(unittest.TestCase):
         numsize = 0
         for num_data in self.list_num_data: numsize += len(num_data)
         self.assertEqual(data_size, numsize)
-
-    def test_create_data_broker(self):
-        """Test create a data broker"""
-        data_descriptor = mofka.DataDescriptor(self.location, self.size)
-        broker = lambda metadata, data_descriptor : mofka.Data(self.list_str_data)
-        broker = broker(self.metadata, data_descriptor)
-
-    def test_create_data_selector(self):
-        """Test create a data selector"""
-        data_descriptor = mofka.DataDescriptor(self.location, self.size)
-        def selector(metadata, data_descriptor):
-            choice = random.choice([True, False])
-            if choice:
-                return data_descriptor
-            else:
-                return mofka.DataDescriptor()
-        selector = selector(self.metadata, data_descriptor)
-
 
 class TestDataDescriptor(unittest.TestCase):
 
@@ -209,11 +198,11 @@ class TestDataDescriptor(unittest.TestCase):
     @unittest.skip("make_stride_view is not yet supported")
     def test_make_stride_view(self):
         """Test make stride view"""
-        data_descriptor = mofka.DataDescriptor(self.location, 25) #self.size)
-        offset = 0 #random.randint(0, self.size//2)
-        blocksize =  10 #random.randint(1, 16)
-        numblocks = 1 # random.randint(1, (self.size - offset)// blocksize)
-        gapsize = 0 # random.randint(0, (self.size - offset) // (blocksize*numblocks)  )
+        data_descriptor = mofka.DataDescriptor(self.location, self.size)
+        offset = random.randint(0, self.size//2)
+        blocksize = random.randint(1, 16)
+        numblocks = random.randint(1, (self.size - offset)// blocksize)
+        gapsize = random.randint(0, (self.size - offset) // (blocksize*numblocks)  )
         ds = data_descriptor.make_stride_view(offset, numblocks, blocksize, gapsize)
         print(data_descriptor.size, offset, blocksize, numblocks, gapsize, flush=True)
         self.assertEqual(ds.size, numblocks*blocksize)
@@ -237,7 +226,7 @@ class TestServiceHandle(unittest.TestCase):
         val = ''.join(random.choice(letters) for i in range(val_len))
         self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
         self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata) 
+        self.str_metadata = json.dumps(self.metadata)
         self.location = ''.join(random.choice(letters) for i in range(val_len))
         self.size = random.randint(16, 128)
 
@@ -246,6 +235,11 @@ class TestServiceHandle(unittest.TestCase):
         del self.gid
         del self.service
         del self.client
+        del self.metadata
+        del self.str_data
+        del self.str_metadata
+        del self.location
+        del self.size
         self.bedrock_server.finalize()
 
     def test_get_servers(self):
@@ -254,7 +248,7 @@ class TestServiceHandle(unittest.TestCase):
 
     def test_get_client(self):
         """Test get client"""
-        self.service.client    
+        self.service.client
 
     def test_create_open_topic(self):
         """Test create and open a topic"""
@@ -294,9 +288,7 @@ class TestTopicHandle(unittest.TestCase):
         val_len = random.randint(16, 128)
         key = ''.join(random.choice(letters) for i in range(key_len))
         val = ''.join(random.choice(letters) for i in range(val_len))
-        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
         self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata)
         self.location = ''.join(random.choice(letters) for i in range(val_len))
         self.size = random.randint(16, 128)
 
@@ -313,6 +305,9 @@ class TestTopicHandle(unittest.TestCase):
         del self.service
         del self.client
         del self.topic
+        del self.metadata
+        del self.location
+        del self.size
         self.bedrock_server.finalize()
 
     def test_create_producer(self):
@@ -335,108 +330,16 @@ class TestTopicHandle(unittest.TestCase):
 
     def test_create_consumer(self):
         """Test Create a consumer associated with a topic"""
-
-        def selector(metadata, data_descriptor):
-            choice = random.choice([True, False])
-            if choice:
-                return data_descriptor
-            else:
-                return mofka.DataDescriptor()
-
-        def broker(metadata, data_descriptor):
-            return mofka.Data()
-
         name = "myconsumer"
         batchsize = random.randint(1,8)
         thread_pool = mofka.ThreadPool(random.randint(1,8))
         data_descriptor = mofka.DataDescriptor(self.location, self.size)
-        consumer = self.topic.consumer(name, batchsize, thread_pool, broker, selector, self.topic.partitions)
-
-    def test_create_consumer_2(self):
-        """Test Create a consumer associated with a topic"""
-
-        def selector(metadata = dict(), data_descriptor = mofka.DataDescriptor()):
-            choice = random.choice([True, False])
-            if choice:
-                return data_descriptor
-            else:
-                return mofka.DataDescriptor()
-
-        def broker(metadata = dict(), data_descriptor = mofka.DataDescriptor() ):
-            return np.random.random(random.randint(1024, 2048)).data
-
-        name = "myconsumer"
-        batchsize = random.randint(1,8)
-        thread_pool = mofka.ThreadPool(random.randint(1,8))
-        data_descriptor = mofka.DataDescriptor(self.location, self.size)
-        consumer = self.topic.consumer(name, batchsize, thread_pool, broker, selector, self.topic.partitions)
+        consumer = self.topic.consumer(name, batchsize, thread_pool, utils.broker, utils.selector, self.topic.partitions)
 
 
 class TestProducer(unittest.TestCase):
 
     def setUp(self):
-        self.metadata = dict()
-        letters = string.ascii_letters
-        key_len = random.randint(8, 64)
-        val_len = random.randint(16, 128)
-        key = ''.join(random.choice(letters) for i in range(key_len))
-        val = ''.join(random.choice(letters) for i in range(val_len))
-        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
-        self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata)
-
-        bedrock_config_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json")
-        with open(bedrock_config_file) as f:
-            self.bedrock_server = BedrockServer("na+sm", config=f.read())
-        self.mid = self.bedrock_server.margo.mid
-        self.gid = self.bedrock_server.ssg["mofka_group"].handle
-        self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect(self.gid)
-
-        name = "my_topic"
-        validator = mofka.Validator(self.metadata)
-        selector = mofka.PartitionSelector(self.metadata)
-        serializer = mofka.Serializer(self.metadata)
-        self.service.create_topic(name, validator, selector, serializer)
-        self.service.add_partition(name, 0)
-
-        self.topic = self.service.open_topic(name)
-        #batchsize = random.randint(1,10)
-        batchsize = mofka.AdaptiveBatchSize
-        thread_pool = mofka.ThreadPool(random.randint(1,10))
-        ordering = mofka.Ordering.Strict
-        self.producer = self.topic.producer(name, batchsize, thread_pool, ordering)
-
-    def tearDown(self):
-        del self.mid
-        del self.gid
-        del self.service
-        del self.client
-        del self.topic
-        del self.producer
-        self.bedrock_server.finalize()
-
-    def test_push_flush_dict_buffer(self):
-        data = self.str_data.encode('ascii')
-        f = self.producer.push(self.metadata, data)
-        f.wait() # TODO generates RuntimeError: PartitionSelector has no target to select from
-        #self.producer.flush()
-
-class TestConsumer(unittest.TestCase):
-
-    def setUp(self):
-        # create data and metadata
-        self.metadata = dict()
-        letters = string.ascii_letters
-        key_len = random.randint(8, 64)
-        val_len = random.randint(16, 128)
-        key = ''.join(random.choice(letters) for i in range(key_len))
-        val = ''.join(random.choice(letters) for i in range(val_len))
-        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
-        self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata)
-
         # Create and connect a create
         bedrock_config_file = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -447,38 +350,95 @@ class TestConsumer(unittest.TestCase):
         self.client = mofka.Client(mid=self.mid)
         self.service = self.client.connect(self.gid)
 
+        # create data and metadata
+        self.metadata = dict()
+        letters = string.ascii_letters
+        key_len = random.randint(8, 64)
+        val_len = random.randint(16, 128)
+        key = ''.join(random.choice(letters) for i in range(key_len))
+        val = ''.join(random.choice(letters) for i in range(val_len))
+        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
+        self.metadata[key] = val
+
         # create a topic
         name = "my_topic"
         validator = mofka.Validator(self.metadata)
         selector = mofka.PartitionSelector(self.metadata)
         serializer = mofka.Serializer(self.metadata)
         self.service.create_topic(name, validator, selector, serializer)
+        self.service.add_partition(name, 0)
+
+        # Create a producer
+        self.topic = self.service.open_topic(name)
+        batchsize = mofka.AdaptiveBatchSize
+        thread_pool = mofka.ThreadPool(random.randint(1,10))
+        ordering = mofka.Ordering.Strict
+        self.producer = self.topic.producer(name, batchsize, thread_pool, ordering)
+
+    def tearDown(self):
+        del self.mid
+        del self.gid
+        del self.metadata
+        del self.str_data
+        del self.service
+        del self.client
+        del self.topic
+        del self.producer
+        self.bedrock_server.finalize()
+
+    def test_push_flush_dict_buffer(self):
+        data = self.str_data.encode('ascii')
+        f = self.producer.push(self.metadata, data)
+        f.wait()
+        self.producer.flush()
+
+class TestConsumer(unittest.TestCase):
+
+    def setUp(self):
+        # Create and connect a create
+        bedrock_config_file = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "config.json")
+        with open(bedrock_config_file) as f:
+            self.bedrock_server = BedrockServer("na+sm", config=f.read())
+        self.mid = self.bedrock_server.margo.mid
+        self.gid = self.bedrock_server.ssg["mofka_group"].handle
+        self.client = mofka.Client(mid=self.mid)
+        self.service = self.client.connect(self.gid)
+
+        # create data and metadata
+        self.metadata = dict()
+        letters = string.ascii_letters
+        key_len = random.randint(8, 64)
+        val_len = random.randint(16, 128)
+        key = ''.join(random.choice(letters) for i in range(key_len))
+        val = ''.join(random.choice(letters) for i in range(val_len))
+        self.metadata[key] = val
+        self.str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
+
+        # create a topic
+        name = "my_topic"
+        validator = mofka.Validator(self.metadata)
+        selector = mofka.PartitionSelector(self.metadata)
+        serializer = mofka.Serializer(self.metadata)
+        self.service.create_topic(name, validator, selector, serializer)
+        self.service.add_partition(name, 0)
         self.topic = self.service.open_topic(name)
 
         # Create a producer
         name = "myproducer"
-        batchsize = random.randint(1,8)
+        batchsize = mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(random.randint(1,8))
         ordering = mofka.Ordering.Strict
         self.producer = self.topic.producer(name, batchsize, thread_pool, ordering)
         f = self.producer.push(self.metadata, self.str_data.encode('ascii'))
+        f.wait()
         self.producer.flush()
 
         # Create a consumer
-        def selector(metadata, data_descriptor):
-            choice = random.choice([True, False])
-            if choice:
-                return data_descriptor
-            else:
-                return mofka.DataDescriptor()
-
-        def broker(metadata, data_descriptor):
-            return mofka.Data(data_descriptor.location.data , descriptor.size)
         name = "myconsumer"
         location = ''.join(random.choice(letters) for i in range(val_len))
         data_descriptor = mofka.DataDescriptor(location, val_len)
-        self.consumer = self.topic.consumer(name, batchsize, thread_pool, broker, selector, self.topic.partitions)
-
+        self.consumer = self.topic.consumer(name, batchsize, thread_pool, utils.broker, utils.selector, self.topic.partitions)
 
     def tearDown(self):
         del self.mid
@@ -488,7 +448,7 @@ class TestConsumer(unittest.TestCase):
         del self.topic
         del self.consumer
         del self.producer
-        del self.str_metadata
+        del self.metadata
         del self.str_data
         self.bedrock_server.finalize()
 
@@ -518,12 +478,11 @@ class TestConsumer(unittest.TestCase):
         """Test get threadpool"""
         pool = self.consumer.thread_pool
 
-    # def test_pull_process(self):
-    #     f = self.consumer.pull()
-    #     event = f.wait()
-    #     data = event.data
-    #     print("data", data, flush=True)
-
+    def test_pull_process(self):
+        """Test pull event data"""
+        f = self.consumer.pull()
+        event = f.wait()
+        data = event.data
 
 class TestPartitionSelector(unittest.TestCase):
 
@@ -535,15 +494,13 @@ class TestPartitionSelector(unittest.TestCase):
         key = ''.join(random.choice(letters) for i in range(key_len))
         val = ''.join(random.choice(letters) for i in range(val_len))
         self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata)
 
     def tearDown(self):
         del self.metadata
-        del self.str_metadata
 
     def test_create_partition_selector_metadata(self):
         """Test create partition selector from metadata"""
-        ps = mofka.PartitionSelector(self.str_metadata)
+        ps = mofka.PartitionSelector(self.metadata)
         # metadata = ps.metadata
         # self.assertEqual(str(metadata), self.str_metadata)
 
