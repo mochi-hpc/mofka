@@ -11,6 +11,7 @@ import random
 
 wd = os.getcwd()
 sys.path.append(wd + "/../python")
+sys.path.insert(0, '../../build/tests/python/cpputils/')
 
 from pymargo.core import Engine
 from mochi.bedrock.server import Server as BedrockServer
@@ -253,9 +254,9 @@ class TestServiceHandle(unittest.TestCase):
     def test_create_open_topic(self):
         """Test create and open a topic"""
         name = "my_topic"
-        validator = mofka.Validator({"type":"my_validator:./cpputils/build/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"type":"./cpputils/build/my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"type":"./cpputils/build/my_serializer:libmy_serializer.so"})
+        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
+        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
+        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         topic = self.service.open_topic(name)
 
@@ -263,9 +264,9 @@ class TestServiceHandle(unittest.TestCase):
         """Test add partition"""
         topic_name = "my_topic"
         server_rank = 0
-        validator = mofka.Validator({"type":"my_validator:./cpputils/build/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"type":"./cpputils/build/my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"type":"./cpputils/build/my_serializer:libmy_serializer.so"})
+        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
+        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
+        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
         self.service.create_topic(topic_name, validator, selector, serializer)
         self.service.add_partition(topic_name, server_rank)
 
@@ -293,9 +294,9 @@ class TestTopicHandle(unittest.TestCase):
         self.size = random.randint(16, 128)
 
         name = "my_topic"
-        validator = mofka.Validator({"type":"my_validator:./cpputils/build/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"type":"./cpputils/build/my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"type":"./cpputils/build/my_serializer:libmy_serializer.so"})
+        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
+        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
+        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         self.topic = self.service.open_topic(name)
 
@@ -361,9 +362,9 @@ class TestProducer(unittest.TestCase):
 
         # create a topic
         name = "my_topic"
-        validator = mofka.Validator({"type":"my_validator:./cpputils/build/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"type":"./cpputils/build/my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"type":"./cpputils/build/my_serializer:libmy_serializer.so"})
+        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
+        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
+        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         self.service.add_partition(name, 0)
 
@@ -416,9 +417,9 @@ class TestConsumer(unittest.TestCase):
 
         # create a topic
         name = "my_topic"
-        validator = mofka.Validator({"type":"my_validator:./cpputils/build/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"type":"./cpputils/build/my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"type":"./cpputils/build/my_serializer:libmy_serializer.so"})
+        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
+        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
+        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         self.service.add_partition(name, 0)
         self.topic = self.service.open_topic(name)
