@@ -15,7 +15,7 @@ mofka::Data broker(const mofka::Metadata& metadata, const mofka::DataDescriptor&
     return mofka::Data{new char[descriptor.size()], descriptor.size()};
 }
 
-PYBIND11_MODULE(utils, m) {
+PYBIND11_MODULE(my_broker_selector, m) {
     m.doc() = "Data broker, data selector binding";
     m.def("selector", &selector, "Data selector");
     m.def("broker", &broker, "Data broker");

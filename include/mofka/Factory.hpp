@@ -8,11 +8,13 @@
 
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
+#include <dlfcn.h>
 
 #include <unordered_map>
 #include <functional>
 #include <memory>
 #include <vector>
+
 
 namespace mofka {
 
@@ -29,11 +31,21 @@ class Factory {
 
     static std::unique_ptr<Base> create(const std::string& key, Args&&... args) {
         auto& factory = instance();
-        auto it = factory.m_creator_fn.find(key);
+        std::string name = key;
+        auto found = key.find(":");
+        if (found != std::string::npos){
+            name = key.substr(0, found);
+            auto it = factory.m_creator_fn.find(name);
+            if (it != factory.m_creator_fn.end()) {
+                const auto path = key.substr(found + 1);
+                dlopen(path.c_str(), RTLD_NOW);
+            }
+        }
+        auto it = factory.m_creator_fn.find(name);
         if (it != factory.m_creator_fn.end()) {
             return it->second(std::forward<Args>(args)...);
         } else {
-            return nullptr; // Key not found
+            throw Exception("Creator not found");
         }
     }
 
