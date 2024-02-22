@@ -219,25 +219,8 @@ void ServiceHandle::addPartition(
     const PartitionDependencies& dependencies,
     std::string_view pool_name) {
 
-    auto partition_uuid  = UUID::generate();
-    auto provider_name   = fmt::format("{}_partition_{}", topic_name, partition_uuid.to_string().substr(0, 8));
-    auto provider_config = rapidjson::Document{};
-    provider_config.SetObject();
-    provider_config.AddMember("topic",
-            rapidjson::Value{topic_name.data(), provider_config.GetAllocator()},
-            provider_config.GetAllocator());
-    provider_config.AddMember("uuid",
-            rapidjson::Value{partition_uuid.to_string().c_str(), provider_config.GetAllocator()},
-            provider_config.GetAllocator());
-    provider_config.AddMember("type",
-            rapidjson::Value{partition_type.data(), provider_config.GetAllocator()},
-            provider_config.GetAllocator());
-    rapidjson::Value partition_value;
-    partition_value.CopyFrom(partition_config.json(), provider_config.GetAllocator());
-    provider_config.AddMember("partition",
-            partition_value, provider_config.GetAllocator());
-    auto provider_config_str = Metadata{std::move(provider_config)}.string();
-
+    auto partition_uuid = UUID::generate();
+    auto provider_name  = fmt::format("{}_partition_{}", topic_name, partition_uuid.to_string().substr(0, 8));
     uint16_t provider_id;
 
     // spin up the provider in the server
@@ -248,10 +231,25 @@ void ServiceHandle::addPartition(
             return $__config__.margo.mercury.address;
         )";
         server.queryConfig(get_address_script, &provider_address);
-        server.startProvider(
-            provider_name, "mofka", bedrock::ServiceHandle::NewProviderID,
-            &provider_id, std::string{pool_name}, provider_config_str, dependencies,
-            {"morka:partition"});
+        auto provider_desciption = nlohmann::json::object();
+        provider_desciption["name"]   = provider_name;
+        provider_desciption["type"]   = "mofka";
+        provider_desciption["pool"]   = pool_name.size() ? pool_name : "__primary__";
+        provider_desciption["config"] = nlohmann::json::object();
+        provider_desciption["config"]["topic"]     = topic_name;
+        provider_desciption["config"]["type"]      = partition_type;
+        provider_desciption["config"]["uuid"]      = partition_uuid.to_string();
+        provider_desciption["config"]["partition"] = nlohmann::json::parse(partition_config.string());
+        provider_desciption["tags"] = nlohmann::json::array();
+        provider_desciption["tags"].push_back("morka:partition");
+        provider_desciption["dependencies"] = nlohmann::json::object();
+        for(auto& p : dependencies) {
+            provider_desciption["dependencies"][p.first] = nlohmann::json::array();
+            for(auto& dep : p.second)
+                provider_desciption["dependencies"][p.first].push_back(dep);
+        }
+
+        server.addProvider(provider_desciption.dump(), &provider_id);
     } catch(const bedrock::Exception& ex) {
         throw Exception{
             fmt::format(
