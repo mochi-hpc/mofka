@@ -64,6 +64,10 @@ class ThreadPoolImpl {
         }
     }
 
+    std::size_t managed_xstreams_size(){
+        return m_managed_xstreams.size();
+    }
+
     private:
 
     thallium::pool                                    m_pool;
