@@ -10,8 +10,7 @@ import time
 import random
 
 wd = os.getcwd()
-sys.path.append(wd + "/../python")
-sys.path.insert(0, '../../build/tests/python/cpputils/')
+print(sys.path)
 
 from pymargo.core import Engine
 from mochi.bedrock.server import Server as BedrockServer
@@ -417,9 +416,12 @@ class TestConsumer(unittest.TestCase):
 
         # create a topic
         name = "my_topic"
-        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
+        validator = mofka.Validator({
+            "__type__":"my_validator:libmy_validator.so"})
+        selector = mofka.PartitionSelector({
+            "__type__":"my_partition_selector:libmy_partition_selector.so"})
+        serializer = mofka.Serializer({
+            "__type__":"my_serializer:libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         self.service.add_partition(name, 0)
         self.topic = self.service.open_topic(name)
