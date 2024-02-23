@@ -13,6 +13,7 @@ spack:
   - argobots@1.2rc1
   - mochi-warabi+bedrock
   - mochi-yokan+bedrock
+  - py-coverage
   - py-pybind11
   - py-mochi-margo
   concretizer:

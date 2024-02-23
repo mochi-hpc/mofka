@@ -8,7 +8,11 @@ set (MOFKA_TEST_PYTHONPATH
 foreach (test-python-source ${test-python-sources})
     get_filename_component (test-target ${test-python-source} NAME_WE)
     set (test-target "${test-target}-python")
-    add_test (NAME ${test-target} COMMAND ${Python3_EXECUTABLE} ${test-python-source})
+    if (${ENABLE_COVERAGE})
+        add_test (NAME ${test-target} COMMAND coverage run -a ${test-python-source})
+    else ()
+        add_test (NAME ${test-target} COMMAND ${Python3_EXECUTABLE} ${test-python-source})
+    endif ()
     set_property (TEST ${test-target} PROPERTY ENVIRONMENT
                   "LD_LIBRARY_PATH=${MOFKA_TEST_LD_LIBRARY_PATH};PYTHONPATH=${MOFKA_TEST_PYTHONPATH}")
 endforeach ()
