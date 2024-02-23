@@ -3,12 +3,12 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "RapidJsonUtil.hpp"
 #include "mofka/ServiceHandle.hpp"
 #include "mofka/Result.hpp"
 #include "mofka/Exception.hpp"
 #include "mofka/TopicHandle.hpp"
 
+#include "JsonUtil.hpp"
 #include "PimplUtil.hpp"
 #include "ClientImpl.hpp"
 #include "ServiceHandleImpl.hpp"
@@ -192,9 +192,9 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
     for(auto& partitionMetadata : partitionsMetadata) {
         const auto& partitionMetadataJson = partitionMetadata.json();
         auto uuid = UUID::from_string(
-                partitionMetadataJson["__uuid__"].GetString());
-        auto address = partitionMetadataJson["__address__"].GetString();
-        uint16_t provider_id = partitionMetadataJson["__provider_id__"].GetUint();
+                partitionMetadataJson["__uuid__"].get_ref<const std::string&>().c_str());
+        const auto& address = partitionMetadataJson["__address__"].get_ref<const std::string&>();
+        uint16_t provider_id = partitionMetadataJson["__provider_id__"].get<uint16_t>();
         auto partitionInfo = std::make_shared<PartitionInfoImpl>(
             uuid, thallium::provider_handle{
                 self->m_client->m_engine.lookup(address),

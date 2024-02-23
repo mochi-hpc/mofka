@@ -1,6 +1,5 @@
 #include <mofka/Validator.hpp>
 #include <mofka/Metadata.hpp>
-#include <rapidjson/document.h>
 
 class MyValidator : public mofka::ValidatorInterface {
 

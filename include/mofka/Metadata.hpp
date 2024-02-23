@@ -8,9 +8,12 @@
 
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
+#include <mofka/Json.hpp>
 
-#include <rapidjson/document.h>
+#include <string>
+#include <string_view>
 #include <memory>
+#include <vector>
 
 namespace mofka {
 
@@ -36,23 +39,15 @@ class Metadata {
      * Validator requires the Metadata to be valid JSON.
      */
     Metadata(std::string json = "{}", bool validate = false);
+    Metadata(std::string_view json, bool validate = false);
+    Metadata(const char* json, bool validate = false);
 
     /**
      * @brief Constructor taking an already formed JSON document.
-     * The document will be moved into the Metadata object, hence it
-     * is passed by value.
      *
      * @param json
      */
-    Metadata(rapidjson::Document json);
-
-    /**
-     * @brief Constructor taking an already formed JSON document.
-     * The rapidjson::Value object will be copied.
-     *
-     * @param json
-     */
-    Metadata(const rapidjson::Value& json);
+    Metadata(nlohmann::json json);
 
     /**
      * @brief Copy-constructor.
@@ -98,7 +93,7 @@ class Metadata {
      * Note: if the Metadata has been constructed from a string,
      * this function will trigger its parsing into a JSON document.
      */
-    const rapidjson::Document& json() const;
+    const nlohmann::json& json() const;
 
     /**
      * @brief Returns the underlying JSON document.
@@ -107,7 +102,7 @@ class Metadata {
      * this function will trigger its parsing into a JSON document.
      * The string representation will also be invalidated.
      */
-    rapidjson::Document& json();
+    nlohmann::json& json();
 
     /**
      * @brief Returns the underlying string representation

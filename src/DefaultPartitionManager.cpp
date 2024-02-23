@@ -3,12 +3,10 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include "DefaultPartitionManager.hpp"
 #include "mofka/DataDescriptor.hpp"
 #include "mofka/BufferWrapperArchive.hpp"
-#include "RapidJsonUtil.hpp"
-#include <rapidjson/writer.h>
 #include <spdlog/spdlog.h>
 #include <numeric>
 #include <iostream>
@@ -108,16 +106,16 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
         const Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies) {
 
-    static constexpr const char* configSchema = R"(
+    static const nlohmann::json configSchema = R"(
     {
         "$schema": "https://json-schema.org/draft/2019-09/schema",
         "type": "object",
         "properties":{}
     }
-    )";
+    )"_json;
 
     /* Validate configuration against schema */
-    static RapidJsonValidator schemaValidator{configSchema};
+    static JsonValidator schemaValidator{configSchema};
     auto validationErrors = schemaValidator.validate(config.json());
     if(!validationErrors.empty()) {
         spdlog::error("[mofka] Error(s) while validating JSON config for DefaultPartitionManager:");

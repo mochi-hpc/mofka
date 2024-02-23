@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include "mofka/Exception.hpp"
 #include "mofka/Validator.hpp"
 #include "MetadataImpl.hpp"
@@ -33,21 +33,21 @@ MOFKA_REGISTER_VALIDATOR(default, DefaultValidator);
 
 Validator Validator::FromMetadata(const Metadata& metadata) {
     auto& json = metadata.json();
-    if(!json.IsObject()) {
+    if(!json.is_object()) {
         throw Exception(
-            "Cannor create Validator from Metadata: "
+            "Cannot create Validator from Metadata: "
             "invalid Metadata (expected JSON object)");
     }
-    if(!json.HasMember("__type__")) {
+    if(!json.contains("__type__")) {
         return Validator{};
     }
     auto& type = json["__type__"];
-    if(!type.IsString()) {
+    if(!type.is_string()) {
         throw Exception(
-            "Cannor create Validator from Metadata: "
+            "Cannot create Validator from Metadata: "
             "invalid __type__ in Metadata (expected string)");
     }
-    auto type_str = std::string{type.GetString()};
+    auto& type_str = type.get_ref<const std::string&>();
     std::shared_ptr<ValidatorInterface> v = ValidatorFactory::create(type_str, metadata);
     return v;
 }

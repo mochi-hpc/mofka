@@ -6,9 +6,7 @@
 #ifndef MOFKA_JSON_HPP
 #define MOFKA_JSON_HPP
 
-#include <rapidjson/document.h>
-#include <rapidjson/error/en.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
+#include <nlohmann/json.hpp>
+#include <nlohmann/json-schema.hpp>
 
 #endif

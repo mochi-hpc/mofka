@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include "mofka/Provider.hpp"
 
 #include "ProviderImpl.hpp"
@@ -15,7 +15,7 @@ namespace mofka {
 Provider::Provider(
         const tl::engine& engine,
         uint16_t provider_id,
-        const rapidjson::Value& config,
+        const Metadata& config,
         const thallium::pool& pool,
         const bedrock::ResolvedDependencyMap& dependencies)
 : self(std::make_shared<ProviderImpl>(engine, provider_id, config, pool, dependencies)) {
@@ -24,9 +24,9 @@ Provider::Provider(
 
 std::vector<bedrock::Dependency> Provider::getDependencies(const Metadata& metadata) {
     auto& json = metadata.json();
-    if(json.IsObject() && json.HasMember("type") && json["type"].IsString()) {
+    if(json.is_object() && json.contains("type") && json["type"].is_string()) {
         return PartitionManagerDependencyFactory::getDependencies(
-            json["type"].GetString()
+            json["type"].get_ref<const std::string&>()
         );
     }
     return {};
@@ -44,7 +44,7 @@ Provider::~Provider() {
     }
 }
 
-const rapidjson::Value& Provider::getConfig() const {
+const Metadata& Provider::getConfig() const {
     return self->m_config;
 }
 

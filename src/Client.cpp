@@ -8,6 +8,7 @@
 #include "mofka/TopicHandle.hpp"
 #include "mofka/Result.hpp"
 
+#include "JsonUtil.hpp"
 #include "PimplUtil.hpp"
 #include "ClientImpl.hpp"
 #include "TopicHandleImpl.hpp"
@@ -47,17 +48,16 @@ std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
         return $result;
     )";
     bsgh.queryConfig(script, &configs);
-    rapidjson::Document doc;
-    doc.Parse(configs.c_str(), configs.size());
+    auto doc = Metadata{configs};
     std::vector<std::pair<std::string, uint16_t>> masters;
-    for(auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
-        const auto& address = it->name.GetString();
-        auto& provider_ids = it->value;
-        for(auto jt = provider_ids.Begin(); jt != provider_ids.End(); ++jt) {
-            masters.push_back({address, jt->GetUint()});
+    for(const auto& p : doc.json().items()) {
+        const auto& address = p.key();
+        for(const auto& provider_id : p.value()) {
+            masters.push_back({address, provider_id.get<uint16_t>()});
         }
     }
-    if(masters.empty()) throw Exception{"Could not find a Yokan provider with the \"mofka:master\" tag"};
+    if(masters.empty())
+        throw Exception{"Could not find a Yokan provider with the \"mofka:master\" tag"};
     // note: if multiple yokan databases have the mofka:master tag,
     // it is assume that they are linked together via RAFT to replicate the same content
     return masters[0];
@@ -83,10 +83,10 @@ ServiceHandle Client::connect(SSGGroupID gid) const {
     return makeServiceHandle(self, gid.value);
 }
 
-const rapidjson::Value& Client::getConfig() const {
+const Metadata& Client::getConfig() const {
     if(!self) throw Exception("Uninitialized ServiceHandle instance");
     // TODO
-    static rapidjson::Value config;
+    static Metadata config{"{}"};
     return config;
 }
 

@@ -6,7 +6,7 @@
 #ifndef MOFKA_WARABI_DATA_STORE_HPP
 #define MOFKA_WARABI_DATA_STORE_HPP
 
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include <warabi/Client.hpp>
 #include <warabi/TargetHandle.hpp>
 #include <mofka/Result.hpp>

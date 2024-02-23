@@ -1,6 +1,5 @@
 #include <mofka/PartitionSelector.hpp>
 #include <mofka/Metadata.hpp>
-#include <rapidjson/document.h>
 
 
 class MyPartitionSelector : public mofka::PartitionSelectorInterface {

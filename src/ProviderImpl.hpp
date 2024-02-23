@@ -33,11 +33,11 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
     public:
 
-    tl::engine           m_engine;
-    rapidjson::Document  m_config;
-    UUID                 m_uuid;
-    std::string          m_topic;
-    tl::pool             m_pool;
+    tl::engine  m_engine;
+    Metadata    m_config;
+    UUID        m_uuid;
+    std::string m_topic;
+    tl::pool    m_pool;
     // RPCs for PartitionManagers
     tl::auto_remote_procedure m_producer_send_batch;
     tl::auto_remote_procedure m_consumer_request_events;
@@ -56,7 +56,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     tl::condition_variable                     m_consumers_cv;
 
     ProviderImpl(const tl::engine& engine, uint16_t provider_id,
-                 const rapidjson::Value& config, const tl::pool& pool,
+                 const Metadata& config, const tl::pool& pool,
                  const bedrock::ResolvedDependencyMap& dependencies)
     : tl::provider<ProviderImpl>(engine, provider_id)
     , m_engine(engine)
@@ -72,13 +72,13 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         ValidateConfig(config);
 
         /* Copy the configuration */
-        m_config.CopyFrom(config, m_config.GetAllocator(), true);
-        m_uuid = UUID::from_string(m_config["uuid"].GetString());
-        m_topic = m_config["topic"].GetString();
+        m_config = config;
+        m_uuid = UUID::from_string(m_config.json()["uuid"].get_ref<const std::string&>().c_str());
+        m_topic = m_config.json()["topic"].get<std::string>();
 
-        std::string partition_type = m_config["type"].GetString();
-        auto partition_config = m_config.HasMember("partition") ? Metadata{m_config["partition"]}
-                                                                : Metadata{"{}"};
+        std::string partition_type = m_config.json()["type"].get<std::string>();
+        auto partition_config = m_config.json().contains("partition")
+            ? Metadata{m_config.json()["partition"]} : Metadata{};
 
         /* Create the partition manager */
         m_partition_manager = PartitionManagerFactory::create(
@@ -88,9 +88,9 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), m_uuid.to_string());
     }
 
-    static void ValidateConfig(const rapidjson::Value& config) {
+    static void ValidateConfig(const Metadata& config) {
         /* Schema for any provider configuration */
-        static constexpr const char* configSchema = R"(
+        static const nlohmann::json configSchema = R"(
         {
             "$schema": "https://json-schema.org/draft/2019-09/schema",
             "type": "object",
@@ -102,11 +102,11 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             },
             "required": ["uuid", "type", "topic"]
         }
-        )";
-        static RapidJsonValidator jsonValidator{configSchema};
+        )"_json;
+        static JsonValidator jsonValidator{configSchema};
 
         /* Validate configuration against schema */
-        auto errors = jsonValidator.validate(config);
+        auto errors = jsonValidator.validate(config.json());
         if(!errors.empty()) {
             spdlog::error("[mofka] Error(s) while validating JSON config for provider:");
             for(auto& error : errors) spdlog::error("[mofka] \t{}", error);

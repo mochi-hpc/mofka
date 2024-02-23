@@ -21,7 +21,6 @@
 #include <mofka/NumEvents.hpp>
 
 #include <thallium.hpp>
-#include <rapidjson/document.h>
 #include <memory>
 
 namespace mofka {

@@ -10,7 +10,7 @@
 #include "mofka/PartitionSelector.hpp"
 #include "mofka/Json.hpp"
 #include "MetadataImpl.hpp"
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 
 namespace mofka {
 
