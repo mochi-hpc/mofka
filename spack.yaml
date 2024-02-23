@@ -4,8 +4,8 @@ spack:
   - pkg-config
   - uuid
   - mochi-thallium
-  - rapidjson
-  - valijson
+  - nlohmann-json
+  - nlohmann-json-schema-validator
   - spdlog+fmt_external
   - fmt
   - tclap
@@ -29,3 +29,5 @@ spack:
       require: "@0.3.0:"
     mochi-bedrock:
       require: "@0.10.0:"
+    nlohmann-json-schema-validator:
+      require: "@2.3.0:"

@@ -17,11 +17,11 @@ class MofkaFactory : public bedrock::AbstractServiceFactory {
     MofkaFactory() {}
 
     void *registerProvider(const bedrock::FactoryArgs &args) override {
-        rapidjson::Document config;
-        rapidjson::ParseResult ok = config.Parse(args.config.c_str());
-        if(!ok) {
-            spdlog::error("Error parsing configuration for Mofka provider: {} ({})",
-                          rapidjson::GetParseError_En(ok.Code()), ok.Offset());
+        mofka::Metadata config;
+        try {
+            config = mofka::Metadata{args.config.c_str(), true};
+        } catch(const mofka::Exception& ex) {
+            spdlog::error("Error parsing configuration for Mofka provider: {}", ex.what());
             return nullptr;
         }
         auto provider = new mofka::Provider(
@@ -38,10 +38,7 @@ class MofkaFactory : public bedrock::AbstractServiceFactory {
 
     std::string getProviderConfig(void *p) override {
         auto provider = static_cast<mofka::Provider *>(p);
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        provider->getConfig().Accept(writer);
-        return buffer.GetString();
+        return provider->getConfig().string();
     }
 
     void *initClient(const bedrock::FactoryArgs& args) override {
@@ -54,10 +51,7 @@ class MofkaFactory : public bedrock::AbstractServiceFactory {
 
     std::string getClientConfig(void* c) override {
         auto client = static_cast<mofka::Client*>(c);
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        client->getConfig().Accept(writer);
-        return buffer.GetString();
+        return client->getConfig().string();
     }
 
     void *createProviderHandle(void *c, hg_addr_t address,

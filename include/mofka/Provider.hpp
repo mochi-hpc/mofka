@@ -7,6 +7,7 @@
 #define MOFKA_PROVIDER_HPP
 
 #include <mofka/ForwardDcl.hpp>
+#include <mofka/Metadata.hpp>
 #include <mofka/Json.hpp>
 
 #include <bedrock/AbstractServiceFactory.hpp>
@@ -37,7 +38,7 @@ class Provider {
      */
     Provider(const thallium::engine& engine,
              uint16_t provider_id = 0,
-             const rapidjson::Value& config = rapidjson::Value{},
+             const Metadata& config = Metadata{"{}"},
              const thallium::pool& pool = thallium::pool{},
              const bedrock::ResolvedDependencyMap& dependencies = {});
 
@@ -76,7 +77,7 @@ class Provider {
      *
      * @return JSON configuration.
      */
-    const rapidjson::Value& getConfig() const;
+    const Metadata& getConfig() const;
 
     /**
      * @brief Checks whether the Provider instance is valid.

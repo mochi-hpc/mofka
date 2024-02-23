@@ -107,7 +107,7 @@ class Client {
      *
      * @return configuration.
      */
-    const rapidjson::Value& getConfig() const;
+    const Metadata& getConfig() const;
 
     private:
 

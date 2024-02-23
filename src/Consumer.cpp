@@ -3,13 +3,13 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "RapidJsonUtil.hpp"
 #include "mofka/Consumer.hpp"
 #include "mofka/Result.hpp"
 #include "mofka/Exception.hpp"
 #include "mofka/TopicHandle.hpp"
 #include "mofka/Future.hpp"
 
+#include "JsonUtil.hpp"
 #include "CerealArchiveAdaptor.hpp"
 #include "EventImpl.hpp"
 #include "Promise.hpp"

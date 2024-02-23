@@ -8,6 +8,7 @@
 
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/ArgsUtil.hpp>
+#include <mofka/Metadata.hpp>
 #include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/Producer.hpp>
@@ -17,7 +18,6 @@
 #include <mofka/Ordering.hpp>
 
 #include <thallium.hpp>
-#include <rapidjson/document.h>
 #include <memory>
 #include <unordered_set>
 

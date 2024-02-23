@@ -6,7 +6,7 @@
 #ifndef MOFKA_YOKAN_EVENT_STORE_HPP
 #define MOFKA_YOKAN_EVENT_STORE_HPP
 
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include <yokan/cxx/collection.hpp>
 #include <mofka/ConsumerHandle.hpp>
 #include <mofka/BatchSize.hpp>

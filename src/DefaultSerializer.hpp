@@ -6,7 +6,7 @@
 #ifndef MOFKA_DEFAULT_SERIALIZER_H
 #define MOFKA_DEFAULT_SERIALIZER_H
 
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include "mofka/Serializer.hpp"
 #include "mofka/Json.hpp"
 

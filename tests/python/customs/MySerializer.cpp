@@ -1,6 +1,5 @@
 #include <mofka/Serializer.hpp>
 #include <mofka/Metadata.hpp>
-#include <rapidjson/document.h>
 
 class MySerializer : public mofka::SerializerInterface {
 

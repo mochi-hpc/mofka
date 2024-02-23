@@ -7,7 +7,7 @@
 #define MOFKA_METADATA_IMPL_H
 
 #include <iostream>
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include "mofka/Json.hpp"
 #include "mofka/Metadata.hpp"
 #include <fmt/format.h>
@@ -15,6 +15,8 @@
 namespace mofka {
 
 class MetadataImpl {
+
+    using json = nlohmann::json;
 
     public:
 
@@ -24,14 +26,9 @@ class MetadataImpl {
         ActualJson = 0x6, /* the json field is up to date (implies ValidJson) */
     };
 
-    explicit MetadataImpl(rapidjson::Document doc)
+    explicit MetadataImpl(json doc)
     : m_json(std::move(doc))
     , m_type(Type::ActualJson) {}
-
-    explicit MetadataImpl(const rapidjson::Value& doc)
-    : m_type(Type::ActualJson) {
-        m_json.CopyFrom(doc, m_json.GetAllocator());
-    }
 
     MetadataImpl(std::string str, bool validate)
     : m_string(std::move(str))
@@ -44,21 +41,17 @@ class MetadataImpl {
 
     void ensureString() {
         if(m_type & Type::String) return;
-        m_string.clear();
-        StringWrapper buffer(m_string);
-        rapidjson::Writer<StringWrapper> writer(buffer);
-        m_json.Accept(writer);
+        m_string = m_json.dump();
         m_type |= Type::String;
     }
 
     void ensureJson() {
         if((m_type & Type::ActualJson) == Type::ActualJson) return;
-        m_json = rapidjson::Document{};
-        rapidjson::ParseResult ok = m_json.Parse(m_string.c_str(), m_string.size());
-        if(!ok) {
+        try {
+            m_json = json::parse(m_string);
+        } catch(const std::exception& ex) {
            throw Exception(fmt::format(
-                "Could not parse Metadata string: {} ({})",
-                rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+                "Could not parse Metadata string: {}", ex.what()));
         }
         m_type |= Type::ActualJson;
     }
@@ -73,9 +66,9 @@ class MetadataImpl {
         }
     }
 
-    std::string         m_string;
-    rapidjson::Document m_json;
-    uint8_t             m_type;
+    std::string m_string;
+    json        m_json;
+    uint8_t     m_type;
 };
 
 template<typename A>

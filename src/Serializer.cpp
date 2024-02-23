@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include "mofka/Exception.hpp"
 #include "mofka/Serializer.hpp"
 #include "MetadataImpl.hpp"
@@ -36,22 +36,22 @@ Metadata Serializer::metadata() const {
 MOFKA_REGISTER_SERIALIZER(default, DefaultSerializer);
 
 Serializer Serializer::FromMetadata(const Metadata& metadata) {
-    auto& json = metadata.json();
-    if(!json.IsObject()) {
+    const auto& json = metadata.json();
+    if(!json.is_object()) {
         throw Exception(
-                "Cannor create Serializer from Metadata: "
+                "Cannot create Serializer from Metadata: "
                 "invalid Metadata (expected JSON object)");
     }
-    if(!json.HasMember("__type__")) {
+    if(!json.contains("__type__")) {
         return Serializer{};
     }
     auto& type = json["__type__"];
-    if(!type.IsString()) {
+    if(!type.is_string()) {
         throw Exception(
-                "Cannor create Serializer from Metadata: "
+                "Cannot create Serializer from Metadata: "
                 "invalid __type__ in Metadata (expected string)");
     }
-    auto type_str = std::string{type.GetString()};
+    const auto& type_str = type.get_ref<const std::string&>();
     std::shared_ptr<SerializerInterface> s = SerializerFactory::create(type_str, metadata);
     return Serializer(std::move(s));
 }

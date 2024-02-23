@@ -4,8 +4,8 @@ spack:
   - pkg-config
   - uuid
   - mochi-thallium
-  - rapidjson
-  - valijson
+  - nlohmann-json
+  - nlohmann-json-schema-validator
   - spdlog+fmt_external
   - fmt
   - tclap
@@ -36,6 +36,8 @@ spack:
       require: "~checksum~boostsys"
     libfabric:
       require: "fabrics=tcp,rxm"
+    nlohmann-json-schema-validator:
+      require: "@2.3.0:"
   mirrors:
     mochi-buildcache:
       url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache

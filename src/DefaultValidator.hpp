@@ -6,7 +6,7 @@
 #ifndef MOFKA_DEFAULT_VALIDATOR_H
 #define MOFKA_DEFAULT_VALIDATOR_H
 
-#include "RapidJsonUtil.hpp"
+#include "JsonUtil.hpp"
 #include "mofka/Metadata.hpp"
 #include "mofka/Validator.hpp"
 #include "mofka/Json.hpp"
@@ -15,6 +15,8 @@
 namespace mofka {
 
 class DefaultValidator : public ValidatorInterface {
+
+    using json = nlohmann::json;
 
     public:
 
@@ -25,7 +27,7 @@ class DefaultValidator : public ValidatorInterface {
     }
 
     Metadata metadata() const override {
-        return Metadata{"{\"type\":\"default\"}"};
+        return Metadata{"{\"type\":\"default\"}"_json};
     }
 
     static std::unique_ptr<ValidatorInterface> create(const Metadata& metadata) {

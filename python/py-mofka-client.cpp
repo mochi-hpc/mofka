@@ -5,7 +5,7 @@
 #include <mofka/ServiceHandle.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <mofka/ThreadPool.hpp>
-#include "../src/RapidJsonUtil.hpp"
+#include "../src/JsonUtil.hpp"
 
 #include <iostream>
 #include <numeric>
@@ -28,9 +28,21 @@ static auto get_buffer_info(const std::string& str) {
     return py::buffer_info{ str.data(), (ssize_t)str.size(), false };
 }
 
+static void check_buffer_is_contiguous(const py::buffer_info& buf_info) {
+    if (!(PyBuffer_IsContiguous((buf_info).view(), 'C')
+       || PyBuffer_IsContiguous((buf_info).view(), 'F')))
+        throw mofka::Exception("Non-contiguous Python buffers are not yet supported");
+}
+
+static void check_buffer_is_writable(const py::buffer_info& buf_info) {
+    if(buf_info.readonly) throw mofka::Exception("Python buffer is read-only");
+}
+
+#if 0
 // TODO: handle non-contiguous buffers
 #define CHECK_BUFFER_IS_CONTIGUOUS(__buf_info__) do { \
-    if (!(PyBuffer_IsContiguous((__buf_info__).view(), 'C') || PyBuffer_IsContiguous((__buf_info__).view(), 'F'))) \
+    if (!(PyBuffer_IsContiguous((__buf_info__).view(), 'C') \
+        || PyBuffer_IsContiguous((__buf_info__).view(), 'F'))) \
         throw mofka::Exception("MOFKA_ERR_NONCONTIG");     \
 } while(0)
 
@@ -38,21 +50,22 @@ static auto get_buffer_info(const std::string& str) {
     if((__buf_info__).readonly)                     \
         throw mofka::Exception("MOFKA_ERR_READONLY");     \
 } while(0)
-
+#endif
 
 template <typename DataType>
 static auto data_helper(const DataType& data){
     auto data_info = get_buffer_info(data);
-    CHECK_BUFFER_IS_CONTIGUOUS(data_info);
+    check_buffer_is_contiguous(data_info);
     return mofka::Data(data_info.ptr, data_info.size);
 }
 
 template<typename DataType>
 static auto data_helper(const std::vector<DataType>& buffers) {
     std::vector<mofka::Data::Segment> segments;
+    segments.reserve(buffers.size());
     for (auto buff : buffers){
         auto buff_info = get_buffer_info(buff);
-        CHECK_BUFFER_IS_CONTIGUOUS(buff_info);
+        check_buffer_is_contiguous(buff_info);
         CHECK_BUFFER_IS_WRITABLE(buff_info);
         segments.push_back(mofka::Data::Segment(buff_info.ptr,
                                                 buff_info.size));
@@ -66,22 +79,14 @@ static auto metadata_helper(const py::dict metadata) {
     return mofka::Metadata(str_metadata);
 }
 
-std::string stringify(const rapidjson::Value& v) {
-    std::string s;
-    mofka::StringWrapper strbuf(s);
-    rapidjson::Writer<mofka::StringWrapper> writer(strbuf);
-    v.Accept(writer);
-    return std::move(strbuf.String());
-}
-
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the Mofka client library";
     m.attr("AdaptiveBatchSize") = py::int_(mofka::BatchSize::Adaptive().value);
     py::class_<mofka::Client>(m, "Client")
         .def_property_readonly("config",
             [](const mofka::Client& client) -> const std::string {
-                auto&  config = client.getConfig();
-                return stringify(config);
+                auto& config = client.getConfig();
+                return config.string();
             })
         .def_property_readonly("engine", &mofka::Client::engine)
         .def(py::init<py_margo_instance_id>(), "mid"_a)
@@ -308,14 +313,14 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def(py::init<>())
         .def(py::init([](const py::buffer buffer){
             auto buffer_info = get_buffer_info(buffer);
-            CHECK_BUFFER_IS_CONTIGUOUS(buffer_info);
+            check_buffer_is_contiguous(buffer_info);
             return new mofka::Data(buffer_info.ptr, buffer_info.size);
         }))
         .def(py::init([](std::vector<py::buffer> buffers){
             std::vector<mofka::Data::Segment> segments(buffers.size());
             for(size_t i = 0; i < buffers.size(); i++) {
                 auto seg_info = get_buffer_info(buffers[i]);
-                CHECK_BUFFER_IS_CONTIGUOUS(seg_info);
+                check_buffer_is_contiguous(seg_info);
                 segments[i] = mofka::Data::Segment{seg_info.ptr, (std::size_t)seg_info.size};
             }
             return new mofka::Data(segments);

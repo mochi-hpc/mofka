@@ -1,6 +1,6 @@
 # (C) 2020 The University of Chicago
 # See COPYRIGHT in top-level directory.
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.16)
 project (mofka C CXX)
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,10 +56,9 @@ find_package (PkgConfig REQUIRED)
 find_package (thallium REQUIRED)
 # search for uuid
 pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
-# search for RapidJSON
-find_package (RapidJSON REQUIRED)
-# search for valijson
-find_package (valijson REQUIRED)
+# search for nlohmann/json and schema validator
+find_package (nlohmann_json REQUIRED)
+find_package (nlohmann_json_schema_validator REQUIRED)
 # search for TCLAP
 find_package (TCLAP REQUIRED)
 # search for spdlog

@@ -38,8 +38,18 @@ set (mofka-vers "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}")
 add_library (mofka-client ${client-src-files})
 add_library (mofka::client ALIAS mofka-client)
 target_link_libraries (mofka-client
-    PUBLIC thallium PkgConfig::uuid rapidjson valijson bedrock-client
-    PRIVATE yokan::client spdlog::spdlog fmt::fmt coverage_config warnings_config)
+    PUBLIC
+    thallium
+    PkgConfig::uuid
+    bedrock-client
+    nlohmann_json::nlohmann_json
+    PRIVATE
+    yokan::client
+    spdlog::spdlog
+    fmt::fmt
+    nlohmann_json_schema_validator::validator
+    coverage_config
+    warnings_config)
 target_include_directories (mofka-client PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (mofka-client BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
@@ -48,13 +58,26 @@ target_include_directories (mofka-client BEFORE PUBLIC
 set_target_properties (mofka-client
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
+target_precompile_headers (mofka-client
+    PUBLIC <thallium.hpp> <nlohmann/json.hpp>
+    PRIVATE <nlohmann/json-schema.hpp>)
 
 # server library
 add_library (mofka-server ${server-src-files})
 add_library (mofka::server ALIAS mofka-server)
 target_link_libraries (mofka-server
-    PUBLIC thallium PkgConfig::uuid fmt::fmt rapidjson
-    PRIVATE mofka-client warabi-client spdlog::spdlog coverage_config warnings_config)
+    PUBLIC
+    thallium
+    PkgConfig::uuid
+    fmt::fmt
+    nlohmann_json::nlohmann_json
+    mofka-client
+    PRIVATE
+    warabi-client
+    spdlog::spdlog
+    nlohmann_json_schema_validator::validator
+    coverage_config
+    warnings_config)
 target_include_directories (mofka-server PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (mofka-server BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
@@ -63,6 +86,7 @@ target_include_directories (mofka-server BEFORE PUBLIC
 set_target_properties (mofka-server
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
+target_precompile_headers (mofka-server REUSE_FROM mofka-client)
 
 # bedrock module library
 add_library (mofka-bedrock-module ${module-src-files})
@@ -77,6 +101,7 @@ target_include_directories (mofka-bedrock-module BEFORE PUBLIC
 set_target_properties (mofka-bedrock-module
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
+target_precompile_headers (mofka-bedrock-module REUSE_FROM mofka-client)
 
 # installation stuff (packaging and install commands)
 write_basic_package_version_file (
