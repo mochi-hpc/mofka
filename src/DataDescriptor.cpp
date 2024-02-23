@@ -82,7 +82,7 @@ DataDescriptor DataDescriptor::makeSubView(
 
 
 DataDescriptor DataDescriptor::makeUnstructuredView(
-        const std::map<size_t, size_t>& segments) const {
+        const std::vector<std::pair<size_t, size_t>>& segments) const {
     if(segments.empty()) return Null();
     if(segments.begin()->first > self->m_size) return Null();
     auto newDesc = std::make_shared<DataDescriptorImpl>(*self);

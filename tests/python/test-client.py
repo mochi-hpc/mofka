@@ -10,7 +10,6 @@ import time
 import random
 
 wd = os.getcwd()
-print(sys.path)
 
 from pymargo.core import Engine
 from mochi.bedrock.server import Server as BedrockServer
@@ -65,7 +64,7 @@ class TestThreadPool(unittest.TestCase):
     def test_get_thread_count(self):
         """Test get thread count"""
         thread_pool = mofka.ThreadPool(self.count)
-        count = thread_pool.thread_count()
+        count = thread_pool.thread_count
         self.assertEqual(self.count, count)
 
 class TestValidator(unittest.TestCase):
@@ -78,83 +77,13 @@ class TestValidator(unittest.TestCase):
         key = ''.join(random.choice(letters) for i in range(key_len))
         val = ''.join(random.choice(letters) for i in range(val_len))
         self.metadata[key] = val
-        self.str_metadata = json.dumps(self.metadata)
 
     def tearDown(self):
         del self.metadata
-        del self.str_metadata
-
-    def test_create_validator_from_string(self):
-        """Test create validator from metadata"""
-        validator = mofka.Validator(self.str_metadata)
 
     def test_create_validator_from_dict(self):
         """Test create validator from metadata"""
-        validator = mofka.Validator(self.metadata)
-
-class TestData(unittest.TestCase):
-
-    def setUp(self):
-        self.metadata = dict()
-        self.list_str_data = list()
-        self.list_num_data = list()
-        letters = string.ascii_letters
-        for i in range(0,8):
-            key_len = random.randint(8, 64)
-            val_len = random.randint(16, 128)
-            key = ''.join(random.choice(letters) for i in range(key_len))
-            val = ''.join(random.choice(letters) for i in range(val_len))
-            str_data = ''.join(random.choice(letters) for i in range(random.randint(1024, 2048)))
-            num_data = bytearray(random.randint(1024, 2048))
-            for i in range(len(num_data)):
-                num_data[i] = random.randint(0, 255)
-            self.metadata[key] = val
-            self.list_str_data.append(str_data.encode('ascii'))
-            self.list_num_data.append(num_data)
-        self.str_metadata = json.dumps(self.metadata)
-        self.location = ''.join(random.choice(letters) for i in range(val_len))
-        self.size = random.randint(16, 128)
-
-    def tearDown(self):
-        del self.list_num_data
-        del self.list_str_data
-        del self.str_metadata
-        del self.metadata
-        del self.location
-        del self.size
-
-    def test_create_empty_data(self):
-        """Test create empty data"""
-        mofka.Data()
-
-    def test_create_data_string(self):
-        """Test create a data from string"""
-        data = mofka.Data(self.list_str_data[0])
-
-    def test_create_data_num(self):
-        """Test create a data from numerical buffer"""
-        mofka.Data(self.list_num_data[0])
-
-    def test_create_data_list_str(self):
-        """Test create data from list of strings"""
-        mofka.Data(self.list_str_data)
-
-    def test_create_data_list_num(self):
-        """Test create data from list of arrays"""
-        mofka.Data(self.list_num_data)
-
-    def test_get_segments(self):
-        """Test get segments"""
-        data = mofka.Data(self.list_num_data)
-        data.segments
-
-    def test_get_size(self):
-        """Test get data size"""
-        data = mofka.Data(self.list_num_data)
-        data_size = data.size
-        numsize = 0
-        for num_data in self.list_num_data: numsize += len(num_data)
-        self.assertEqual(data_size, numsize)
+        validator = mofka.Validator.from_metadata(self.metadata)
 
 class TestDataDescriptor(unittest.TestCase):
 
@@ -253,19 +182,25 @@ class TestServiceHandle(unittest.TestCase):
     def test_create_open_topic(self):
         """Test create and open a topic"""
         name = "my_topic"
-        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
+        validator = mofka.Validator.from_metadata(
+            {"__type__":"my_validator:libmy_validator.so"})
+        selector = mofka.PartitionSelector.from_metadata(
+            {"__type__":"my_partition_selector:libmy_partition_selector.so"})
+        serializer = mofka.Serializer.from_metadata(
+            {"__type__":"my_serializer:libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         topic = self.service.open_topic(name)
 
     def test_add_partition(self):
         """Test add partition"""
         topic_name = "my_topic"
+        validator = mofka.Validator.from_metadata(
+            {"__type__":"my_validator:libmy_validator.so"})
+        selector = mofka.PartitionSelector.from_metadata(
+            {"__type__":"my_partition_selector:libmy_partition_selector.so"})
+        serializer = mofka.Serializer.from_metadata(
+            {"__type__":"my_serializer:libmy_serializer.so"})
         server_rank = 0
-        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
         self.service.create_topic(topic_name, validator, selector, serializer)
         self.service.add_partition(topic_name, server_rank)
 
@@ -293,9 +228,12 @@ class TestTopicHandle(unittest.TestCase):
         self.size = random.randint(16, 128)
 
         name = "my_topic"
-        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
+        validator = mofka.Validator.from_metadata(
+            {"__type__":"my_validator:libmy_validator.so"})
+        selector = mofka.PartitionSelector.from_metadata(
+            {"__type__":"my_partition_selector:libmy_partition_selector.so"})
+        serializer = mofka.Serializer.from_metadata(
+            {"__type__":"my_serializer:libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         self.topic = self.service.open_topic(name)
 
@@ -361,9 +299,12 @@ class TestProducer(unittest.TestCase):
 
         # create a topic
         name = "my_topic"
-        validator = mofka.Validator({"__type__":"my_validator:../../build/tests/python/cpputils/libmy_validator.so"})
-        selector = mofka.PartitionSelector({"__type__":"my_partition_selector:../../build/tests/python/cpputils/libmy_partition_selector.so"})
-        serializer = mofka.Serializer({"__type__":"my_serializer:../../build/tests/python/cpputils/libmy_serializer.so"})
+        validator = mofka.Validator.from_metadata(
+            {"__type__":"my_validator:libmy_validator.so"})
+        selector = mofka.PartitionSelector.from_metadata(
+            {"__type__":"my_partition_selector:libmy_partition_selector.so"})
+        serializer = mofka.Serializer.from_metadata(
+            {"__type__":"my_serializer:libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         self.service.add_partition(name, 0)
 
@@ -416,11 +357,11 @@ class TestConsumer(unittest.TestCase):
 
         # create a topic
         name = "my_topic"
-        validator = mofka.Validator({
+        validator = mofka.Validator.from_metadata({
             "__type__":"my_validator:libmy_validator.so"})
-        selector = mofka.PartitionSelector({
+        selector = mofka.PartitionSelector.from_metadata({
             "__type__":"my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer({
+        serializer = mofka.Serializer.from_metadata({
             "__type__":"my_serializer:libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
         self.service.add_partition(name, 0)
@@ -461,7 +402,7 @@ class TestConsumer(unittest.TestCase):
 
     def test_get_batchsize(self):
         """Test get consumer batchsize"""
-        b = self.consumer.batchsize
+        b = self.consumer.batch_size
         # TODO
 
     def test_get_data_broker(self):
@@ -502,13 +443,13 @@ class TestPartitionSelector(unittest.TestCase):
 
     def test_create_partition_selector_metadata(self):
         """Test create partition selector from metadata"""
-        ps = mofka.PartitionSelector(self.metadata)
+        ps = mofka.PartitionSelector.from_metadata(self.metadata)
         # metadata = ps.metadata
         # self.assertEqual(str(metadata), self.str_metadata)
 
     def test_create_partition_selector_dict(self):
         """Test create partition selector from dict"""
-        ps = mofka.PartitionSelector(self.metadata)
+        ps = mofka.PartitionSelector.from_metadata(self.metadata)
         # metadata = ps.metadata
         # self.assertEqual(str(metadata), self.metadata)
 

@@ -161,7 +161,7 @@ class DataDescriptor {
      * use this function if you have the possibility to use sub or strided
      * views (or a composition of them).
      *
-     * @param segments Map of offset -> size.
+     * @param segments List of <offset,size> pairs.
      *
      * @return a new DataDescriptor.
      *
@@ -171,14 +171,14 @@ class DataDescriptor {
      * "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
      *   ***   *****  **
      *
-     * Let M be a map with the content {{1, 3}, {7, 5}, {14, 2}}.
+     * Let M be a list with the content {{1, 3}, {7, 5}, {14, 2}}.
      * Calling D.makeUnstructuredView(M) will select the bytes shown with
      * a * above, leading to a DataDescriptor representing the following data:
      *
      * "BCDHIJKLOPQR"
      */
     DataDescriptor makeUnstructuredView(
-        const std::map<size_t, size_t>& segments) const;
+        const std::vector<std::pair<size_t, size_t>>& segments) const;
 
     /**
      * @brief Load the DataDescriptor from an Archive.

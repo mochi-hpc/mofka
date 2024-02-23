@@ -1,6 +1,8 @@
+#define PYBIND11_DETAILED_ERROR_MESSAGES
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include "pybind11_json/pybind11_json.hpp"
 #include <mofka/Client.hpp>
 #include <mofka/ServiceHandle.hpp>
 #include <mofka/TopicHandle.hpp>
@@ -24,7 +26,7 @@ static auto get_buffer_info(const py::buffer& buf) {
     return buf.request();
 }
 
-static auto get_buffer_info(const std::string& str) {
+static auto get_buffer_info(std::string_view str) {
     return py::buffer_info{ str.data(), (ssize_t)str.size(), false };
 }
 
@@ -52,64 +54,56 @@ static auto data_helper(const std::vector<DataType>& buffers) {
     for (auto buff : buffers){
         auto buff_info = get_buffer_info(buff);
         check_buffer_is_contiguous(buff_info);
-        CHECK_BUFFER_IS_WRITABLE(buff_info);
-        segments.push_back(mofka::Data::Segment(buff_info.ptr,
-                                                buff_info.size));
+        segments.push_back(mofka::Data::Segment{buff_info.ptr,
+                                                static_cast<size_t>(buff_info.size)});
     }
     return mofka::Data(segments);
 }
 
-static auto metadata_helper(const py::dict metadata) {
-    py::module_ json = py::module_::import("json");
-    std::string str_metadata = json.attr("dumps")(metadata).cast<std::string>();
-    return mofka::Metadata(str_metadata);
-}
+using PythonDataSelector = std::function<mofka::DataDescriptor(const nlohmann::json&, const mofka::DataDescriptor&)>;
+using PythonDataBroker   = std::function<std::vector<py::buffer>(const nlohmann::json&, const mofka::DataDescriptor&)>;
 
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the Mofka client library";
+
+    py::register_exception<mofka::Exception>(m, "Exception", PyExc_RuntimeError);
+
     m.attr("AdaptiveBatchSize") = py::int_(mofka::BatchSize::Adaptive().value);
+
     py::class_<mofka::Client>(m, "Client")
         .def_property_readonly("config",
-            [](const mofka::Client& client) -> const std::string {
-                auto& config = client.getConfig();
-                return config.string();
+            [](const mofka::Client& client) -> nlohmann::json {
+                return client.getConfig().json();
             })
         .def_property_readonly("engine", &mofka::Client::engine)
         .def(py::init<py_margo_instance_id>(), "mid"_a)
         .def("connect",
-             [](const mofka::Client& client, const std::string_view ssgfile) -> mofka::ServiceHandle {
+             [](const mofka::Client& client, std::string_view ssgfile) -> mofka::ServiceHandle {
                 return client.connect(mofka::SSGFileName{ssgfile});
              },
-            "ssgfile"_a)
+            "ssg_file"_a)
         .def("connect",
              [](const mofka::Client& client, uint64_t ssgid) -> mofka::ServiceHandle {
                 return client.connect(mofka::SSGGroupID{ssgid});
              },
-            "gid"_a)
+            "ssg_group_id"_a)
     ;
 
     py::class_<mofka::Validator>(m, "Validator")
-        .def(py::init(
-            [](const py::dict& d_metadata){
-                mofka::Metadata metadata = metadata_helper(d_metadata);
-                return mofka::Validator::FromMetadata(metadata);
-            }))
-        .def(py::init(
-            [](const std::string s_metadata){
-                mofka::Metadata metadata = mofka::Metadata(s_metadata);
-                return mofka::Validator::FromMetadata(metadata);
-            }))
+        .def_static("from_metadata",
+            [](const nlohmann::json& md){
+                return mofka::Validator::FromMetadata(md);
+            }, "metadata"_a)
     ;
 
     py::class_<mofka::ThreadPool>(m, "ThreadPool")
         .def(py::init(
-            [](std::size_t count){
-            return new mofka::ThreadPool(mofka::ThreadCount{count});
-        }), "count"_a=0)
-        .def("thread_count",
+                [](std::size_t count){
+                    return new mofka::ThreadPool(mofka::ThreadCount{count});
+            }), "thread_count"_a=0)
+        .def_property_readonly("thread_count",
             [](const mofka::ThreadPool& thread_pool) -> std::size_t {
-                mofka::ThreadCount t_count = thread_pool.threadCount();
-                return t_count.count;
+                return thread_pool.threadCount().count;
             })
     ;
 
@@ -119,16 +113,10 @@ PYBIND11_MODULE(pymofka_client, m) {
     ;
 
     py::class_<mofka::Serializer>(m, "Serializer")
-        .def(py::init(
-            [](const py::dict d_metadata){
-                mofka::Metadata metadata = metadata_helper(d_metadata);
-                return mofka::Serializer::FromMetadata(metadata);
-            }))
-        .def(py::init(
-            [](const std::string s_metadata){
-                mofka::Metadata metadata = mofka::Metadata(s_metadata);
-                return mofka::Serializer::FromMetadata(metadata);
-            }))
+        .def_static("from_metadata",
+            [](const nlohmann::json& md){
+                return mofka::Serializer::FromMetadata(md);
+            }, "metadata"_a)
     ;
 
     py::class_<mofka::PartitionInfo>(m, "PartitionInfo")
@@ -138,16 +126,10 @@ PYBIND11_MODULE(pymofka_client, m) {
     ;
 
     py::class_<mofka::PartitionSelector>(m, "PartitionSelector")
-        .def(py::init(
-            [](const py::dict d_metadata){
-                mofka::Metadata metadata = metadata_helper(d_metadata);
-                return mofka::PartitionSelector::FromMetadata(metadata);
-            }))
-        .def(py::init(
-            [](const std::string s_metadata){
-                mofka::Metadata metadata = mofka::Metadata(s_metadata);
-                return mofka::PartitionSelector::FromMetadata(metadata);
-            }))
+        .def_static("from_metadata",
+            [](const nlohmann::json& md){
+                return mofka::PartitionSelector::FromMetadata(md);
+            }, "metadata"_a)
     ;
 
     py::class_<mofka::ServiceHandle>(m, "ServiceHandle")
@@ -173,7 +155,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::string_view topic_name,
                size_t server_rank,
                const std::string& partition_type,
-               const std::string& partition_config,
+               const nlohmann::json& partition_config,
                const mofka::ServiceHandle::PartitionDependencies& dependencies,
                const std::string& pool_name) {
                 service.addPartition(
@@ -182,7 +164,8 @@ PYBIND11_MODULE(pymofka_client, m) {
                     dependencies, pool_name);
             },
             "topic_name"_a, "server_rank"_a, "partition_type"_a="memory",
-            "partition_config"_a="{}", "dependencies"_a=mofka::ServiceHandle::PartitionDependencies{},
+            "partition_config"_a=nlohmann::json::object(),
+            "dependencies"_a=mofka::ServiceHandle::PartitionDependencies{},
             "pool_name"_a="")
     ;
 
@@ -201,63 +184,103 @@ PYBIND11_MODULE(pymofka_client, m) {
             [](const mofka::TopicHandle& topic,
                std::string_view name,
                std::size_t batch_size,
-               mofka::ThreadPool thread_pool,
+               std::optional<mofka::ThreadPool> thread_pool,
                mofka::Ordering ordering) -> mofka::Producer {
                 return topic.producer(
-                    name, mofka::BatchSize(batch_size), thread_pool, ordering);
+                    name, mofka::BatchSize(batch_size),
+                    thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
+                    ordering);
             },
-            "name"_a, "batch_size"_a, "thread_pool"_a, "ordering"_a)
+            "name"_a, "batch_size"_a, "thread_pool"_a=std::optional<mofka::ThreadPool>{},
+            "ordering"_a=mofka::Ordering::Strict)
         .def("consumer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,
                std::size_t batch_size,
-               mofka::ThreadPool thread_pool,
-               std::function<mofka::Data(const mofka::Metadata&, const mofka::DataDescriptor&)> broker,
-               std::function<mofka::DataDescriptor(const mofka::Metadata&, const mofka::DataDescriptor&)> selector,
-               const std::vector<mofka::PartitionInfo>& targets) -> mofka::Consumer {
+               std::optional<mofka::ThreadPool> thread_pool,
+               PythonDataBroker broker,
+               PythonDataSelector selector,
+               std::optional<std::vector<mofka::PartitionInfo>> targets) -> mofka::Consumer {
+                auto cpp_broker =
+                    [broker=std::move(broker)]
+                    (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::Data {
+                        auto segments = broker(metadata.json(), descriptor);
+                        std::vector<mofka::Data::Segment> cpp_segments;
+                        cpp_segments.reserve(segments.size());
+                        for(auto& segment : segments) {
+                            auto buf_info = get_buffer_info(segment);
+                            check_buffer_is_writable(buf_info);
+                            check_buffer_is_contiguous(buf_info);
+                            cpp_segments.push_back({buf_info.ptr, (size_t)buf_info.size});
+                        }
+                        return mofka::Data{std::move(cpp_segments)};
+                };
+                auto cpp_selector =
+                    [selector=std::move(selector)]
+                    (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::DataDescriptor {
+                        return selector(metadata.json(), descriptor);
+                    };
                 return topic.consumer(
-                    name, mofka::BatchSize(batch_size), thread_pool, broker,
-                    selector, targets);
+                    name, mofka::BatchSize(batch_size),
+                    thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
+                    cpp_broker, cpp_selector,
+                    targets.value_or(topic.partitions()));
                },
-            "name"_a, "batch_size"_a, "thread_pool"_a, "data_broker"_a,
-            "data_selector"_a, "targets"_a)
-
-        .def("consumer",
-            [](const mofka::TopicHandle& topic,
-               std::string_view name) -> mofka::Consumer {
-                return topic.consumer(
-                    name);
-               },
-            "name"_a)
+            "name"_a, "batch_size"_a=mofka::BatchSize::Adaptive().value,
+            "thread_pool"_a=std::nullopt, "data_broker"_a=mofka::DataBroker{},
+            "data_selector"_a=mofka::DataSelector{}, "targets"_a=std::optional<std::vector<mofka::PartitionInfo>>{})
     ;
 
     py::class_<mofka::Producer>(m, "Producer")
         .def_property_readonly("name", &mofka::Producer::name)
-        .def_property_readonly("threadPool", &mofka::Producer::threadPool)
+        .def_property_readonly("thread_pool", &mofka::Producer::threadPool)
         .def_property_readonly("topic", &mofka::Producer::topic)
         .def("push",
             [](const mofka::Producer& producer,
-               std::string s_metadata,
+               std::string metadata,
                py::buffer b_data) -> mofka::Future<mofka::EventID> {
-                mofka::Metadata metadata = mofka::Metadata(s_metadata);
-                return producer.push(metadata, data_helper(b_data));
+                return producer.push(std::move(metadata), data_helper(b_data));
             },
-            "metadata"_a, "data"_a="{}")
+            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true))
         .def("push",
             [](const mofka::Producer& producer,
-               py::dict d_metadata,
+               nlohmann::json metadata,
                py::buffer b_data) -> mofka::Future<mofka::EventID> {
-                return producer.push(metadata_helper(d_metadata), data_helper(b_data));
+                return producer.push(std::move(metadata), data_helper(b_data));
             },
-            "metadata"_a, "data"_a)
-        .def("flush",
-            [](mofka::Producer& producer){
-                producer.flush();
-            })
-        .def("batchsize",
+            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true))
+        .def("push",
+            [](const mofka::Producer& producer,
+               nlohmann::json metadata,
+               std::string_view b_data) -> mofka::Future<mofka::EventID> {
+                return producer.push(std::move(metadata), data_helper(b_data));
+            },
+            "metadata"_a, "data"_a=std::string_view{})
+        .def("push",
+            [](const mofka::Producer& producer,
+               std::string metadata,
+               const std::vector<py::buffer>& b_data) -> mofka::Future<mofka::EventID> {
+                return producer.push(std::move(metadata), data_helper(b_data));
+            },
+            "metadata"_a, "data"_a=std::vector<py::memoryview>{})
+        .def("push",
+            [](const mofka::Producer& producer,
+               nlohmann::json metadata,
+               const std::vector<py::buffer>& b_data) -> mofka::Future<mofka::EventID> {
+                return producer.push(std::move(metadata), data_helper(b_data));
+            },
+            "metadata"_a, "data"_a=std::vector<py::memoryview>{})
+        .def("push",
+            [](const mofka::Producer& producer,
+               nlohmann::json metadata,
+               const std::vector<std::string_view>& b_data) -> mofka::Future<mofka::EventID> {
+                return producer.push(std::move(metadata), data_helper(b_data));
+            },
+            "metadata"_a, "data"_a=std::vector<std::string_view>{})
+        .def("flush", &mofka::Producer::flush)
+        .def("batch_size",
             [](const mofka::Producer& producer) -> std::size_t {
-                mofka::BatchSize b_size = producer.batchSize();
-                return b_size.value;
+                return producer.batchSize().value;
             })
     ;
 
@@ -267,15 +290,11 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def_property_readonly("topic", &mofka::Consumer::topic)
         .def_property_readonly("data_broker", &mofka::Consumer::dataBroker)
         .def_property_readonly("data_selector", &mofka::Consumer::dataSelector)
-        .def("batchsize",
+        .def("batch_size",
             [](const mofka::Consumer& consumer) -> std::size_t {
-                mofka::BatchSize b_size = consumer.batchSize();
-                return b_size.value;
+                return consumer.batchSize().value;
             })
-        .def("pull",
-            [](mofka::Consumer& consumer) -> mofka::Future<mofka::Event> {
-                return consumer.pull();
-            })
+        .def("pull", &mofka::Consumer::pull)
         .def("process",
             [](const mofka::Consumer& consumer,
                mofka::EventProcessor processor,
@@ -286,31 +305,6 @@ PYBIND11_MODULE(pymofka_client, m) {
             "processor"_a, "threadPoll"_a,
             "max_events"_a=std::numeric_limits<size_t>::max()
             )
-    ;
-
-    py::class_<mofka::Data::Segment>(m, "Segment")
-        .def_readwrite("ptr", &mofka::Data::Segment::ptr)
-        .def_readwrite("size", &mofka::Data::Segment::size)
-    ;
-
-    py::class_<mofka::Data>(m, "Data")
-        .def_property_readonly("segments", &mofka::Data::segments)
-        .def_property_readonly("size", &mofka::Data::size)
-        .def(py::init<>())
-        .def(py::init([](const py::buffer buffer){
-            auto buffer_info = get_buffer_info(buffer);
-            check_buffer_is_contiguous(buffer_info);
-            return new mofka::Data(buffer_info.ptr, buffer_info.size);
-        }))
-        .def(py::init([](std::vector<py::buffer> buffers){
-            std::vector<mofka::Data::Segment> segments(buffers.size());
-            for(size_t i = 0; i < buffers.size(); i++) {
-                auto seg_info = get_buffer_info(buffers[i]);
-                check_buffer_is_contiguous(seg_info);
-                segments[i] = mofka::Data::Segment{seg_info.ptr, (std::size_t)seg_info.size};
-            }
-            return new mofka::Data(segments);
-        }))
     ;
 
     py::class_<mofka::DataDescriptor>(m, "DataDescriptor")
@@ -339,24 +333,30 @@ PYBIND11_MODULE(pymofka_client, m) {
             "offset"_a, "size"_a)
         .def("make_unstructured_view",
             [](const mofka::DataDescriptor& data_descriptor,
-               const std::map<std::size_t, std::size_t> segments) -> mofka::DataDescriptor {
+               const std::vector<std::pair<std::size_t, std::size_t>> segments) -> mofka::DataDescriptor {
                 return data_descriptor.makeUnstructuredView(segments);
             },
             "segments"_a)
     ;
 
     py::class_<mofka::Event>(m, "Event")
-        .def_property_readonly("metadata", &mofka::Event::metadata)
-        .def_property_readonly("data", &mofka::Event::data)
+        .def_property_readonly("metadata",
+                [](mofka::Event& event) { return event.metadata().string(); })
+        .def_property_readonly("data",
+                [](mofka::Event& event) {
+                    py::list segments;
+                    for(auto& segment : event.data().segments())
+                        segments.append(
+                            py::memoryview::from_memory(
+                                segment.ptr, segment.size));
+                    return segments;
+                })
         .def_property_readonly("partition", &mofka::Event::partition)
         .def("acknowledge",
              [](const mofka::Event& event){
                 event.acknowledge();
              })
     ;
-
-    py::class_<mofka::EventID>(m, "EventID");
-    py::class_<mofka::Metadata>(m, "Metadata");
 
     py::class_<mofka::Future<std::uint64_t>, std::shared_ptr<mofka::Future<std::uint64_t>>>(m, "FutureUint")
         .def("wait", &mofka::Future<std::uint64_t>::wait)
