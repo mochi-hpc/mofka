@@ -38,20 +38,6 @@ static void check_buffer_is_writable(const py::buffer_info& buf_info) {
     if(buf_info.readonly) throw mofka::Exception("Python buffer is read-only");
 }
 
-#if 0
-// TODO: handle non-contiguous buffers
-#define CHECK_BUFFER_IS_CONTIGUOUS(__buf_info__) do { \
-    if (!(PyBuffer_IsContiguous((__buf_info__).view(), 'C') \
-        || PyBuffer_IsContiguous((__buf_info__).view(), 'F'))) \
-        throw mofka::Exception("MOFKA_ERR_NONCONTIG");     \
-} while(0)
-
-#define CHECK_BUFFER_IS_WRITABLE(__buf_info__) do { \
-    if((__buf_info__).readonly)                     \
-        throw mofka::Exception("MOFKA_ERR_READONLY");     \
-} while(0)
-#endif
-
 template <typename DataType>
 static auto data_helper(const DataType& data){
     auto data_info = get_buffer_info(data);
