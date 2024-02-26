@@ -79,6 +79,11 @@ We first need to initialize a :code:`thallium::engine`, which is the runtime
 used by all the Mochi libraries. Then, we also initialize SSG with :code:`ssg_init`
 and tell the engine to finalize it when it is itself finalized.
 
+.. important::
+
+   The Thallium engine needs to be initialized in *server mode* for Mofka to work.
+   This is because Mofka servers will send RPCs to the clients.
+
 Next, we create a :code:`mofka::Client` object and use it to create a
 :code:`mofka::ServiceHandle`. The latter is initialized using the SSG file
 created by our running Mofka server (*mofka.ssg*).
@@ -100,6 +105,11 @@ have all been sent, we call :code:`producer.flush()`.
 .. literalinclude:: ../_code/producer.cpp
    :language: cpp
 
+
+.. note::
+
+   You may see a warning on your standard output about event ordering.
+   You can ignore it for now.
 
 Simple consumer application
 ---------------------------
