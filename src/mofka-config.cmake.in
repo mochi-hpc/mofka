@@ -15,7 +15,7 @@ find_dependency (thallium)
 find_dependency (PkgConfig)
 pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
 find_dependency (RapidJSON)
-find_dependency (valijson)
+find_dependency (hlohmann_json)
 find_dependency (bedrock)
 
 include ("${CMAKE_CURRENT_LIST_DIR}/mofka-targets.cmake")

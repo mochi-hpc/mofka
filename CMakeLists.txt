@@ -1,6 +1,6 @@
 # (C) 2020 The University of Chicago
 # See COPYRIGHT in top-level directory.
-cmake_minimum_required (VERSION 3.16)
+cmake_minimum_required (VERSION 3.21)
 project (mofka C CXX)
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -84,6 +84,8 @@ set (MOFKA_VERSION_MINOR 1)
 set (MOFKA_VERSION_PATCH 0)
 set (MOFKA_VERSION
      "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}.${MOFKA_VERSION_PATCH}")
+
+add_subdirectory (docs/_code)
 
 add_subdirectory (src)
 if (${ENABLE_TESTS})

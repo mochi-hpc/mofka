@@ -1,0 +1,4 @@
+sphinx>=4.3.0
+sphinx-book-theme
+sphinx_copybutton
+sphinx-tabs
