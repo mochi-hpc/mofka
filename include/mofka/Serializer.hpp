@@ -152,7 +152,7 @@ class Serializer {
     /**
      * @brief Same as the above function but the type is expected
      * to be provided as a "__type__" field in the metdata, and the
-     * function will fall back to "__default__" if not provided.
+     * function will fall back to "default" if not provided.
      *
      * @param metadata Metadata of the Serializer.
      *

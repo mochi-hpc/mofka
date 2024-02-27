@@ -141,7 +141,7 @@ class Validator {
     /**
      * @brief Same as the above function but will look for a "__type__"
      * field in the metadata and, if not provided, will fall back to the
-     * "__default__" type.
+     * "default" type.
      *
      * @param metadata Metadata of the validator.
      *

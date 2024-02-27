@@ -221,7 +221,7 @@ class PartitionSelector {
     /**
      * @brief Version of the above function that does not require a type.
      * The type will be obtained from a "__type__" field in the metadata,
-     * and will fall back to "__default__" if not provided.
+     * and will fall back to "default" if not provided.
      *
      * @param metadata Metadata of the PartitionSelector.
      *
