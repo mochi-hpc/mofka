@@ -10,6 +10,7 @@
 #include <mofka/UUID.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Exception.hpp>
+#include <mofka/InvalidMetadata.hpp>
 #include <mofka/Factory.hpp>
 
 #include <functional>
@@ -208,7 +209,19 @@ class PartitionSelector {
 
     /**
      * @brief Factory function to create a PartitionSelector instance
-     * when the underlying implementation is not known.
+     * from its type and configuration.
+     *
+     * @param type Type of PartitionSelector.
+     * @param metadata Metadata of the PartitionSelector.
+     *
+     * @return PartitionSelector instance.
+     */
+    static PartitionSelector FromMetadata(const char* type, const Metadata& metadata);
+
+    /**
+     * @brief Version of the above function that does not require a type.
+     * The type will be obtained from a "__type__" field in the metadata,
+     * and will fall back to "__default__" if not provided.
      *
      * @param metadata Metadata of the PartitionSelector.
      *

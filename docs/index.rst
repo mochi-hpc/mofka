@@ -31,6 +31,7 @@ which manipulate large datasets and their metadata.
 
    usage/installation
    usage/quickstart
+   usage/topics
 
 
 

@@ -43,4 +43,5 @@ int main(int argc, char** argv) {
     }
 
     engine.finalize();
+    return 0;
 }

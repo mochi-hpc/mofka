@@ -91,9 +91,13 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::Validator>(m, "Validator")
         .def_static("from_metadata",
+            [](const char* type, const nlohmann::json& md){
+                return mofka::Validator::FromMetadata(type, md);
+            }, "type"_a, "metadata"_a=nlohmann::json::object())
+        .def_static("from_metadata",
             [](const nlohmann::json& md){
                 return mofka::Validator::FromMetadata(md);
-            }, "metadata"_a)
+            }, "metadata"_a=nlohmann::json::object())
     ;
 
     py::class_<mofka::ThreadPool>(m, "ThreadPool")
@@ -114,9 +118,13 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::Serializer>(m, "Serializer")
         .def_static("from_metadata",
+            [](const char* type, const nlohmann::json& md){
+                return mofka::Serializer::FromMetadata(type, md);
+            }, "type"_a, "metadata"_a=nlohmann::json::object())
+        .def_static("from_metadata",
             [](const nlohmann::json& md){
                 return mofka::Serializer::FromMetadata(md);
-            }, "metadata"_a)
+            }, "metadata"_a=nlohmann::json::object())
     ;
 
     py::class_<mofka::PartitionInfo>(m, "PartitionInfo")
@@ -129,7 +137,11 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def_static("from_metadata",
             [](const nlohmann::json& md){
                 return mofka::PartitionSelector::FromMetadata(md);
-            }, "metadata"_a)
+            }, "metadata"_a=nlohmann::json::object())
+        .def_static("from_metadata",
+            [](const char* type, const nlohmann::json& md){
+                return mofka::PartitionSelector::FromMetadata(type, md);
+            }, "type"_a, "metadata"_a=nlohmann::json::object())
     ;
 
     py::class_<mofka::ServiceHandle>(m, "ServiceHandle")

@@ -52,4 +52,17 @@ Validator Validator::FromMetadata(const Metadata& metadata) {
     return v;
 }
 
+Validator Validator::FromMetadata(const char* type, const Metadata& metadata) {
+    auto& json = metadata.json();
+    if(!json.is_object()) {
+        throw Exception(
+            "Cannot create Validator from Metadata: "
+            "invalid Metadata (expected JSON object)");
+    }
+    auto md_copy = metadata;
+    md_copy.json()["__type__"] = type;
+    std::shared_ptr<ValidatorInterface> v = ValidatorFactory::create(type, md_copy);
+    return v;
+}
+
 }

@@ -70,7 +70,7 @@ template <typename FactoryType, typename Derived>
 struct Registrar {
 
     explicit Registrar(const std::string& key) {
-        FactoryType::instance().registerCreator(key, &Derived::create);
+        FactoryType::instance().registerCreator(key, Derived::create);
     }
 
 };
@@ -78,7 +78,7 @@ struct Registrar {
 }
 
 #define MOFKA_REGISTER_IMPLEMENTATION_FOR(__factory__, __derived__, __name__) \
-    static ::mofka::Registrar<__factory__, __derived__> \
+    static ::mofka::Registrar<::mofka::__factory__, __derived__> \
     __mofkaRegistrarFor ## __factory__ ## _ ## __derived__ ## _ ## __name__{#__name__}
 
 #endif

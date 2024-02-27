@@ -11,25 +11,13 @@
 #include <mofka/Data.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/Factory.hpp>
+#include <mofka/InvalidMetadata.hpp>
 
 #include <functional>
 #include <exception>
 #include <stdexcept>
 
 namespace mofka {
-
-/**
- * @brief The InvalidMetadata class is the exception raised
- * by Validators when a Metadata is not valid.
- */
-class InvalidMetadata : public Exception {
-
-    public:
-
-    template<typename ... Args>
-    InvalidMetadata(Args&&... args)
-    : Exception(std::forward<Args>(args)...) {}
-};
 
 /**
  * @brief The ValidatorInterface class provides an interface for
@@ -140,7 +128,22 @@ class Validator {
      * @brief Factory function to create a Validator instance
      * when the underlying implementation is not known.
      *
+     * Note: the type can be in the form "name:library.so" if
+     * library.so must be loaded to access the validator.
+     *
+     * @param type Type of Validator.
      * @param metadata Metadata of the Validator.
+     *
+     * @return Validator instance.
+     */
+    static Validator FromMetadata(const char* type, const Metadata& metadata);
+
+    /**
+     * @brief Same as the above function but will look for a "__type__"
+     * field in the metadata and, if not provided, will fall back to the
+     * "__default__" type.
+     *
+     * @param metadata Metadata of the validator.
      *
      * @return Validator instance.
      */

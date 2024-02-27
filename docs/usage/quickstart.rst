@@ -66,6 +66,7 @@ against the Mofka library in CMake.
 
 .. literalinclude:: ../_code/CMakeLists.txt
    :language: cmake
+   :end-before: CUSTOM TOPIC OBJECTS
 
 
 Simple producer application

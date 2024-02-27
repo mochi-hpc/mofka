@@ -59,4 +59,17 @@ PartitionSelector PartitionSelector::FromMetadata(const Metadata& metadata) {
     return ts;
 }
 
+PartitionSelector PartitionSelector::FromMetadata(const char* type, const Metadata& metadata) {
+    auto& json = metadata.json();
+    if(!json.is_object()) {
+        throw Exception(
+            "Cannot create PartitionSelector from Metadata: "
+            "invalid Metadata (expected JSON object)");
+    }
+    auto md_copy = metadata;
+    md_copy.json()["__type__"] = type;
+    std::shared_ptr<PartitionSelectorInterface> ts = PartitionSelectorFactory::create(type, md_copy);
+    return ts;
+}
+
 }

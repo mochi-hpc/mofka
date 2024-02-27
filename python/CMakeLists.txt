@@ -5,6 +5,12 @@ pybind11_strip (pymofka_client)
 
 set (PY_VERSION ${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR})
 
+configure_file (mofkactl.sh.in ${CMAKE_BINARY_DIR}/bin/mofkactl USE_SOURCE_PERMISSIONS @ONLY)
+
+install (FILES ${CMAKE_BINARY_DIR}/bin/mofkactl
+         DESTINATION bin
+         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+
 install (TARGETS pymofka_client
          EXPORT mofka-targets
          ARCHIVE DESTINATION lib/python${PY_VERSION}/site-packages
