@@ -31,19 +31,21 @@ give it a name, and optionally provide three objects.
 .. image:: ../_static/TopicPipeline-light.svg
    :class: only-light
 
-These objects can be customized and can be parameterized. For instance, a validator
-that checks the content of a JSON Metadata could be provided with the list of
-expected fields.
+Mofka will take advantage of multithreading to parallelize and pipeline the execution
+of the validator, partition selector, and serializer over many events. These objects
+can be customized and parameterized. For instance, a validator that checks the content
+of a JSON Metadata could be provided with a list of fields it expects to find in the
+Metadata of each event.
 
 .. topic:: A motivating example
 
-   Hereafter, we will create a topic accepting events that
-   represent collisions in a particle accelerator. The Metadata part of such events will
-   need to have an *energy* value, represented by an unsigned integer (just so we can show
-   what optimizations could be done with Mofka's modularity). Furthermore, let's say the
-   detector is calibrated to output energies from 0 to 99. We can create a validator that
-   checks that the energy field is present and that its value is stricly lower than 100.
-   If we would like to aggregate events with similar energy values into the same partition,
+   Hereafter, we will create a topic accepting events that represent collisions in a
+   particle accelerator. We will require that the Metadata part of such events have
+   an *energy* value, represented by an unsigned integer (just so we can show
+   what optimizations could be done with Mofka's modularity). Furthermore, let's say that
+   the detector is calibrated to output energies from 0 to 99. We can create a validator that
+   checks that the energy field is not only present, but that its value is also stricly lower
+   than 100. If we would like to aggregate events with similar energy values into the same partition,
    we could have the partition selector make its decision based on this energy value.
    Finally, since we know that the energy value is between 0 and 99 and is the only relevant
    part of an event's Metadata, we could serialize this value into a single byte (:code:`uint8_t`),
@@ -75,8 +77,16 @@ implementation.
 
    .. group-tab:: mofkactl
 
-      Work in progress...
+      .. literalinclude:: ../_code/create_topic.sh
+         :language: bash
 
+      Configuration parameters of each objects are passed using hierarchical
+      command-line options. For instance, :code:`-p.x 42 -p.y.z abc`
+      will produce the configuration :code:`{ "x": 42, "y": { "z": "abc" }}`.
+
+      The group file is the name/path of the SSG group file specified in the
+      server's JSON configuration. If not provided, :code:`mofkactl` will
+      look for a *"mofka.ssg"* file in the current working directory.
 
 We can now take a look at the implementation of these classes.
 
@@ -115,4 +125,8 @@ of the energy when it is serialized. :code:`EnergySerializer` inherits
 Adding partitions
 -----------------
 
-TODO
+Now that we have created a topic, we can add partitions to it.
+Right now Mofka won't do any rebalancing if we add new partitions after having pushed
+some events in a topic, so we recommend setting up partitions right after creating the
+topic, and before having applications use it.
+

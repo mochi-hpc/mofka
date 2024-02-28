@@ -215,13 +215,6 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def_property_readonly("partitions", &mofka::TopicHandle::partitions)
         .def("producer",
             [](const mofka::TopicHandle& topic,
-               std::string_view name) -> mofka::Producer {
-                return topic.producer(
-                    name);
-            },
-            "name"_a)
-        .def("producer",
-            [](const mofka::TopicHandle& topic,
                std::string_view name,
                std::size_t batch_size,
                std::optional<mofka::ThreadPool> thread_pool,
@@ -231,7 +224,8 @@ PYBIND11_MODULE(pymofka_client, m) {
                     thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
                     ordering);
             },
-            "name"_a, "batch_size"_a, "thread_pool"_a=std::optional<mofka::ThreadPool>{},
+            "name"_a="", "batch_size"_a=mofka::BatchSize::Adaptive().value,
+            "thread_pool"_a=std::optional<mofka::ThreadPool>{},
             "ordering"_a=mofka::Ordering::Strict)
         .def("consumer",
             [](const mofka::TopicHandle& topic,
@@ -263,7 +257,8 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return topic.consumer(
                     name, mofka::BatchSize(batch_size),
                     thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
-                    cpp_broker, cpp_selector,
+                    mofka::DataBroker{cpp_broker},
+                    mofka::DataSelector{cpp_selector},
                     targets.value_or(topic.partitions()));
                },
             "name"_a, "batch_size"_a=mofka::BatchSize::Adaptive().value,

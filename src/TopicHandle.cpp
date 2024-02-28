@@ -56,9 +56,9 @@ const std::vector<PartitionInfo>& TopicHandle::partitions() const {
 }
 
 Ordering TopicHandle::defaultOrdering() {
-    spdlog::warn("Ordering not specified when creating Producer. "
-                 "Ordering will be strict by default. If this was intended, "
-                 "explicitely specify the ordering as Ordering::Strict.");
+//    spdlog::warn("Ordering not specified when creating Producer. "
+//                 "Ordering will be strict by default. If this was intended, "
+//                 "explicitely specify the ordering as Ordering::Strict.");
     return Ordering::Strict;
 }
 
