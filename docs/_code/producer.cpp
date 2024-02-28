@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
         mofka::ServiceHandle sh = client.connect(mofka::SSGFileName{group_file});
 
         sh.createTopic(topic_name);
-        sh.addPartition(topic_name, 0, "memory");
+        sh.addMemoryPartition(topic_name, 0);
 
         mofka::TopicHandle topic = sh.openTopic(topic_name);
 

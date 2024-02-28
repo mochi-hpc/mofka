@@ -38,7 +38,7 @@ TEST_CASE("Consumer test", "[consumer]") {
         mofka::ServiceHandle::PartitionDependencies partition_dependencies;
         getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
-        REQUIRE_NOTHROW(sh.addPartition(
+        REQUIRE_NOTHROW(sh.addCustomPartition(
                     "mytopic", 0, partition_type,
                     partition_config, partition_dependencies));
 

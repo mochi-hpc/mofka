@@ -46,7 +46,13 @@ int main(int argc, char** argv) {
         sh.createTopic(topic_name, validator, selector, serializer);
         // END CREATE TOPIC
 
-        sh.addPartition(topic_name, 0, "memory");
+        // START ADD MEMORY PARTITION
+        sh.addMemoryPartition(topic_name, 0);
+        // END ADD MEMORY PARTITION
+
+        // START ADD DEFAULT PARTITION
+        sh.addDefaultPartition(topic_name, 0);
+        // END ADD DEFAULT PARTITION
 
 
     } catch(const mofka::Exception& ex) {

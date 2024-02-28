@@ -162,7 +162,27 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return service.openTopic(name);
             },
             "topic_name"_a)
-        .def("add_partition",
+        .def("add_default_partition",
+            [](mofka::ServiceHandle& service,
+               std::string_view topic_name,
+               size_t server_rank,
+               std::string_view metadata_provider,
+               std::string_view data_provider,
+               const nlohmann::json& partition_config,
+               const std::string& pool_name) {
+                service.addDefaultPartition(
+                    topic_name, server_rank,
+                    metadata_provider,
+                    data_provider,
+                    mofka::Metadata{partition_config},
+                    pool_name);
+            },
+            "topic_name"_a, "server_rank"_a,
+            "metadata_provider"_a=std::string_view{},
+            "data_provider"_a=std::string_view{},
+            "partition_config"_a=nlohmann::json::object(),
+            "pool_name"_a="")
+        .def("add_custom_partition",
             [](mofka::ServiceHandle& service,
                std::string_view topic_name,
                size_t server_rank,
@@ -170,7 +190,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                const nlohmann::json& partition_config,
                const mofka::ServiceHandle::PartitionDependencies& dependencies,
                const std::string& pool_name) {
-                service.addPartition(
+                service.addCustomPartition(
                     topic_name, server_rank, partition_type,
                     mofka::Metadata{partition_config},
                     dependencies, pool_name);
@@ -179,6 +199,14 @@ PYBIND11_MODULE(pymofka_client, m) {
             "partition_config"_a=nlohmann::json::object(),
             "dependencies"_a=mofka::ServiceHandle::PartitionDependencies{},
             "pool_name"_a="")
+        .def("add_memory_partition",
+            [](mofka::ServiceHandle& service,
+               std::string_view topic_name,
+               size_t server_rank,
+               const std::string& pool_name) {
+                service.addMemoryPartition(topic_name, server_rank, pool_name);
+            },
+            "topic_name"_a, "server_rank"_a, "pool_name"_a="")
     ;
 
     py::class_<mofka::TopicHandle>(m, "TopicHandle")

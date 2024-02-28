@@ -118,12 +118,45 @@ class ServiceHandle {
      * @param dependencies Map of dependencies expected by the partition.
      * @param pool_name Pool name in the server.
      */
-    void addPartition(std::string_view topic_name,
-                      size_t server_rank,
-                      std::string_view partition_type = "memory",
-                      const Metadata& partition_config = Metadata{"{}"},
-                      const PartitionDependencies& dependencies = {},
-                      std::string_view pool_name = "");
+    void addCustomPartition(std::string_view topic_name,
+                            size_t server_rank,
+                            std::string_view partition_type = "memory",
+                            const Metadata& partition_config = Metadata{"{}"},
+                            const PartitionDependencies& dependencies = {},
+                            std::string_view pool_name = "");
+
+    /**
+     * @brief Add an in-memory partition. Full in-memory partitions are useful
+     * for testing, but in general we advise using addDefaultPartition to add
+     * a partition that is backed up by Yokan and Warabi providers for Metadata
+     * and Data storage respectively.
+     *
+     * @param topic_name Name of the topic.
+     * @param server_rank Rank of the server in which to add the partition.
+     * @param pool_name Pool name in the server.
+     */
+    void addMemoryPartition(std::string_view topic_name,
+                            size_t server_rank,
+                            std::string_view pool_name = "");
+
+    /**
+     * @brief Add a partition backed by Mofka' default partition manager implementation.
+     * This partition manager uses a Yokan provider for Metadata storage and a Warabi
+     * provider for Data storage.
+     *
+     * @param topic_name Topic name.
+     * @param server_rank Rank of the server in which to add the partition.
+     * @param metadata_provider Locator of the metadata provider (e.g. my_yokan_provider@local)
+     * @param data_provider Locator of the data provider (e.g. my_warabi_provider@some_address)
+     * @param partition_config Configuration for the partition.
+     * @param pool_name Pool name in the server.
+     */
+    void addDefaultPartition(std::string_view topic_name,
+                             size_t server_rank,
+                             std::string_view metadata_provider = {},
+                             std::string_view data_provider = {},
+                             const Metadata& config = {},
+                             std::string_view pool_name = "");
 
     private:
 

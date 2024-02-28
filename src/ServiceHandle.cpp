@@ -40,7 +40,7 @@ void ServiceHandle::createTopic(
     //
     // The partitions are managed in a collection named
     // "MOFKA:GLOBAL:{}:partitions. The topic is created without any partition.
-    // The partitions need to be added using ServiceHandle::addPartition().
+    // The partitions need to be added using ServiceHandle::add*Partition().
     std::array<std::string, 3> keys = {
         fmt::format("MOFKA:GLOBAL:{}:validator",  name),
         fmt::format("MOFKA:GLOBAL:{}:selector",   name),
@@ -211,7 +211,26 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
         std::move(partitionsList));
 }
 
-void ServiceHandle::addPartition(
+void ServiceHandle::addMemoryPartition(std::string_view topic_name,
+                                       size_t server_rank,
+                                       std::string_view pool_name) {
+    addCustomPartition(topic_name, server_rank, "memory", {}, {}, pool_name);
+}
+
+void ServiceHandle::addDefaultPartition(std::string_view topic_name,
+                                        size_t server_rank,
+                                        std::string_view metadata_provider,
+                                        std::string_view data_provider,
+                                        const Metadata& config,
+                                        std::string_view pool_name) {
+    PartitionDependencies dependencies = {
+        {"metadata", {std::string{metadata_provider.data(), metadata_provider.size()}}},
+        {"data", {std::string{data_provider.data(), data_provider.size()}}}
+    };
+    addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name);
+}
+
+void ServiceHandle::addCustomPartition(
     std::string_view topic_name,
     size_t server_rank,
     std::string_view partition_type,

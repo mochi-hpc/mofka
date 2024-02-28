@@ -191,7 +191,7 @@ class TestServiceHandle(unittest.TestCase):
         self.service.create_topic(name, validator, selector, serializer)
         topic = self.service.open_topic(name)
 
-    def test_add_partition(self):
+    def test_add_memory_partition(self):
         """Test add partition"""
         topic_name = "my_topic"
         validator = mofka.Validator.from_metadata(
@@ -202,7 +202,7 @@ class TestServiceHandle(unittest.TestCase):
             {"__type__":"my_serializer:libmy_serializer.so"})
         server_rank = 0
         self.service.create_topic(topic_name, validator, selector, serializer)
-        self.service.add_partition(topic_name, server_rank)
+        self.service.add_memory_partition(topic_name, server_rank)
 
 
 class TestTopicHandle(unittest.TestCase):
@@ -306,7 +306,7 @@ class TestProducer(unittest.TestCase):
         serializer = mofka.Serializer.from_metadata(
             {"__type__":"my_serializer:libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
-        self.service.add_partition(name, 0)
+        self.service.add_memory_partition(name, 0)
 
         # Create a producer
         self.topic = self.service.open_topic(name)
@@ -364,7 +364,7 @@ class TestConsumer(unittest.TestCase):
         serializer = mofka.Serializer.from_metadata({
             "__type__":"my_serializer:libmy_serializer.so"})
         self.service.create_topic(name, validator, selector, serializer)
-        self.service.add_partition(name, 0)
+        self.service.add_memory_partition(name, 0)
         self.topic = self.service.open_topic(name)
 
         # Create a producer
