@@ -1,0 +1,4 @@
+#!/bin/bash
+
+MOFKACTL_PYTHONPATH=@CMAKE_INSTALL_PREFIX@/lib/python@Python3_VERSION_MAJOR@.@Python3_VERSION_MINOR@/site-packages
+PYTHONPATH=$PYTHONPATH:$MOFKACTL_PYTHONPATH python3 -m mochi.mofka.mofkactl $@

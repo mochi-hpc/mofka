@@ -9,6 +9,7 @@
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Archive.hpp>
 #include <mofka/Metadata.hpp>
+#include <mofka/InvalidMetadata.hpp>
 #include <mofka/Factory.hpp>
 
 #include <functional>
@@ -66,11 +67,11 @@ class SerializerInterface {
     virtual Metadata metadata() const = 0;
 
     /**
-     * @note A SerializerInterface class must also provide a static Create
+     * @note A SerializerInterface class must also provide a static create
      * function with the following prototype, instanciating a shared_ptr of
      * the class from the provided Metadata:
      *
-     * static std::shared_ptr<SerializerInterface> Create(const Metadata&);
+     * static std::shared_ptr<SerializerInterface> create(const Metadata&);
      */
 };
 
@@ -139,8 +140,19 @@ class Serializer {
     Metadata metadata() const;
 
     /**
-     * @brief Factory function to create a Serializer instance
-     * when the underlying implementation is not known.
+     * @brief Factory function to create a Serializer instance.
+     *
+     * @param type Type of Serializer.
+     * @param metadata Metadata of the Serializer.
+     *
+     * @return Serializer instance.
+     */
+    static Serializer FromMetadata(const char* type, const Metadata& metadata);
+
+    /**
+     * @brief Same as the above function but the type is expected
+     * to be provided as a "__type__" field in the metdata, and the
+     * function will fall back to "default" if not provided.
      *
      * @param metadata Metadata of the Serializer.
      *
