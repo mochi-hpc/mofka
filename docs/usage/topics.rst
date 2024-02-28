@@ -25,6 +25,12 @@ give it a name, and optionally provide three objects.
   object. If not provided, the default serializer will convert the Metadata into a
   string representation.
 
+.. image:: ../_static/TopicPipeline-dark.svg
+   :class: only-dark
+
+.. image:: ../_static/TopicPipeline-light.svg
+   :class: only-light
+
 These objects can be customized and can be parameterized. For instance, a validator
 that checks the content of a JSON Metadata could be provided with the list of
 expected fields.
