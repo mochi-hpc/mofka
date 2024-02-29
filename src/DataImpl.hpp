@@ -28,8 +28,14 @@ class DataImpl {
 
     DataImpl() = default;
 
+    ~DataImpl() {
+        if(m_ctx_free) m_ctx_free(m_ctx);
+    }
+
     std::vector<Data::Segment> m_segments;
     size_t                     m_size = 0;
+    void*                      m_ctx = nullptr;
+    void (*m_ctx_free)(void*) = nullptr;
 };
 
 }

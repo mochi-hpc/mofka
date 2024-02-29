@@ -4,9 +4,11 @@
 #include <pybind11/functional.h>
 #include "pybind11_json/pybind11_json.hpp"
 #include <mofka/Client.hpp>
+#include <mofka/Data.hpp>
 #include <mofka/ServiceHandle.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <mofka/ThreadPool.hpp>
+#include "../src/DataImpl.hpp"
 #include "../src/JsonUtil.hpp"
 
 #include <iostream>
@@ -15,6 +17,23 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
+namespace mofka {
+class PythonBindingHelper {
+
+    public:
+
+    static void SetDataContext(mofka::Data& data, py::object obj) {
+        data.self->m_ctx = static_cast<void*>(new py::object(std::move(obj)));
+        data.self->m_ctx_free = [](void* uargs) -> void {
+            delete static_cast<py::object*>(uargs);
+        };
+    }
+
+    static py::object GetDataContext(const mofka::Data& data) {
+        return *static_cast<py::object*>(data.self->m_ctx);
+    }
+};
+}
 
 typedef py::capsule py_margo_instance_id;
 typedef py::capsule py_hg_addr_t;
@@ -61,7 +80,7 @@ static auto data_helper(const std::vector<DataType>& buffers) {
 }
 
 using PythonDataSelector = std::function<mofka::DataDescriptor(const nlohmann::json&, const mofka::DataDescriptor&)>;
-using PythonDataBroker   = std::function<std::vector<py::buffer>(const nlohmann::json&, const mofka::DataDescriptor&)>;
+using PythonDataBroker   = std::function<py::list(const nlohmann::json&, const mofka::DataDescriptor&)>;
 
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the Mofka client library";
@@ -242,12 +261,14 @@ PYBIND11_MODULE(pymofka_client, m) {
                         std::vector<mofka::Data::Segment> cpp_segments;
                         cpp_segments.reserve(segments.size());
                         for(auto& segment : segments) {
-                            auto buf_info = get_buffer_info(segment);
+                            auto buf_info = get_buffer_info(segment.cast<py::buffer>());
                             check_buffer_is_writable(buf_info);
                             check_buffer_is_contiguous(buf_info);
                             cpp_segments.push_back({buf_info.ptr, (size_t)buf_info.size});
                         }
-                        return mofka::Data{std::move(cpp_segments)};
+                        auto data = mofka::Data{std::move(cpp_segments)};
+                        mofka::PythonBindingHelper::SetDataContext(data, std::move(segments));
+                        return data;
                 };
                 auto cpp_selector =
                     [selector=std::move(selector)]
@@ -379,12 +400,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 [](mofka::Event& event) { return event.metadata().string(); })
         .def_property_readonly("data",
                 [](mofka::Event& event) {
-                    py::list segments;
-                    for(auto& segment : event.data().segments())
-                        segments.append(
-                            py::memoryview::from_memory(
-                                segment.ptr, segment.size));
-                    return segments;
+                    return mofka::PythonBindingHelper::GetDataContext(event.data());
                 })
         .def_property_readonly("partition", &mofka::Event::partition)
         .def("acknowledge",

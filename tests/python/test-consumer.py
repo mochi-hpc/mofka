@@ -16,18 +16,12 @@ from mochi.bedrock.server import Server as BedrockServer
 import pymofka_client as mofka
 
 
-class DataContainer:
+def my_data_selector(metadata, descriptor):
+    return descriptor
 
-    def __init__(self):
-        self.allocated = []
-
-    def selector(self, metadata, descriptor):
-        return descriptor
-
-    def broker(self, metadata, descriptor):
-        data = bytearray(descriptor.size)
-        self.allocated.append((metadata, data))
-        return [data]
+def my_data_broker(metadata, descriptor):
+    data = bytearray(descriptor.size)
+    return [data]
 
 
 class TestConsumer(unittest.TestCase):
@@ -68,12 +62,11 @@ class TestConsumer(unittest.TestCase):
         self.producer.flush()
 
         # Create a consumer
-        self.container = DataContainer()
         self.consumer = self.topic.consumer(
                 name="my_consumer",
                 batch_size=1,
-                data_broker=self.container.broker,
-                data_selector=self.container.selector)
+                data_broker=my_data_broker,
+                data_selector=my_data_selector)
 
     def tearDown(self):
         del self.mid
@@ -117,8 +110,7 @@ class TestConsumer(unittest.TestCase):
         event = f.wait()
         data = event.data
         self.assertEqual(len(data), 1)
-        self.assertEqual(data[0].tobytes(), self.data)
-        self.assertEqual(len(self.container.allocated), 1)
+        self.assertEqual(data[0], self.data)
 
 
 if __name__ == '__main__':

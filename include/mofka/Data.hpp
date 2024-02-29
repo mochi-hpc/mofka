@@ -15,6 +15,7 @@
 namespace mofka {
 
 class DataImpl;
+class PythonBindingHelper;
 class ProducerBatchImpl;
 class ConsumerImpl;
 
@@ -100,6 +101,8 @@ class Data {
     friend class ProducerBatchImpl;
     friend class Event;
     friend class ConsumerImpl;
+    friend class PythonBindingHelper;
+
 };
 
 }
