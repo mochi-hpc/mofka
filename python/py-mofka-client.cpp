@@ -45,10 +45,6 @@ static auto get_buffer_info(const py::buffer& buf) {
     return buf.request();
 }
 
-static auto get_buffer_info(std::string_view str) {
-    return py::buffer_info{ str.data(), (ssize_t)str.size(), false };
-}
-
 static void check_buffer_is_contiguous(const py::buffer_info& buf_info) {
     if (!(PyBuffer_IsContiguous((buf_info).view(), 'C')
        || PyBuffer_IsContiguous((buf_info).view(), 'F')))
@@ -59,24 +55,28 @@ static void check_buffer_is_writable(const py::buffer_info& buf_info) {
     if(buf_info.readonly) throw mofka::Exception("Python buffer is read-only");
 }
 
-template <typename DataType>
-static auto data_helper(const DataType& data){
+static auto data_helper(const py::buffer& data) {
     auto data_info = get_buffer_info(data);
     check_buffer_is_contiguous(data_info);
-    return mofka::Data(data_info.ptr, data_info.size);
+    auto result = mofka::Data(data_info.ptr, data_info.size);
+    mofka::PythonBindingHelper::SetDataContext(result, data);
+    return result;
 }
 
-template<typename DataType>
-static auto data_helper(const std::vector<DataType>& buffers) {
+static auto data_helper(const py::list& buffers) {
     std::vector<mofka::Data::Segment> segments;
     segments.reserve(buffers.size());
     for (auto buff : buffers){
-        auto buff_info = get_buffer_info(buff);
+        auto buff_info = get_buffer_info(buff.cast<py::buffer>());
         check_buffer_is_contiguous(buff_info);
-        segments.push_back(mofka::Data::Segment{buff_info.ptr,
-                                                static_cast<size_t>(buff_info.size)});
+        segments.push_back(
+            mofka::Data::Segment{
+                buff_info.ptr,
+                static_cast<size_t>(buff_info.size)});
     }
-    return mofka::Data(segments);
+    auto result = mofka::Data(std::move(segments));
+    mofka::PythonBindingHelper::SetDataContext(result, buffers);
+    return result;
 }
 
 using PythonDataSelector = std::function<mofka::DataDescriptor(const nlohmann::json&, const mofka::DataDescriptor&)>;
@@ -307,32 +307,18 @@ PYBIND11_MODULE(pymofka_client, m) {
             "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true))
         .def("push",
             [](const mofka::Producer& producer,
-               nlohmann::json metadata,
-               std::string_view b_data) -> mofka::Future<mofka::EventID> {
-                return producer.push(std::move(metadata), data_helper(b_data));
-            },
-            "metadata"_a, "data"_a=std::string_view{})
-        .def("push",
-            [](const mofka::Producer& producer,
                std::string metadata,
-               const std::vector<py::buffer>& b_data) -> mofka::Future<mofka::EventID> {
+               const py::list& b_data) -> mofka::Future<mofka::EventID> {
                 return producer.push(std::move(metadata), data_helper(b_data));
             },
             "metadata"_a, "data"_a=std::vector<py::memoryview>{})
         .def("push",
             [](const mofka::Producer& producer,
                nlohmann::json metadata,
-               const std::vector<py::buffer>& b_data) -> mofka::Future<mofka::EventID> {
+               py::list b_data) -> mofka::Future<mofka::EventID> {
                 return producer.push(std::move(metadata), data_helper(b_data));
             },
-            "metadata"_a, "data"_a=std::vector<py::memoryview>{})
-        .def("push",
-            [](const mofka::Producer& producer,
-               nlohmann::json metadata,
-               const std::vector<std::string_view>& b_data) -> mofka::Future<mofka::EventID> {
-                return producer.push(std::move(metadata), data_helper(b_data));
-            },
-            "metadata"_a, "data"_a=std::vector<std::string_view>{})
+            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true))
         .def("flush", &mofka::Producer::flush)
         .def("batch_size",
             [](const mofka::Producer& producer) -> std::size_t {
