@@ -27,12 +27,12 @@ def create(
                               help="SSG group file of the service")] = "./mofka.ssg"
         ):
     from ._util import parse_config_from_args
-    validator_config = parse_config_from_args(ctx.args, "--validator.")
-    validator_config.update(parse_config_from_args(ctx.args, "--v."))
-    selector_config = parse_config_from_args(ctx.args, "--partition-selector.")
-    selector_config.update(parse_config_from_args(ctx.args, "--p."))
-    serializer_config = parse_config_from_args(ctx.args, "--serializer.")
-    serializer_config.update(parse_config_from_args(ctx.args, "--s."))
+    validator_config = parse_config_from_args(ctx.args.copy(), "--validator.")
+    validator_config.update(parse_config_from_args(ctx.args.copy(), "--v."))
+    selector_config = parse_config_from_args(ctx.args.copy(), "--partition-selector.")
+    selector_config.update(parse_config_from_args(ctx.args.copy(), "--p."))
+    serializer_config = parse_config_from_args(ctx.args.copy(), "--serializer.")
+    serializer_config.update(parse_config_from_args(ctx.args.copy(), "--s."))
 
     from ._util import ServiceContext
     with ServiceContext(groupfile) as service:
