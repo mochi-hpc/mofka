@@ -5,3 +5,5 @@
 /.vscode/
 /compile_commands.json
 *.swp
+/docs/_build/
+__pycache__/

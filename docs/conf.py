@@ -15,7 +15,9 @@ version = ''
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx_tabs.tabs']
+extensions = [
+    'sphinx_tabs.tabs',
+    'sphinx.ext.autosectionlabel']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '_env', '_code']
@@ -35,8 +37,8 @@ html_theme_options = {
     "use_repository_button": True,
     "use_issues_button": True,
     "logo": {
-        "image_light": "_static/logo-light.svg",
-        "image_dark": "_static/logo-dark.svg",
+        "image_light": "_static/MofkaLogo-light.svg",
+        "image_dark": "_static/MofkaLogo-dark.svg",
    }
 }
 

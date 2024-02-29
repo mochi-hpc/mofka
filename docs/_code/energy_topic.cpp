@@ -5,15 +5,14 @@
 
 int main(int argc, char** argv) {
 
-    if(argc != 4) {
+    if(argc != 3) {
         std::cerr << "Usage: "
-                  << argv[0] << " <protocol> <groupfile> <topic>" << std::endl;
+                  << argv[0] << " <protocol> <groupfile>" << std::endl;
         return -1;
     }
 
     auto protocol   = argv[1];
     auto group_file = argv[2];
-    auto topic_name = argv[3];
 
     auto engine = thallium::engine(protocol, THALLIUM_SERVER_MODE);
     ssg_init();
@@ -43,16 +42,21 @@ int main(int argc, char** argv) {
                 mofka::Metadata{{{"energy_max", 100}}}
             );
 
-        sh.createTopic(topic_name, validator, selector, serializer);
+        sh.createTopic("collisions", validator, selector, serializer);
         // END CREATE TOPIC
 
-        // START ADD MEMORY PARTITION
-        sh.addMemoryPartition(topic_name, 0);
-        // END ADD MEMORY PARTITION
-
-        // START ADD DEFAULT PARTITION
-        sh.addDefaultPartition(topic_name, 0);
-        // END ADD DEFAULT PARTITION
+        // START ADD PARTITION
+        // add an in-memory partition
+        sh.addMemoryPartition("collisions", 0);
+        // add a default partition (all arguments specified)
+        sh.addDefaultPartition(
+                "collisions", 0,
+                "my_metadata_provider@local",
+                "my_data_provider@local",
+                {}, "__primary__");
+        // add a default partition (discover providers automatically)
+        sh.addDefaultPartition("collisions", 0);
+        // END ADD PARTITION
 
 
     } catch(const mofka::Exception& ex) {

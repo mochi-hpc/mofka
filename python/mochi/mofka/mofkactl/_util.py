@@ -53,7 +53,12 @@ def parse_config_from_args(args: List[str], prefix):
         section = config
         for i in range(len(field_names)):
             if i == len(field_names) - 1:
-                section[field_names[i]] = value
+                if field_names[i] not in section:
+                    section[field_names[i]] = value
+                elif isinstance(section[field_names[i]], list):
+                    section[field_names[i]].append(value)
+                else:
+                    section[field_names[i]] = [section[field_names[i]], value]
             else:
                 if field_names[i] not in section:
                     section[field_names[i]] = {}

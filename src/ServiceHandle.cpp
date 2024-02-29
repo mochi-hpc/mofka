@@ -227,6 +227,63 @@ void ServiceHandle::addDefaultPartition(std::string_view topic_name,
         {"metadata", {std::string{metadata_provider.data(), metadata_provider.size()}}},
         {"data", {std::string{data_provider.data(), data_provider.size()}}}
     };
+    if(metadata_provider.size() == 0 || data_provider.size() == 0) {
+        try {
+            auto server = self->m_bsgh[server_rank];
+            auto get_candidate_providers_script = R"(
+            $result = {};
+            $result["address"] = $__config__.margo.mercury.address;
+            foreach($__config__.providers as $p) {
+                if($p.type != "yokan") continue;
+                if(!is_array($p.tags)) continue;
+                if(in_array("mofka:metadata", $p.tags)) {
+                    $result["metadata"] = $p.name;
+                    break;
+                }
+            }
+            foreach($__config__.providers as $p) {
+                if($p.type != "warabi") continue;
+                if(!is_array($p.tags)) continue;
+                if(in_array("mofka:data", $p.tags)) {
+                    $result["data"] = $p.name;
+                    break;
+                }
+            }
+            return $result;
+            )";
+            std::string script_result;
+            server.queryConfig(get_candidate_providers_script, &script_result);
+
+            auto candidates = nlohmann::json::parse(script_result);
+
+            if(metadata_provider.empty()) {
+                if(candidates.contains("metadata")) {
+                    dependencies["metadata"] = {candidates["metadata"].get<std::string>()};
+                } else {
+                    throw Exception(
+                        "No metadata provider provided or found in server. "
+                        "Please provide one or make sure a Yokan provider exists "
+                        "with the tag \"mofka:metadata\" in the server.");
+                }
+            }
+            if(data_provider.empty()) {
+                if(candidates.contains("data")) {
+                    dependencies["data"] = {candidates["data"].get<std::string>()};
+                } else {
+                    throw Exception(
+                        "No data provider provided or found in server. "
+                        "Please provide one or make sure a Warabi provider exists "
+                        "with the tag \"mofka:data\" in the server.");
+                }
+            }
+
+        } catch(const bedrock::Exception& ex) {
+            throw Exception{
+                fmt::format("Error when querying server configuration: {}", ex.what())
+            };
+        }
+    }
+
     addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name);
 }
 

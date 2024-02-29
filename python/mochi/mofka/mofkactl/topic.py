@@ -12,7 +12,7 @@ app = typer.Typer()
 def create(
         ctx: typer.Context,
         name: Annotated[
-            str, typer.Argument(help="Name of the pool to create")],
+            str, typer.Argument(help="Name of the topic to create")],
         validator: Annotated[
             str, typer.Option("-v", "--validator",
                               help="Validator implementation")] = "default",
@@ -50,5 +50,6 @@ def create(
                     metadata=serializer_config))
         except ClientException as err:
             print(f"Error: {err}")
+            del service
             raise typer.Exit(code=-1)
         del service

@@ -77,8 +77,10 @@ implementation.
 
    .. group-tab:: mofkactl
 
-      .. literalinclude:: ../_code/create_topic.sh
+      .. literalinclude:: ../_code/energy_topic.sh
          :language: bash
+         :start-after: START CREATE TOPIC
+         :end-before: END CREATE TOPIC
 
       Configuration parameters of each objects are passed using hierarchical
       command-line options. For instance, :code:`-p.x 42 -p.y.z abc`
@@ -129,4 +131,87 @@ Now that we have created a topic, we can add partitions to it.
 Right now Mofka won't do any rebalancing if we add new partitions after having pushed
 some events in a topic, so we recommend setting up partitions right after creating the
 topic, and before having applications use it.
+
+Partitions in Mofka are managed by a *partition manager*. A partition manager
+is the object that will receive RPCs targetting the partition's data and metadata.
+While it is possible to implement your own partition manager, Mofka comes with two
+implementations.
+
+* **Memory**: The *"memory"* partition manager is a manager that keeps the Metadata
+  and Data in the local memory of the process it runs on. This partition manager
+  doesn't have any dependency and is easy to use for testing, for instance, but it
+  won't provide persistence and will be limited by the amount of memory available
+  on the node.
+* **Default**: What is called the *"default"* partition manager is a manager that
+  relies on a `Yokan <https://mochi.readthedocs.io/en/latest/yokan.html>`_ provider
+  for storing Metadata and on a `Warabi <https://github.com/mochi-hpc/mochi-warabi>`_
+  provider for storing Data. Yokan is a key/value storage component with a number
+  of database backends available, such as RocksDB, LevelDB, BerkeleyDB, etc.
+  Warabi is a blob storage component also with a variety of backend implementations
+  including Pmem.
+
+A "memory" partition manager was used in the :ref:`Getting started` example. In the following
+we will deploy a "memory" partition manager as well as a "default" partition manager, backed
+with a Yokan provider and a Warabi provider. First, we need to start Bedrock with a slightly
+longer JSON configuration.
+
+.. literalinclude:: ../_code/default-config.json
+   :language: json
+
+This configuration instantiates three providers: two Yokan providers and a Warabi provider.
+The first Yokan provider is used to store information about the topics created. The second
+Yokan provider will be used to store event metadata for some Mofka partitions. The Warabi
+provider will store the data.
+
+.. note::
+
+   Right now the two Yokan providers use the "map" backend, which is in-memory, and the
+   Warabi provider uses the "memory" backend, which, you guessed it... is in memory.
+   So we haven't improved much compared with a simpler "memory" partition manager. But
+   this will allow us to complexify this configuration further later to make the
+   partition persistent.
+
+We can now add a partition that uses these providers.
+
+.. tabs::
+
+   .. group-tab:: C++
+
+      .. literalinclude:: ../_code/energy_topic.cpp
+         :language: cpp
+         :start-after: START ADD PARTITION
+         :end-before: END ADD PARTITION
+         :dedent: 8
+
+      Adding a partition is done via the :code:`ServiceHandle` instance by calling
+      :code:`addMemoryPartition()` or :code:`addDefaultPartition()`. These functions
+      takes at least two arguments: the topic name, and the rank of the server in which
+      to add the partition. Servers are number contiguously from :code:`0` to :code:`N-1`
+      where `N` can be obtained by calling :code:`sh.numServers()`.
+
+      An optional argument is the Argobots pool to use to execute RPCs sent to the partition
+      manager.
+
+   .. group-tab:: Python
+
+      Work in progress...
+
+   .. group-tab:: mofkactl
+
+      .. literalinclude:: ../_code/energy_topic.sh
+         :language: bash
+         :start-after: START ADD PARTITION
+         :end-before: END ADD PARTITION
+
+With a default partition manager, we can specify the Metadata provider in the form
+of an "address" interpretable by Bedrock. Here *"my_metadata_provider@local"* asks
+Bedrock to look for a provider named *"my_metadata_provider"* in the same process as
+the partition manager.
+
+.. note::
+
+   We can ommit the Metadata (resp. Data) provider in the above
+   code/commands. If we don't provide it, Mofka will look for a Yokan (resp. Warabi)
+   provider with the tag :code:`"mofka:metadata"` (resp. :code:`"mofka:data"` ) in the
+   target server and use that as the Metadata (resp. Data) provider.
 
