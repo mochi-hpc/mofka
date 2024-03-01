@@ -58,6 +58,49 @@ int main(int argc, char** argv) {
         sh.addDefaultPartition("collisions", 0);
         // END ADD PARTITION
 
+        {
+        // START PRODUCER
+        mofka::TopicHandle topic = sh.openTopic("collisions");
+
+        mofka::ThreadPool thread_pool{mofka::ThreadCount{4}};
+        mofka::BatchSize  batch_size = mofka::BatchSize::Adaptive();
+        mofka::Ordering   ordering = mofka::Ordering::Loose; // or Strict
+
+        mofka::Producer producer = topic.producer(
+                "app1", thread_pool, batch_size, ordering);
+        // END PRODUCER
+
+        // START EVENT
+        std::vector<char> segment1 = { 'a', 'b', 'c', 'd' };
+
+        // expose 1 segment using its pointer and size
+        mofka::Data data1{segment1.data(), segment1.size()};
+
+        std::vector<char> segment2 = { 'e', 'f' };
+
+        // expose 2 non-contiguous segments using mofka::Data::Segment
+        mofka::Data data2{{
+            mofka::Data::Segment{segment1.data(), segment1.size()},
+            mofka::Data::Segment{segment2.data(), segment2.size()}
+        }};
+        mofka::Metadata metadata1{R"({"energy": 42})"};
+
+        using json = nlohmann::json;
+        auto md = json::object();
+        md["energy"] = 42;
+        mofka::Metadata metadata2{md};
+        // END EVENT
+
+        // START PRODUCE EVENT
+        mofka::Future<mofka::EventID> future = producer.push(metadata1, data1);
+
+        producer.push(metadata2, data2);
+
+        mofka::EventID event_id_1 = future.wait();
+
+        producer.flush();
+        // END PRODUCE EVENT
+        }
 
     } catch(const mofka::Exception& ex) {
         std::cerr << ex.what() << std::endl;

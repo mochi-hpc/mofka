@@ -51,6 +51,11 @@ Metadata of each event.
    part of an event's Metadata, we could serialize this value into a single byte (:code:`uint8_t`),
    drastically reducing the metadata size compared with a string like :code:`{"energy":42}`.
 
+.. important::
+
+   In the following, we will still run a single-process Mofka server. Multi-process/node
+   deployments will be covered in :ref:`Deployment`.
+
 
 Creating a topic
 ----------------
@@ -90,7 +95,8 @@ implementation.
       server's JSON configuration. If not provided, :code:`mofkactl` will
       look for a *"mofka.ssg"* file in the current working directory.
 
-We can now take a look at the implementation of these classes.
+Let's take a look at the implementation of the validator, partition selector,
+and serializer classes.
 
 .. literalinclude:: ../_code/energy_validator.cpp
    :language: cpp
@@ -99,20 +105,20 @@ The :code:`EnergyValidator` class inherits from :code:`mofka::ValidatorInterface
 and provides the :code:`validate` member function. This function checks for the
 presence of an :code:`energy` field of type unsigned integer and checks that
 its value is less than an :code:`energy_max` value provided when creating the
-validator.
+validator. If validation fails, the :code:`validate` function throws an exception.
 
 .. important::
 
-   The :code:`MOFKA_REGISTER_VALIDATOR` macro must be used to make tell Mofka
+   The :code:`MOFKA_REGISTER_VALIDATOR` macro must be used to tell Mofka
    about the :code:`EnergyValidator` class. Its first argument is the name by
    which we will refer to the class in user code (*"energy_validator"*), the
-   second argument is the name of the class itself.
+   second argument is the name of the class itself (*EnergyValidator*).
 
 .. literalinclude:: ../_code/energy_partition_selector.cpp
    :language: cpp
 
 The :code:`EnergyPartitionSelector` is also initialized with an :code:`energy_max`
-value and uses it to aggregate events into "bins" of similar energy values.
+value and uses it to aggregate events into uniform "bins" of similar energy values.
 It inherits from :code:`mofka::PartitionSelectorInterface` and we call
 :code:`MOFKA_REGISTER_PARTITION_SELECTOR` to make it available for Mofka to use.
 
@@ -121,39 +127,45 @@ It inherits from :code:`mofka::PartitionSelectorInterface` and we call
 
 The :code:`EnergySerializer` is also initialized with an :code:`energy_max` value.
 This value is used to choose an appropriate number of bytes for the raw representation
-of the energy when it is serialized. :code:`EnergySerializer` inherits
+of the energy when it is serialized. :code:`EnergySerializer` inherits from
+:code:`SerializerInterface` and is registered with Mofka using
+:code:`MOFKA_REGISTER_SERIALIZER`.
 
 
 Adding partitions
 -----------------
 
-Now that we have created a topic, we can add partitions to it.
-Right now Mofka won't do any rebalancing if we add new partitions after having pushed
-some events in a topic, so we recommend setting up partitions right after creating the
-topic, and before having applications use it.
+Topics are created without any partitions, so trying to push events into our "collisions"
+topic will result in an error right now. We need add partitions to it.
+
+.. note::
+
+   Right now Mofka won't do any rebalancing if we add more partitions after having pushed
+   some events in a topic, so we recommend setting up partitions right after creating the
+   topic, and before having applications use it.
 
 Partitions in Mofka are managed by a *partition manager*. A partition manager
-is the object that will receive RPCs targetting the partition's data and metadata.
-While it is possible to implement your own partition manager, Mofka comes with two
-implementations.
+is the object that will receive and respond to RPCs targetting the partition's
+data and metadata. While it is possible to implement your own partition manager,
+Mofka already comes with two implementations.
 
 * **Memory**: The *"memory"* partition manager is a manager that keeps the Metadata
   and Data in the local memory of the process it runs on. This partition manager
   doesn't have any dependency and is easy to use for testing, for instance, but it
   won't provide persistence and will be limited by the amount of memory available
   on the node.
-* **Default**: What is called the *"default"* partition manager is a manager that
-  relies on a `Yokan <https://mochi.readthedocs.io/en/latest/yokan.html>`_ provider
-  for storing Metadata and on a `Warabi <https://github.com/mochi-hpc/mochi-warabi>`_
+* **Default**: The *"default"* partition manager is a manager that relies on a
+  `Yokan <https://mochi.readthedocs.io/en/latest/yokan.html>`_ provider for storing
+  Metadata and on a `Warabi <https://github.com/mochi-hpc/mochi-warabi>`_
   provider for storing Data. Yokan is a key/value storage component with a number
   of database backends available, such as RocksDB, LevelDB, BerkeleyDB, etc.
   Warabi is a blob storage component also with a variety of backend implementations
   including Pmem.
 
 A "memory" partition manager was used in the :ref:`Getting started` example. In the following
-we will deploy a "memory" partition manager as well as a "default" partition manager, backed
-with a Yokan provider and a Warabi provider. First, we need to start Bedrock with a slightly
-longer JSON configuration.
+we will deploy a "memory" partition manager as well as a "default" partition manager. Since the
+latter relies on Yokan and Warabi, we need to start Bedrock with a slightly longer
+JSON configuration, shown hereafter.
 
 .. literalinclude:: ../_code/default-config.json
    :language: json
@@ -165,11 +177,10 @@ provider will store the data.
 
 .. note::
 
-   Right now the two Yokan providers use the "map" backend, which is in-memory, and the
-   Warabi provider uses the "memory" backend, which, you guessed it... is in memory.
+   Right now the two Yokan providers use Yokan's "map" backend, which is in-memory, and the
+   Warabi provider uses Warabi's "memory" backend, which, you guessed it... is in memory.
    So we haven't improved much compared with a simpler "memory" partition manager. But
-   this will allow us to complexify this configuration further later to make the
-   partition persistent.
+   this will allow us to complexify this configuration further later.
 
 We can now add a partition that uses these providers.
 
@@ -203,15 +214,28 @@ We can now add a partition that uses these providers.
          :start-after: START ADD PARTITION
          :end-before: END ADD PARTITION
 
+Two required arguments when adding partitions are the name of the topic and the rank
+of the server to which the partition should be added. Here because we only have one
+server, the rank is 0.
+
 With a default partition manager, we can specify the Metadata provider in the form
 of an "address" interpretable by Bedrock. Here *"my_metadata_provider@local"* asks
 Bedrock to look for a provider named *"my_metadata_provider"* in the same process as
-the partition manager.
+the partition manager. In :ref:`Deployment` we will see that we could easily run these
+providers on different processes.
 
 .. note::
 
-   We can ommit the Metadata (resp. Data) provider in the above
-   code/commands. If we don't provide it, Mofka will look for a Yokan (resp. Warabi)
+   If we don't specify the Metadata (resp. Data) provider in the above
+   code/commands, Mofka will look for a Yokan (resp. Warabi)
    provider with the tag :code:`"mofka:metadata"` (resp. :code:`"mofka:data"` ) in the
-   target server and use that as the Metadata (resp. Data) provider.
+   target server process and use that as the Metadata (resp. Data) provider.
+   If multiple such providers exist, Mofka will choose the first one it finds in the
+   configuration file.
 
+.. note::
+
+   We could have relied on a single Yokan provider and given it both tags :code:`"mofka:master"`
+   and :code:`mofka:metadata`. This is perfectly valid. However, storing topic information
+   in the same database as events is not recommended as it could lead to a bottleneck and
+   it could make it difficult later on to delete partitions.

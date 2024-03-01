@@ -32,6 +32,8 @@ which manipulate large datasets and their metadata.
    usage/installation
    usage/quickstart
    usage/topics
+   usage/producer.rst
+   usage/deployment.rst
 
 
 
