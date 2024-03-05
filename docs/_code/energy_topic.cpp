@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
 
         // START PRODUCE EVENT
         mofka::Future<mofka::EventID> future = producer.push(metadata1, data1);
+        future.completed(); // returns true if the future has completed
 
         producer.push(metadata2, data2);
 
@@ -100,6 +101,42 @@ int main(int argc, char** argv) {
 
         producer.flush();
         // END PRODUCE EVENT
+        }
+
+        {
+        // START CONSUMER
+        mofka::TopicHandle topic = sh.openTopic("collisions");
+        mofka::BatchSize  batch_size = mofka::BatchSize::Adaptive();
+        mofka::ThreadPool thread_pool{mofka::ThreadCount{4}};
+        mofka::DataSelector data_selector =
+            [](const mofka::Metadata& md, const mofka::DataDescriptor& dd) -> mofka::DataDescriptor {
+                if(md.json()["energy"] > 20) {
+                    return dd;
+                } else {
+                    return mofka::DataDescriptor::Null();
+                }
+            };
+        mofka::DataBroker data_broker =
+            [](const mofka::Metadata& md, const mofka::DataDescriptor& dd) -> mofka::Data {
+                char* ptr = new char[dd.size()];
+                return mofka::Data{ptr, dd.size()};
+            };
+        mofka::Consumer consumer = topic.consumer(
+            "app2", thread_pool, batch_size, data_selector, data_broker);
+        // END CONSUMER
+        // START CONSUME EVENTS
+        mofka::Future<mofka::Event> future = consumer.pull();
+        future.completed(); // returns true if the future has completed
+
+        mofka::Event event        = future.wait();
+        mofka::Data data          = event.data();
+        mofka::Metadata metadata  = event.metadata();
+        mofka::EventID event_id   = event.id();
+
+        event.acknowledge();
+
+        delete[] static_cast<char*>(data.segments()[0].ptr);
+        // END CONSUME EVENTS
         }
 
     } catch(const mofka::Exception& ex) {

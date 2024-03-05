@@ -27,8 +27,8 @@ class Data {
     public:
 
     struct Segment {
-        const void* ptr;
-        size_t      size;
+        void*  ptr;
+        size_t size;
     };
 
     /**
@@ -39,7 +39,7 @@ class Data {
     /**
      * @brief Creates a Data object with a single segment.
      */
-    Data(const void* ptr, size_t size);
+    Data(void* ptr, size_t size);
 
     /**
      * @brief Creates a Data object from a list of Segments.

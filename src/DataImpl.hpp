@@ -22,7 +22,7 @@ class DataImpl {
         }
     }
 
-    DataImpl(const void* ptr, size_t size)
+    DataImpl(void* ptr, size_t size)
     : m_segments{{ptr, size}}
     , m_size(size) {}
 

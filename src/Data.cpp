@@ -16,7 +16,7 @@ PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(Data);
 Data::Data()
 : self(std::make_shared<DataImpl>()) {}
 
-Data::Data(const void* ptr, size_t size)
+Data::Data(void* ptr, size_t size)
 : self(std::make_shared<DataImpl>(ptr, size)) {}
 
 Data::Data(std::vector<Segment> segments)

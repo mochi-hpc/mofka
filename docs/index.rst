@@ -33,6 +33,7 @@ which manipulate large datasets and their metadata.
    usage/quickstart
    usage/topics
    usage/producer.rst
+   usage/consumer.rst
    usage/deployment.rst
 
 
