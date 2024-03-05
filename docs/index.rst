@@ -15,10 +15,10 @@ RPC and RDMA library and a high level of on-node concurrency using
 `Argobots <https://www.argobots.org/>`_.
 
 Mofka provides a C++ and a Python interface. One of its particularities is that it
-splits events into two parts: a *Data* part, referencing raw, potentially large data,
+splits events into two parts: a **data** part, referencing potentially large, raw data,
 which Mofka will try its best not to copy more than necessary (e.g., by relying on
 RDMA to transfer it directly from a client application's memory to a storage device
-on servers) and a *Metadata* part, which consists of structured information about
+on servers) and a **metadata** part, which consists of structured information about
 the data (usually expressed in JSON). Doing so allows Mofka to store each part
 independently, batch metadata together, and allow an event to reference (a subset of)
 the data of another event. This interface is also often more adapted to HPC applications,

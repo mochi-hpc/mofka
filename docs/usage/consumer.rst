@@ -41,18 +41,18 @@ A consumer can be created with five parameters, four of which are optional.
   send batches as soon as possible but will increase the batch size if the consumer is not
   responding fast enough.
 
-* **Data selector**: the consumer first receives the Metadata part of an event and runs
-  the user-provided data selector function on the Metadata to know whether the data should
-  be pulled. This function takes the Metadata part of the event as well as a :code:`DataDescriptor`
+* **Data selector**: the consumer first receives the metadata part of an event and runs
+  the user-provided data selector function on the metadata to know whether the data should
+  be pulled. This function takes the metadata part of the event as well as a :code:`DataDescriptor`
   instance. The latter is an opaque key that Mofka can use to locate the actual data.
   The above code is an example of data selector that will tell the consumer to pull the data
-  only if the *"energy"* field in the Metadata is greater than 20. It does so by returning
+  only if the *"energy"* field in the metadata is greater than 20. It does so by returning
   the provided :code:`DataDescriptor` if the field is greater than 20, and by returning
   :code:`mofka::DataDescriptor::Null()` if it isn't. The data selector could tell Mofka to pull
   *only a subset of an event's data*. More on this in the :ref:`Data descriptors` section.
 
-* **Data broker**: if the data selector returned a non-null DataDescriptor, the user-provided
-  data broker function is invoked by the consumer. This function takes the event's Metadata
+* **Data broker**: if the data selector returned a non-null :code:`DataDescriptor`, the user-provided
+  data broker function is invoked by the consumer. This function takes the event's metadata
   and the :code:`DataDescriptor` returned by the data selector, and must return a :code:`mofka::Data`
   object pointing to the location in memory where the application wishes for the data to be placed.
   This memory could be non-contiguous, it could be allocated by the data broker or it could point to
@@ -82,7 +82,7 @@ we can pull the events out of the consumer. The following code shows how to do t
       :code:`consumer.pull()` is a non-blocking function that returns a
       :code:`mofka::Future<Event>` that can be tested for completion and waited on.
       Waiting on the future gets us a :code:`mofka::Event` instance which contains the
-      event's Metadata and Data.
+      event's metadata and data.
 
       The call to :code:`event.acknowledge()` tells the Mofka partition manager that
       all the events in the partition up to this one have been processed by this consumer
@@ -90,7 +90,7 @@ we can pull the events out of the consumer. The following code shows how to do t
 
       .. note::
 
-         In this example we have allocated the Data in our data broker function,
+         In this example we have allocated the memory for the data in our data broker function,
          so we need to free it when we no longer need it.
 
    .. group-tab:: Python

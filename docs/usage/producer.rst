@@ -5,7 +5,7 @@ Applications that need to produce events into one or more topics will need
 to create a :code:`Producer` instance. This object is an interface to produce
 events into a designated topic. It will internally run the Validator, Partition
 selector, and Serializer on the events it is being passed to validate the event's
-Metadata and Data, select a destination partition for each event, and serialize
+metadata and data, select a destination partition for each event, and serialize
 the event's metadata into batches aimed at the same partition.
 
 .. note::
@@ -70,8 +70,8 @@ A producer can be created with four optional parameters.
 Producing events
 ----------------
 
-As explained earlier, Mofka splits events into two parts: Metadata and Data.
-The Metadata part is JSON-structured, small, and can be batched with the Metadata
+As explained earlier, Mofka splits events into two parts: metadata and data.
+The metadata part is JSON-structured, small, and can be batched with the metadata
 of other events to issue fewer RPCs to partition managers. The Data part is optional
 and represents potentially larger, raw data that can benefit from being transferred
 via zero-copy mechanisms such as RDMA.
@@ -82,7 +82,8 @@ by a JSON fragment containing the timestamp and detector information (e.g., call
 parameters), as well as information about the images (e.g., dimensions, pixel format).
 The data part of an event would be the image itself.
 
-The code bellow shows how to create the Data and Metadata pieces of an event.
+The code bellow shows how to create the data and metadata pieces of an event
+in the form of a :code:`Data` instance and a :code:`Metadata` instance respectively.
 
 .. tabs::
 
@@ -94,13 +95,13 @@ The code bellow shows how to create the Data and Metadata pieces of an event.
          :end-before: END EVENT
          :dedent: 8
 
-      The first Data object, :code:`data1`, is a view of a single contiguous
+      The first :code:`mofka::Data data1` object is a view of a single contiguous
       segment of memory underlying the :code:`segment1` vector. The second
-      Data object, :code:`data2`, is a view of two non-contiguous such segments.
+      :code:`Data data2` object is a view of two non-contiguous segments.
 
-      The first Metadata object, :code:`metadata1`, is created from a raw string
-      representing a JSON object with and "energy" field. The second Metadata object
-      contains the same information but is initialized using an :code:`nlohmann::json`
+      The first :code:`mofka::Metadata` object, :code:`metadata1`, is created from a
+      raw string representing a JSON object with and "energy" field. The second :code:`Metadata`
+      object contains the same information but is initialized using an :code:`nlohmann::json`
       instance, which is the library used by Mofka to manage JSON data in C++.
 
    .. group-tab:: Python
@@ -123,7 +124,7 @@ The code bellow shows how to create the Data and Metadata pieces of an event.
    is freed. Howeber the user should still take care that they are not written to
    until the data has been transferred.
 
-Having created the Metadata and the Data part of an event, we can now push the event
+Having created the metadata and the data part of an event, we can now push the event
 into the producer, as shown in the code bellow.
 
 .. tabs::
@@ -140,13 +141,13 @@ into the producer, as shown in the code bellow.
 
       Work in progress...
 
-The producer's :code:`push` function takes the Metadata and the Data and returns a :code:`Future`.
-Such a future can be tested for completion (:code:`future.completed()`) and can be blocked
-on until it completes (:code:`future.wait()`). The latter method returns the event ID of the
-created event (64-bits unsigned integer). It is perfectly OK to drop the future if you do not care
-to wait for its completion or for the resulting event ID, as examplified with the second event.
-Event IDs are monotonically increasing and are per-partition, so two events stored in distinct
-partitions may end up with the same ID.
+The producer's :code:`push` function takes the :code:`Metadata` and the :code:`Data`
+objects and returns a :code:`Future`. Such a future can be tested for completion
+(:code:`future.completed()`) and can be blocked on until it completes (:code:`future.wait()`).
+The latter method returns the event ID of the created event (64-bits unsigned integer).
+It is perfectly OK to drop the future if you do not care to wait for its completion or
+for the resulting event ID, as examplified with the second event. Event IDs are monotonically
+ncreasing and are per-partition, so two events stored in distinct partitions may end up with the same ID.
 
 Calling :code:`producer.flush()` is a blocking call that will force all the pending batches of events
 to be sent, regardless of whether they have reached the requested size. It can be useful to ensure
@@ -156,6 +157,7 @@ that all the events have been sent either periodically or before terminating the
 
    If the batch size used by the producer is anything else than :code:`mofka::BatchSize::Adaptive()`,
    a call to :code:`future.wait()` will block until the batch containing the corresponding event
-   has been filled up to the requested size and sent to its target partition. Hence, and easy
+   has been filled up to the requested size and sent to its target partition. Hence, an easy
    mistake to do is to call :code:`future.wait()` when the batch is not full and with no other threads
-   filling it up. This situation will result in a deadlock.
+   pushing more events to it. In this situation the batch will never get full, will never be sent,
+   and :code:`future.wait()` will never complete.

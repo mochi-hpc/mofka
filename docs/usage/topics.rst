@@ -5,10 +5,10 @@ Events in Mofka are pushed into *topics*. A topic is a distributed collection
 of *partitions* to which events are appended. When creating a topic, users have to
 give it a name, and optionally provide three objects.
 
-* **Validator**: a validator is an object that validates that the Metadata and Data
+* **Validator**: a validator is an object that validates that the metadata and data
   part comply with whatever is expected for the topic. Metadata are JSON documents
   by default, so for instance a validator could check that some expected fields
-  are present. If the Metadata part describes the Data part in some way, a validator
+  are present. If the metadata part describes the data part in some way, a validator
   could check that this description is actually correct. This validation will happen
   before the event is sent to any server, resulting in an exception if the event is
   not valid. If not provided, the default validator will accept all the events it is
@@ -20,10 +20,10 @@ give it a name, and optionally provide three objects.
   strategy. If not provided, the default partition selector will cycle through the
   partitions in a round robin manner.
 
-* **Serializer**: a serializer is an object that can serialize a Metadata object into
-  a binary representation, and deserialize a binary representation back into a Metadata
-  object. If not provided, the default serializer will convert the Metadata into a
-  string representation.
+* **Serializer**: a serializer is an object that can serialize a :code:`Metadata` object
+  into a binary representation, and deserialize a binary representation back into a
+  :code:`Metadata` object. If not provided, the default serializer will convert the
+  :code:`Metadata` into a string representation.
 
 .. image:: ../_static/TopicPipeline-dark.svg
    :class: only-dark
@@ -34,13 +34,13 @@ give it a name, and optionally provide three objects.
 Mofka will take advantage of multithreading to parallelize and pipeline the execution
 of the validator, partition selector, and serializer over many events. These objects
 can be customized and parameterized. For instance, a validator that checks the content
-of a JSON Metadata could be provided with a list of fields it expects to find in the
-Metadata of each event.
+of a JSON metadata could be provided with a list of fields it expects to find in the
+metadata of each event.
 
 .. topic:: A motivating example
 
    Hereafter, we will create a topic accepting events that represent collisions in a
-   particle accelerator. We will require that the Metadata part of such events have
+   particle accelerator. We will require that the metadata part of such events have
    an *energy* value, represented by an unsigned integer (just so we can show
    what optimizations could be done with Mofka's modularity). Furthermore, let's say that
    the detector is calibrated to output energies from 0 to 99. We can create a validator that
@@ -48,7 +48,7 @@ Metadata of each event.
    than 100. If we would like to aggregate events with similar energy values into the same partition,
    we could have the partition selector make its decision based on this energy value.
    Finally, since we know that the energy value is between 0 and 99 and is the only relevant
-   part of an event's Metadata, we could serialize this value into a single byte (:code:`uint8_t`),
+   part of an event's metadata, we could serialize this value into a single byte (:code:`uint8_t`),
    drastically reducing the metadata size compared with a string like :code:`{"energy":42}`.
 
 .. important::
@@ -149,15 +149,15 @@ is the object that will receive and respond to RPCs targetting the partition's
 data and metadata. While it is possible to implement your own partition manager,
 Mofka already comes with two implementations.
 
-* **Memory**: The *"memory"* partition manager is a manager that keeps the Metadata
-  and Data in the local memory of the process it runs on. This partition manager
+* **Memory**: The *"memory"* partition manager is a manager that keeps the metadata
+  and data in the local memory of the process it runs on. This partition manager
   doesn't have any dependency and is easy to use for testing, for instance, but it
   won't provide persistence and will be limited by the amount of memory available
   on the node.
 * **Default**: The *"default"* partition manager is a manager that relies on a
   `Yokan <https://mochi.readthedocs.io/en/latest/yokan.html>`_ provider for storing
-  Metadata and on a `Warabi <https://github.com/mochi-hpc/mochi-warabi>`_
-  provider for storing Data. Yokan is a key/value storage component with a number
+  metadata and on a `Warabi <https://github.com/mochi-hpc/mochi-warabi>`_
+  provider for storing data. Yokan is a key/value storage component with a number
   of database backends available, such as RocksDB, LevelDB, BerkeleyDB, etc.
   Warabi is a blob storage component also with a variety of backend implementations
   including Pmem.
@@ -218,7 +218,7 @@ Two required arguments when adding partitions are the name of the topic and the 
 of the server to which the partition should be added. Here because we only have one
 server, the rank is 0.
 
-With a default partition manager, we can specify the Metadata provider in the form
+With a default partition manager, we can specify the metadata provider in the form
 of an "address" interpretable by Bedrock. Here *"my_metadata_provider@local"* asks
 Bedrock to look for a provider named *"my_metadata_provider"* in the same process as
 the partition manager. In :ref:`Deployment` we will see that we could easily run these
@@ -226,10 +226,10 @@ providers on different processes.
 
 .. note::
 
-   If we don't specify the Metadata (resp. Data) provider in the above
+   If we don't specify the metadata (resp. data) provider in the above
    code/commands, Mofka will look for a Yokan (resp. Warabi)
    provider with the tag :code:`"mofka:metadata"` (resp. :code:`"mofka:data"` ) in the
-   target server process and use that as the Metadata (resp. Data) provider.
+   target server process and use that as the metadata (resp. data) provider.
    If multiple such providers exist, Mofka will choose the first one it finds in the
    configuration file.
 

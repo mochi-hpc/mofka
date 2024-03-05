@@ -9,8 +9,8 @@ about it, from the implementation of its databases, down to how they share
 resources such as hardware threads and I/O devices, ensuring that you can
 configure it to maximize performance on each individual platform and for
 each individual use case. The downside of this approach, however, is that
-you will need a lot more knowledge about Mochi than you would need about
-the inner workings of other services like Kafka.
+you will need more knowledge about Mochi than you would need about the inner
+workings of other services like Kafka.
 
 In this section, we will quickly deploy the bare minimum for a single-node,
 functional Mofka service accessible locally, before we can dive into the
