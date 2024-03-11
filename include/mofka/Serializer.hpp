@@ -71,7 +71,7 @@ class SerializerInterface {
      * function with the following prototype, instanciating a shared_ptr of
      * the class from the provided Metadata:
      *
-     * static std::shared_ptr<SerializerInterface> create(const Metadata&);
+     * static std::unique_ptr<SerializerInterface> create(const Metadata&);
      */
 };
 

@@ -9,6 +9,7 @@
 #include "MetadataImpl.hpp"
 #include "PimplUtil.hpp"
 #include "DefaultSerializer.hpp"
+#include "SchemaSerializer.hpp"
 #include <fmt/format.h>
 #include <unordered_map>
 
@@ -34,6 +35,7 @@ Metadata Serializer::metadata() const {
 }
 
 MOFKA_REGISTER_SERIALIZER(default, DefaultSerializer);
+MOFKA_REGISTER_SERIALIZER(schema, SchemaSerializer);
 
 Serializer Serializer::FromMetadata(const Metadata& metadata) {
     const auto& json = metadata.json();
