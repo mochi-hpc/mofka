@@ -1,0 +1,27 @@
+{
+    "address": "na+sm",
+    "options": {
+        "simultaneous": false
+    },
+    "producers": {
+        "ranks": [1],
+        "num_events": 1000,
+        "topic": {
+            "name": "mytopic",
+            "metadata": {
+                "num_fields": 8,
+                "key_sizes": [8,16],
+                "val_sizes": [16,64]
+            },
+            "partitions": [
+                {
+                    "type":"memory",
+                    "rank": 0
+                }
+            ]
+        }
+    },
+    "consumers": {
+        "ranks": [1]
+    }
+}
