@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 #include <mpi.h>
 #include <thallium.hpp>
+#include <unistd.h>
 
 class BenchmarkProducer {
 
@@ -26,6 +27,7 @@ class BenchmarkProducer {
     MetadataGenerator    m_metadata_generator;
     bool                 m_run_in_thread;
     json                 m_config;
+    Communicator         m_comm;
 
     thallium::managed<thallium::pool>    m_run_pool;
     thallium::managed<thallium::xstream> m_run_es;
@@ -51,6 +53,7 @@ class BenchmarkProducer {
         getMax(config["topic"]["metadata"]["val_sizes"]))
     , m_run_in_thread(run_in_thread)
     , m_config(config)
+    , m_comm(comm)
     {
         m_mofka_service_handle = m_mofka_client.connect(
             mofka::SSGFileName{config["group_file"].get<std::string>()}
@@ -105,18 +108,82 @@ class BenchmarkProducer {
     private:
 
     void runThread() {
+        auto& rng = m_string_generator.rng();
         auto num_events = m_config["num_events"].get<size_t>();
-        // TODO barrier + timing
+
+        size_t min_burst_size = m_config.contains("burst_size") ?
+            getMin(m_config["burst_size"]) : 1;
+        size_t max_burst_size = m_config.contains("burst_size") ?
+            getMax(m_config["burst_size"]) : 1;
+        std::uniform_int_distribution<size_t> burst_size_dist(
+                min_burst_size, max_burst_size);
+
+        size_t min_wait_between_bursts_ms = m_config.contains("wait_between_bursts_ms") ?
+            getMin(m_config["wait_between_bursts_ms"]) : 0;
+        size_t max_wait_between_bursts_ms = m_config.contains("wait_between_bursts_ms") ?
+            getMax(m_config["wait_between_bursts_ms"]) : 0;
+        std::uniform_int_distribution<size_t> wait_between_bursts_ms_dist(
+                min_wait_between_bursts_ms, max_wait_between_bursts_ms);
+
+        size_t min_wait_between_events_ms = m_config.contains("wait_between_events_ms") ?
+            getMin(m_config["wait_between_events_ms"]) : 0;
+        size_t max_wait_between_events_ms = m_config.contains("wait_between_events_ms") ?
+            getMax(m_config["wait_between_events_ms"]) : 0;
+        std::uniform_int_distribution<size_t> wait_between_events_ms_dist(
+                min_wait_between_events_ms, max_wait_between_events_ms);
+
+        size_t min_flush_every = m_config.contains("flush_every") ?
+            getMin(m_config["flush_every"]) : 0;
+        size_t max_flush_every = m_config.contains("flush_every") ?
+            getMax(m_config["flush_every"]) : 0;
+        std::uniform_int_distribution<size_t> flush_every_dist(
+                min_flush_every, max_flush_every);
+
+        bool flush_between_bursts = m_config.value("flush_between_bursts", false);
+
+        m_comm.barrier();
+        double t_start = MPI_Wtime();
+        size_t next_burst = burst_size_dist(rng);
+        size_t next_flush = flush_every_dist(rng);
+
         for(size_t i = 0; i < num_events; ++i) {
             auto metadata = m_metadata_generator.generate();
             // TODO handle data
             m_mofka_producer.push(metadata);
+            std::cerr << "Pushing event " << i << std::endl;
             // TODO add push interval and flush frequency
+            next_burst -= 1;
+            if(next_burst == 0) {
+                if(flush_between_bursts) {
+                    std::cerr << "Flushing after burst" << std::endl;
+                    m_mofka_producer.flush();
+                }
+                size_t wait_between_bursts_ms = wait_between_bursts_ms_dist(rng);
+                if(wait_between_bursts_ms) {
+                    std::cerr << "Waiting " << wait_between_bursts_ms << " msec after burst" << std::endl;
+                    usleep(1000*wait_between_bursts_ms);
+                }
+                next_burst = burst_size_dist(rng);
+            } else {
+                size_t wait_between_events_ms = wait_between_events_ms_dist(rng);
+                if(wait_between_events_ms) {
+                    std::cerr << "Waiting " << wait_between_events_ms << " msec after event" << std::endl;
+                    usleep(1000*wait_between_events_ms);
+                }
+            }
+            if(max_flush_every != 0) {
+                next_flush -= 1;
+                if(next_flush == 0) {
+                    std::cerr << "Flushing" << std::endl;
+                    next_flush = flush_every_dist(rng);
+                    m_mofka_producer.flush();
+                }
+            }
         }
-        std::cerr << "Flushing" << std::endl;
         m_mofka_producer.flush();
-        // TODO barrier + timing
-        std::cerr << "Done" << std::endl;
+        m_comm.barrier();
+        double t_end = MPI_Wtime();
+        std::cerr << "Producer finished in " << (t_end - t_start) << " seconds" << std::endl;
     }
 
     void createTopic(const json& config) {

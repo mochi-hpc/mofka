@@ -58,6 +58,11 @@
     "producers": {
         "ranks": [1],
         "num_events": 1000,
+        "burst_size": 5,
+        "wait_between_bursts_ms": 1000,
+        "wait_between_events_ms": [0, 300],
+        "flush_between_bursts": true,
+        "flush_every": 100,
         "group_file": "mofka.ssg",
         "topic": {
             "name": "mytopic",

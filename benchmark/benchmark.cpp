@@ -49,6 +49,27 @@ static const json configSchema = R"(
                 "ordering": {"enum": ["loose", "strict"]},
                 "thread_count": {"type": "integer", "minimum": 0},
                 "num_events": {"type": "integer", "minimum": 0},
+                "burst_size": { "oneOf": [
+                    {"type": "integer", "minimum": 1},
+                    {"type": "array", "minItems":2, "maxItems":2,
+                     "items": {"type":"integer", "minimum": 1}}
+                ]},
+                "wait_between_bursts_ms": { "oneOf": [
+                    {"type": "integer", "minimum": 0},
+                    {"type": "array", "minItems":2, "maxItems":2,
+                     "items": {"type":"integer", "minimum": 0}}
+                ]},
+                "wait_between_events_ms": { "oneOf": [
+                    {"type": "integer", "minimum": 0},
+                    {"type": "array", "minItems":2, "maxItems":2,
+                     "items": {"type":"integer", "minimum": 0}}
+                ]},
+                "flush_between_bursts": {"type": "boolean"},
+                "flush_every": { "oneOf": [
+                    {"type": "integer", "minimum": 1},
+                    {"type": "array", "minItems":2, "maxItems":2,
+                     "items": {"type":"integer", "minimum": 1}}
+                ]},
                 "topic": {
                     "type": "object",
                     "properties": {
