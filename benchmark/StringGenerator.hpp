@@ -37,6 +37,10 @@ class StringGenerator {
         }
         return result;
     }
+
+    std::mt19937& rng() {
+        return m_rng;
+    }
 };
 
 #endif
