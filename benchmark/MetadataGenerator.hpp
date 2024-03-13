@@ -61,6 +61,14 @@ class MetadataGenerator {
     const json& schema() const {
         return m_schema;
     }
+
+    std::vector<std::string> properties() const {
+        std::vector<std::string> result;
+        for(const auto& p : m_prototype.items()) {
+            result.push_back(p.value().get<std::string>());
+        }
+        return result;
+    }
 };
 
 #endif

@@ -3,9 +3,62 @@
     "options": {
         "simultaneous": false
     },
+    "servers" : {
+        "ranks": [0],
+        "config": {
+            "margo": {
+                "argobots": {
+                    "pools": [
+                        {
+                            "name": "rpc_and_progress_pool",
+                            "kind": "fifo_wait",
+                            "access": "mpmc"
+                        }
+                    ],
+                    "xstreams": [
+                        {
+                            "name": "rpc_and_progress_es",
+                            "scheduler": {
+                                "type": "basic_wait",
+                                "pools": ["rpc_and_progress_pool"]
+                            }
+                        }
+                    ]
+                },
+                "rpc_pool": "rpc_and_progress_pool",
+                "progress_pool": "rpc_and_progress_pool"
+            },
+            "ssg": [
+                {
+                    "name": "mofka",
+                    "method": "init",
+                    "group_file": "mofka.ssg"
+                }
+            ],
+            "libraries": {
+                "yokan": "libyokan-bedrock-module.so",
+                "warabi": "libwarabi-bedrock-module.so",
+                "mofka" : "libmofka-bedrock-module.so"
+            },
+            "providers": [
+                {
+                    "name": "master",
+                    "provider_id": 1,
+                    "type": "yokan",
+                    "tags" : [ "mofka:master" ],
+                    "config" : {
+                        "database" : {
+                            "type": "map"
+                        }
+                    }
+                }
+            ]
+        }
+    },
     "producers": {
         "ranks": [1],
         "num_events": 1000,
+        "group_file": "mofka.ssg",
         "topic": {
             "name": "mytopic",
             "metadata": {
@@ -22,6 +75,7 @@
         }
     },
     "consumers": {
+        "group_file": "mofka.ssg",
         "ranks": [1]
     }
 }
