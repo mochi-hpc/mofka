@@ -3,6 +3,7 @@
 #include "PropertyListSerializer.hpp"
 #include "Producer.hpp"
 #include "Consumer.hpp"
+#include "Communicator.hpp"
 
 #include "../src/JsonUtil.hpp"
 
@@ -38,6 +39,7 @@ static const json configSchema = R"(
         "producers": {
             "type": "object",
             "properties": {
+                "group_file": {"type":"string"},
                 "ranks": { "type": "array", "minItems": 1, "uniqueItems": true,
                            "items": {"type":"integer", "minimum":0}},
                 "batch_size": { "oneOf": [
@@ -117,48 +119,44 @@ static const json configSchema = R"(
                     "required": ["name", "metadata", "partitions"]
                 }
             },
-            "required": ["topic", "ranks", "num_events"]
+            "required": ["topic", "ranks", "num_events", "group_file"]
         },
         "consumers": {
             "type": "object",
             "properties": {
+                "group_file": {"type":"string"},
                 "ranks": { "type": "array", "minItems": 1, "uniqueItems": true,
                            "items": {"type":"integer", "minimum":0}},
-                "config": {
-                    "type": "object",
+                "batch_size": { "oneOf": [
+                    {"type": "integer", "minimum": 1},
+                    {"enum": ["adaptive"]}
+                ]},
+                "thread_count": {"type": "integer", "minimum": 0},
+                "partitions_per_consumer": {"type":"integer", "minimum":1},
+                "data_selector": {
+                    "type":"object",
                     "properties": {
-                        "batch_size": { "oneOf": [
+                        "selectivity": {"type":"number", "minimum":0, "maximum":1},
+                        "fragmentation": { "oneOf": [
                             {"type": "integer", "minimum": 1},
-                            {"enum": ["adaptive"]}
-                        ]},
-                        "thread_count": {"type": "integer", "minimum": 0},
-                        "partitions_per_consumer": {"type":"integer", "minimum":1},
-                        "data_selector": {
-                            "type":"object",
-                            "properties": {
-                                "selectivity": {"type":"number", "minimum":0, "maximum":1},
-                                "fragmentation": { "oneOf": [
-                                    {"type": "integer", "minimum": 1},
-                                    {"type": "array", "minItems":2, "maxItems":2,
-                                     "items": {"type":"integer", "minimum": 1}}
-                                ]}
-                            }
-                        },
-                        "data_broker": {
-                            "type":"object",
-                            "properties": {
-                                "reuse": {"type":"boolean"},
-                                "fragmentation": { "oneOf": [
-                                    {"type": "integer", "minimum": 1},
-                                    {"type": "array", "minItems":2, "maxItems":2,
-                                     "items": {"type":"integer", "minimum": 1}}
-                                ]}
-                            }
-                        }
+                            {"type": "array", "minItems":2, "maxItems":2,
+                             "items": {"type":"integer", "minimum": 1}}
+                        ]}
+                    }
+                },
+                "data_broker": {
+                    "type":"object",
+                    "properties": {
+                        "reuse": {"type":"boolean"},
+                        "fragmentation": { "oneOf": [
+                            {"type": "integer", "minimum": 1},
+                            {"type": "array", "minItems":2, "maxItems":2,
+                             "items": {"type":"integer", "minimum": 1}}
+                        ]}
                     }
                 }
             },
-            "required": ["ranks"]
+            "required": ["ranks", "group_file"]
         },
         "options": {
             "type": "object",
@@ -180,7 +178,11 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
-    MPI_Init(&argc, &argv);
+    int provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+    if(provided != MPI_THREAD_SERIALIZED) {
+        std::cerr << "WARNING: MPI_THREAD_SERIALIZED not supported" << std::endl;
+    }
 
     int comm_rank;
     int comm_size;
@@ -269,20 +271,27 @@ int main(int argc, char** argv) {
     std::shared_ptr<BenchmarkConsumer> consumer;
 
     if(is_server) {
-        auto server_config = config["server"].contains("config") ?
-            config["server"]["config"].dump() : std::string{"{}"};
+        auto server_config = config["servers"].contains("config") ?
+            config["servers"]["config"].dump() : std::string{"{}"};
         server = std::make_shared<bedrock::Server>(address, server_config);
     } else {
         auto server_config = R"({"margo":{"use_progress_thread":true}})";
         server = std::make_shared<bedrock::Server>(address, server_config);
     }
 
-    MPI_Comm server_comm = MPI_COMM_NULL;
-    MPI_Comm producer_comm = MPI_COMM_NULL;
-    MPI_Comm consumer_comm = MPI_COMM_NULL;
-    MPI_Comm_split(MPI_COMM_WORLD, is_server ? 1 : 0, comm_rank, &server_comm);
-    MPI_Comm_split(MPI_COMM_WORLD, is_producer ? 1 : 0, comm_rank, &producer_comm);
-    MPI_Comm_split(MPI_COMM_WORLD, is_consumer ? 1 : 0, comm_rank, &consumer_comm);
+    server->getMargoManager().addPool(
+        R"({"name":"__mpi_pool__", "kind":"fifo_wait", "access":"mpmc"})");
+    server->getMargoManager().addXstream(
+        R"({"name":"__mpi_xstream__", "scheduler":{"pools":["__mpi_pool__"],"type":"basic_wait"}}})");
+
+    auto mpi_pool = thallium::pool{
+        server->getMargoManager().getPool("__mpi_pool__")->getHandle<ABT_pool>()};
+
+    auto world = Communicator{mpi_pool, MPI_COMM_WORLD};
+
+    auto server_comm   = world.split(is_server ? 1 : 0);
+    auto producer_comm = world.split(is_producer ? 1 : 0);;
+    auto consumer_comm = world.split(is_consumer ? 1 : 0);
 
     bool simultaneous = false;
     if(config.contains("options"))
@@ -290,22 +299,33 @@ int main(int argc, char** argv) {
 
     if(is_producer)
         producer = std::make_shared<BenchmarkProducer>(
+            server->getMargoManager().getThalliumEngine(),
             seed, config["producers"], producer_comm, is_consumer && simultaneous);
     if(is_consumer)
         consumer = std::make_shared<BenchmarkConsumer>(
+            server->getMargoManager().getThalliumEngine(),
             seed + comm_size, config["consumers"], consumer_comm);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    world.barrier();
 
     if(is_producer) producer->run();
-    if(!simultaneous) MPI_Barrier(MPI_COMM_WORLD);
+    if(!simultaneous) world.barrier();
     if(is_consumer) consumer->run();
 
     if(is_consumer) consumer->wait();
     if(is_producer) producer->wait();
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    world.barrier();
+
+    producer.reset();
+    consumer.reset();
+
     server->finalize();
+    server.reset();
+
+    server_comm.free();
+    producer_comm.free();
+    consumer_comm.free();
 
     MPI_Finalize();
 
