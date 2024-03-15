@@ -156,7 +156,6 @@ static const json configSchema = R"(
                     {"enum": ["adaptive"]}
                 ]},
                 "thread_count": {"type": "integer", "minimum": 0},
-                "partitions_per_consumer": {"type":"integer", "minimum":1},
                 "data_selector": {
                     "type":"object",
                     "properties": {
