@@ -6,13 +6,21 @@ set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 enable_testing ()
 
+# library version set here (e.g. for shared libs).
+set (MOFKA_VERSION_MAJOR 0)
+set (MOFKA_VERSION_MINOR 0)
+set (MOFKA_VERSION_PATCH 4)
+set (MOFKA_VERSION
+     "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}.${MOFKA_VERSION_PATCH}")
+
 add_library (coverage_config INTERFACE)
 add_library (warnings_config INTERFACE)
 
-option (ENABLE_TESTS    "Build tests" OFF)
-option (ENABLE_EXAMPLES "Build examples" OFF)
-option (ENABLE_COVERAGE "Build with coverage" OFF)
-option (ENABLE_PYTHON   "Build the Python module" OFF)
+option (ENABLE_TESTS     "Build tests" OFF)
+option (ENABLE_EXAMPLES  "Build examples" OFF)
+option (ENABLE_COVERAGE  "Build with coverage" OFF)
+option (ENABLE_PYTHON    "Build the Python module" OFF)
+option (ENABLE_BENCHMARK "Build the benchmark" OFF)
 
 # add our cmake module directory to the path
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
@@ -78,16 +86,9 @@ if (ENABLE_PYTHON)
     add_subdirectory (python)
 endif ()
 
-# library version set here (e.g. for shared libs).
-set (MOFKA_VERSION_MAJOR 0)
-set (MOFKA_VERSION_MINOR 0)
-set (MOFKA_VERSION_PATCH 4)
-set (MOFKA_VERSION
-     "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}.${MOFKA_VERSION_PATCH}")
-
+add_subdirectory (src)
 add_subdirectory (docs/_code)
 
-add_subdirectory (src)
 if (${ENABLE_TESTS})
     enable_testing ()
     find_package (Catch2 QUIET)
@@ -102,6 +103,11 @@ if (${ENABLE_TESTS})
     endif ()
     add_subdirectory (tests)
 endif (${ENABLE_TESTS})
+
 if (${ENABLE_EXAMPLES})
     add_subdirectory (examples)
 endif (${ENABLE_EXAMPLES})
+
+if (${ENABLE_BENCHMARK})
+    add_subdirectory (benchmark)
+endif (${ENABLE_BENCHMARK})

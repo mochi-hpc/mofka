@@ -1,0 +1,89 @@
+{
+    "address": "na+sm",
+    "options": {
+        "simultaneous": false
+    },
+    "servers" : {
+        "ranks": [0],
+        "config": {
+            "margo": {
+                "argobots": {
+                    "pools": [
+                        {
+                            "name": "rpc_and_progress_pool",
+                            "kind": "fifo_wait",
+                            "access": "mpmc"
+                        }
+                    ],
+                    "xstreams": [
+                        {
+                            "name": "rpc_and_progress_es",
+                            "scheduler": {
+                                "type": "basic_wait",
+                                "pools": ["rpc_and_progress_pool"]
+                            }
+                        }
+                    ]
+                },
+                "rpc_pool": "rpc_and_progress_pool",
+                "progress_pool": "rpc_and_progress_pool"
+            },
+            "ssg": [
+                {
+                    "name": "mofka",
+                    "method": "init",
+                    "group_file": "mofka.ssg"
+                }
+            ],
+            "libraries": {
+                "yokan": "libyokan-bedrock-module.so",
+                "warabi": "libwarabi-bedrock-module.so",
+                "mofka" : "libmofka-bedrock-module.so"
+            },
+            "providers": [
+                {
+                    "name": "master",
+                    "provider_id": 1,
+                    "type": "yokan",
+                    "tags" : [ "mofka:master" ],
+                    "config" : {
+                        "database" : {
+                            "type": "map"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "producers": {
+        "ranks": [1],
+        "num_events": 100,
+        "burst_size": 5,
+        "wait_between_bursts_ms": 1000,
+        "wait_between_events_ms": [0, 300],
+        "flush_between_bursts": true,
+        "flush_every": 100,
+        "group_file": "mofka.ssg",
+        "topic": {
+            "name": "mytopic",
+            "metadata": {
+                "num_fields": 8,
+                "key_sizes": [8,16],
+                "val_sizes": [16,64]
+            },
+            "partitions": [
+                {
+                    "type":"memory",
+                    "rank": 0
+                }
+            ]
+        }
+    },
+    "consumers": {
+        "group_file": "mofka.ssg",
+        "topic_name": "mytopic",
+        "consumer_name": "myconsumer",
+        "num_events": 100,
+        "ranks": [2]
+    }
+}
