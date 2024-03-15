@@ -24,6 +24,7 @@ class BenchmarkConsumer {
     Communicator         m_comm;
     json                 m_config;
     bool                 m_run_in_thread;
+    bool                 m_has_partitions;
 
     thallium::managed<thallium::pool>    m_run_pool;
     thallium::managed<thallium::xstream> m_run_es;
@@ -60,8 +61,16 @@ class BenchmarkConsumer {
 
         // TODO add data selector and data broker
 
-        m_mofka_consumer = m_mofka_topic_handle.consumer(
-            consumer_name, batch_size, thread_pool);
+        std::vector<mofka::PartitionInfo> my_partitions;
+        size_t comm_size = m_comm.size();
+        for(size_t i = m_comm.rank(); i < m_mofka_topic_handle.partitions().size(); i += comm_size) {
+            my_partitions.push_back(m_mofka_topic_handle.partitions()[i]);
+        }
+        m_has_partitions = !my_partitions.empty();
+        if(m_has_partitions) {
+            m_mofka_consumer = m_mofka_topic_handle.consumer(
+                consumer_name, batch_size, thread_pool, my_partitions);
+        }
     }
 
     void run() {
@@ -89,12 +98,31 @@ class BenchmarkConsumer {
     private:
 
     void runThread() {
+        std::unordered_map<mofka::UUID, size_t> events_received;
         auto num_events = m_config["num_events"].get<size_t>();
-        for(size_t i = 0; i < num_events; ++i) {
-            auto event = m_mofka_consumer.pull().wait();
-            std::cout << "Event " << event.id() << " received from partition "
-                      << event.partition() << std::endl;
+        auto ack        = m_config.value("ack_every", num_events);
+        m_comm.barrier();
+        double t_start = MPI_Wtime();
+        if(m_has_partitions) {
+            for(size_t i = 0; i < num_events; ++i) {
+                auto event = m_mofka_consumer.pull().wait();
+                std::cout << "Event " << event.id() << " received from partition "
+                    << event.partition() << std::endl;
+                auto uuid = event.partition().uuid();
+                auto it = events_received.find(uuid);
+                if(it == events_received.end())
+                    it = events_received.insert(std::make_pair(uuid, 0)).first;
+                it->second += 1;
+                if(it->second % ack == 0 || i == num_events-1) {
+                    std::cout << "Acknowledging event " << event.id()
+                              << " from partition " << uuid << std::endl;
+                    event.acknowledge();
+                }
+            }
         }
+        m_comm.barrier();
+        double t_end = MPI_Wtime();
+        std::cout << "Consumer finished in " << (t_end - t_start) << " seconds" << std::endl;
     }
 };
 
