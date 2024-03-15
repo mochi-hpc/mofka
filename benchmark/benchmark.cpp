@@ -146,8 +146,11 @@ static const json configSchema = R"(
             "type": "object",
             "properties": {
                 "group_file": {"type":"string"},
+                "topic_name": {"type":"string"},
+                "consumer_name": {"type":"string"},
                 "ranks": { "type": "array", "minItems": 1, "uniqueItems": true,
                            "items": {"type":"integer", "minimum":0}},
+                "num_events": {"type": "integer", "minimum": 0},
                 "batch_size": { "oneOf": [
                     {"type": "integer", "minimum": 1},
                     {"enum": ["adaptive"]}
@@ -177,7 +180,7 @@ static const json configSchema = R"(
                     }
                 }
             },
-            "required": ["ranks", "group_file"]
+            "required": ["ranks", "group_file", "topic_name", "num_events", "consumer_name"]
         },
         "options": {
             "type": "object",
@@ -322,6 +325,7 @@ int main(int argc, char** argv) {
         producer = std::make_shared<BenchmarkProducer>(
             server->getMargoManager().getThalliumEngine(),
             seed, config["producers"], producer_comm, is_consumer && simultaneous);
+    world.barrier();
     if(is_consumer)
         consumer = std::make_shared<BenchmarkConsumer>(
             server->getMargoManager().getThalliumEngine(),
@@ -340,6 +344,8 @@ int main(int argc, char** argv) {
 
     producer.reset();
     consumer.reset();
+
+    world.barrier();
 
     server->finalize();
     server.reset();
