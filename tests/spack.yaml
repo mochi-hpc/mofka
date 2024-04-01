@@ -6,7 +6,7 @@ spack:
   - mochi-thallium
   - nlohmann-json
   - nlohmann-json-schema-validator
-  - spdlog+fmt_external
+  - spdlog
   - fmt
   - tclap
   - mochi-bedrock+ssg+python
