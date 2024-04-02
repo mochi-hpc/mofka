@@ -26,13 +26,6 @@ jobs:
         git clone https://github.com/mochi-hpc/mochi-spack-packages
         spack -e tests repo add mochi-spack-packages
 
-    - name: Update index
-      run: |
-        spack -e tests mirror set --push \
-          --oci-username ${{ github.actor }} \
-          --oci-password "${{ secrets.GITHUB_TOKEN }}" mochi-buildcache
-        spack -e tests buildcache update-index mochi-buildcache
-
     - name: Install spack environment
       run: |
         spack -e tests install
@@ -56,6 +49,7 @@ jobs:
     - name: Push packages to buildcache and update index
       if: ${{ !cancelled() }}
       run: |
+        spack -e tests mirror add --unsigned mochi-buildcache oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
         spack -e tests mirror set --push \
           --oci-username ${{ github.actor }} \
           --oci-password "${{ secrets.GITHUB_TOKEN }}" mochi-buildcache

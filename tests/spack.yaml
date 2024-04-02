@@ -40,10 +40,6 @@ spack:
       require: "fabrics=tcp,rxm"
     nlohmann-json-schema-validator:
       require: "@2.3.0:"
-  mirrors:
-    mochi-buildcache:
-      url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
-      signed: false
   config:
     install_tree:
       padded_length: 128
