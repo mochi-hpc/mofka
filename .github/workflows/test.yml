@@ -49,7 +49,6 @@ jobs:
     - name: Push packages to buildcache and update index
       if: ${{ !cancelled() }}
       run: |
-        spack -e tests mirror add --unsigned mochi-buildcache oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
         spack -e tests mirror set --push \
           --oci-username ${{ github.actor }} \
           --oci-password "${{ secrets.GITHUB_TOKEN }}" mochi-buildcache
