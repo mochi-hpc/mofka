@@ -10,7 +10,6 @@ spack:
   - fmt
   - tclap
   - mochi-bedrock+ssg+python
-  - argobots@1.2rc1
   - mochi-warabi+bedrock
   - mochi-yokan+bedrock
   - py-pybind11
@@ -23,6 +22,8 @@ spack:
       lib: [LD_LIBRARY_PATH]
       lib64: [LD_LIBRARY_PATH]
   packages:
+    argobots:
+      require: "@1.2:"
     mochi-yokan:
       require: "@0.4.2:"
     mochi-warabi:

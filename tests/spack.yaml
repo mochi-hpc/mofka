@@ -10,7 +10,6 @@ spack:
   - fmt
   - tclap
   - mochi-bedrock+ssg+python
-  - argobots@1.2rc1
   - mochi-warabi+bedrock
   - mochi-yokan+bedrock
   - py-coverage
@@ -27,6 +26,8 @@ spack:
     all:
       providers:
         mpi: [mpich]
+    argobots:
+      require: "@1.2:"
     mochi-yokan:
       require: "@0.4.2:"
     mochi-warabi:
