@@ -15,3 +15,6 @@ install (TARGETS pymofka_client
          EXPORT mofka-targets
          ARCHIVE DESTINATION lib/python${PY_VERSION}/site-packages
          LIBRARY DESTINATION lib/python${PY_VERSION}/site-packages)
+
+install (DIRECTORY mochi/mofka
+         DESTINATION lib/python${PY_VERSION}/site-packages/mochi)
