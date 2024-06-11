@@ -10,7 +10,6 @@ add_library (coverage_config INTERFACE)
 add_library (warnings_config INTERFACE)
 
 option (ENABLE_TESTS    "Build tests" OFF)
-option (ENABLE_EXAMPLES "Build examples" OFF)
 option (ENABLE_COVERAGE "Build with coverage" OFF)
 option (ENABLE_PYTHON   "Build the Python module" OFF)
 
@@ -71,6 +70,8 @@ find_package (bedrock REQUIRED)
 find_package (warabi REQUIRED)
 # search for yokan
 find_package (yokan REQUIRED)
+# search for flock
+find_package (flock REQUIRED)
 
 if (ENABLE_PYTHON)
     find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
@@ -102,6 +103,3 @@ if (${ENABLE_TESTS})
     endif ()
     add_subdirectory (tests)
 endif (${ENABLE_TESTS})
-if (${ENABLE_EXAMPLES})
-    add_subdirectory (examples)
-endif (${ENABLE_EXAMPLES})

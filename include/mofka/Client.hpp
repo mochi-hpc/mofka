@@ -10,7 +10,6 @@
 #include <mofka/ServiceHandle.hpp>
 #include <mofka/UUID.hpp>
 #include <mofka/Json.hpp>
-#include <mofka/SSG.hpp>
 
 #include <thallium.hpp>
 #include <memory>
@@ -82,20 +81,11 @@ class Client {
     /**
      * @brief Creates a ServiceHandle representing a Mofka service.
      *
-     * @param filename SSG group file name of the service.
+     * @param filename name of the group file of the service.
      *
      * @return a ServiceHandle instance.
      */
-    ServiceHandle connect(SSGFileName ssgfile) const;
-
-    /**
-     * @brief Creates a ServiceHandle representing a Mofka service.
-     *
-     * @param group_id SSG group id.
-     *
-     * @return a ServiceHandle instance.
-     */
-    ServiceHandle connect(SSGGroupID gid) const;
+    ServiceHandle connect(const std::string& groupfile) const;
 
     /**
      * @brief Checks that the Client instance is valid.

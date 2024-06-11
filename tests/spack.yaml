@@ -9,9 +9,10 @@ spack:
   - spdlog
   - fmt
   - tclap
-  - mochi-bedrock+ssg+python
+  - mochi-bedrock+python
   - mochi-warabi+bedrock
   - mochi-yokan+bedrock
+  - mochi-flock+python
   - py-coverage
   - py-pybind11
   - py-mochi-margo
@@ -34,6 +35,8 @@ spack:
       require: "@0.3.0:"
     mochi-bedrock:
       require: "@0.10.0:"
+    mochi-flock:
+      require: "@0.2.0:"
     mercury:
       require: "~checksum~boostsys"
     libfabric:

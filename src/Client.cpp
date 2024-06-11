@@ -14,7 +14,9 @@
 #include "TopicHandleImpl.hpp"
 #include "ConsumerImpl.hpp"
 
+#include <nlohmann/json.hpp>
 #include <thallium/serialization/stl/string.hpp>
+#include <fstream>
 #include <utility>
 #include <tuple>
 
@@ -63,24 +65,40 @@ std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
     return masters[0];
 }
 
-template<typename T>
-static auto makeServiceHandle(std::shared_ptr<ClientImpl> self, const T& ssgArg) {
-    if(!self) throw Exception("Uninitialized ServiceHandle instance");
+ServiceHandle Client::connect(const std::string& groupfile) const {
+    if(!self) throw Exception("Uninitialized Client instance");
+
+    std::unordered_set<std::string> addrSet;
+    std::vector<std::string> addresses;
+
+    std::ifstream inputFile(groupfile);
+    if(!inputFile.is_open()) {
+        throw Exception{"Could not open group file"};
+    }
+
     try {
-        auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(ssgArg);
+        nlohmann::json content;
+        inputFile >> content;
+        if(!content.is_object() || !content.contains("members") || !content["members"].is_array())
+            throw Exception{"Group file doesn't appear to be a correctly formatted Flock group file"};
+        auto& members = content["members"];
+        if(members.empty())
+            throw Exception{"No member found in provided Flock group file"};
+        for(auto& member : members) {
+            if(!member.is_object() || !member.contains("address"))
+                throw Exception{"Group file doesn't appear to be a correctly formatted Flock group file"};
+            auto c =  addrSet.size();
+            auto& addr = member["address"].get_ref<const std::string&>();
+            addrSet.insert(addr);
+            if(c < addrSet.size())
+                addresses.push_back(addr);
+        }
+        auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(addresses);
         auto master = discoverMofkaServiceMaster(bsgh);
         return std::make_shared<ServiceHandleImpl>(self, std::move(bsgh), master);
     } catch(const std::exception& ex) {
         throw Exception(ex.what());
     }
-}
-
-ServiceHandle Client::connect(SSGFileName ssgfile) const {
-    return makeServiceHandle(self, std::string{ssgfile});
-}
-
-ServiceHandle Client::connect(SSGGroupID gid) const {
-    return makeServiceHandle(self, gid.value);
 }
 
 const Metadata& Client::getConfig() const {

@@ -58,9 +58,6 @@ target_include_directories (mofka-client BEFORE PUBLIC
 set_target_properties (mofka-client
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
-#target_precompile_headers (mofka-client
-#    PUBLIC <thallium.hpp> <nlohmann/json.hpp>
-#    PRIVATE <nlohmann/json-schema.hpp>)
 
 # server library
 add_library (mofka-server ${server-src-files})
@@ -86,7 +83,6 @@ target_include_directories (mofka-server BEFORE PUBLIC
 set_target_properties (mofka-server
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
-#target_precompile_headers (mofka-server REUSE_FROM mofka-client)
 
 # bedrock module library
 add_library (mofka-bedrock-module ${module-src-files})
@@ -101,7 +97,6 @@ target_include_directories (mofka-bedrock-module BEFORE PUBLIC
 set_target_properties (mofka-bedrock-module
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
-#target_precompile_headers (mofka-bedrock-module REUSE_FROM mofka-client)
 
 # installation stuff (packaging and install commands)
 write_basic_package_version_file (
