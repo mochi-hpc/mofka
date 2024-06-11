@@ -58,8 +58,6 @@ pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
 # search for nlohmann/json and schema validator
 find_package (nlohmann_json REQUIRED)
 find_package (nlohmann_json_schema_validator REQUIRED)
-# search for TCLAP
-find_package (TCLAP REQUIRED)
 # search for spdlog
 find_package (spdlog REQUIRED)
 # search for fmt package

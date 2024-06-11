@@ -34,7 +34,7 @@ Alternatively, you can isolate your Mofka installation in a Spack environment as
    spack add mofka
    spack install
 
-It is generally recommended to using Spack environment to better manage package isolation.
+It is generally recommended to use Spack environment to better manage package isolation.
 Adding *mochi-spack-packages* this way also ensures that it is added only to the environment
 and not globally.
 
