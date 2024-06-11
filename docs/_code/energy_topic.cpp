@@ -1,6 +1,5 @@
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
-#include <ssg.h>
 #include <iostream>
 
 int main(int argc, char** argv) {
@@ -15,8 +14,6 @@ int main(int argc, char** argv) {
     auto group_file = argv[2];
 
     auto engine = thallium::engine(protocol, THALLIUM_SERVER_MODE);
-    ssg_init();
-    engine.push_prefinalize_callback(ssg_finalize);
 
     try {
 

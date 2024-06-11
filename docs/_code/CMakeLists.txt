@@ -8,14 +8,11 @@ if (PROJECT_IS_TOP_LEVEL) # allows building from inside Mofka's source tree
     find_package (mofka REQUIRE)
 endif ()
 
-find_package (PkgConfig REQUIRED)
-pkg_check_modules (ssg REQUIRED IMPORTED_TARGET ssg)
-
 add_executable (myproducer producer.cpp)
-target_link_libraries (myproducer mofka::client PkgConfig::ssg)
+target_link_libraries (myproducer mofka::client)
 
 add_executable (myconsumer consumer.cpp)
-target_link_libraries (myconsumer mofka::client PkgConfig::ssg)
+target_link_libraries (myconsumer mofka::client)
 
 # CUSTOM TOPIC OBJECTS
 
@@ -29,5 +26,5 @@ add_library (energy_serializer SHARED energy_serializer.cpp)
 target_link_libraries (energy_serializer mofka::client)
 
 add_executable (energy_topic energy_topic.cpp)
-target_link_libraries (energy_topic mofka::client PkgConfig::ssg)
+target_link_libraries (energy_topic mofka::client)
 
