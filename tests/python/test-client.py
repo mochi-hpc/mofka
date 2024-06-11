@@ -34,9 +34,9 @@ class TestClient(unittest.TestCase):
         client = mofka.Client(mid=self.mid)
 
     def test_connect_client(self):
-        """Test connecting a client to a ssg group"""
+        """Test connecting a client to a group"""
         client = mofka.Client(mid=self.mid)
-        service = client.connect("mofka_flock.json")
+        service = client.connect("mofka.json")
 
     def test_get_config(self):
         """Test get client config"""
@@ -143,7 +143,7 @@ class TestServiceHandle(unittest.TestCase):
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
         self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect("mofka_flock.json")
+        self.service = self.client.connect("mofka.json")
         self.metadata = dict()
         letters = string.ascii_letters
         key_len = random.randint(8, 64)
@@ -210,7 +210,7 @@ class TestTopicHandle(unittest.TestCase):
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
         self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect("mofka_flock.json")
+        self.service = self.client.connect("mofka.json")
 
         self.metadata = dict()
         letters = string.ascii_letters
@@ -278,7 +278,7 @@ class TestProducer(unittest.TestCase):
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
         self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect("mofka_flock.json")
+        self.service = self.client.connect("mofka.json")
 
         # create data and metadata
         self.metadata = dict()

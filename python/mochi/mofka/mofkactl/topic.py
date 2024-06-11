@@ -24,7 +24,7 @@ def create(
                               help="Serializer implementation")] = "default",
         groupfile: Annotated[
             str, typer.Option("-g", "--groupfile",
-                              help="SSG group file of the service")] = "./mofka.ssg"
+                              help="Flock group file of the service")] = "./mofka.json"
         ):
     from ._util import parse_config_from_args
     validator_config = parse_config_from_args(ctx.args.copy(), "--validator.")

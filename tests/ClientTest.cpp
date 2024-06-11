@@ -17,7 +17,7 @@ TEST_CASE("Client test", "[client]") {
     auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
     CAPTURE(partition_type);
 
-//    auto remove_file = EnsureFileRemoved{"mofka_flock.json"};
+    auto remove_file = EnsureFileRemoved{"mofka.json"};
 
     auto server = bedrock::Server("na+sm", config);
     ENSURE(server.finalize());
@@ -32,7 +32,7 @@ TEST_CASE("Client test", "[client]") {
         SECTION("Initialize a service handle") {
             mofka::ServiceHandle sh;
             REQUIRE(!static_cast<bool>(sh));
-            REQUIRE_NOTHROW(sh = client.connect("mofka_flock.json"));
+            REQUIRE_NOTHROW(sh = client.connect("mofka.json"));
             REQUIRE(static_cast<bool>(sh));
 
             SECTION("Create a topic") {

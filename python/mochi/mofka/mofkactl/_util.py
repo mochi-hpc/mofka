@@ -1,30 +1,39 @@
 import os
 import typer
+import json
 from typing import Optional, List
 from pymargo.core import Engine
 
 
 class ServiceContext:
 
-    def __init__(self, groupfile="mofka.ssg"):
+    def __init__(self, groupfile="mofka.json"):
         self.groupfile = groupfile
-        import pyssg
-        self.protocol = pyssg.get_group_transport_from_file(self.groupfile)
+        with open(groupfile) as f:
+            content = json.load(f)
+            if (not isinstance(content, dict)) or ("members" not in content):
+                print(f"Error: group file's content seems invalid")
+                raise typer.Exit(code=-1)
+            members = content["members"]
+            if (not isinstance(members, list)) or (len(members) == 0):
+                print(f"Error: group file's content seems invalid")
+                raise typer.Exit(code=-1)
+            member = members[0]
+            if (not isinstance(member, dict)) or ("address" not in member):
+                print(f"Error: group file's content seems invalid")
+                raise typer.Exit(code=-1)
+            address = member["address"]
+            self.protocol = address.split(":")[0]
 
     def __enter__(self):
         self.engine = Engine(self.protocol)
-        import pyssg
-        pyssg.init()
         from ..client import Client
         client = Client(self.engine.mid)
         self.service = client.connect(self.groupfile)
         return self.service
 
     def __exit__(self, type, value, traceback):
-        self.service = None
         del self.service
-        import pyssg
-        pyssg.finalize()
         self.engine.finalize()
 
 

@@ -16,7 +16,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
 //    spdlog::set_level(spdlog::level::from_str("trace"));
     auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
     CAPTURE(partition_type);
-    auto remove_file = EnsureFileRemoved{"mofka_flock.json"};
+    auto remove_file = EnsureFileRemoved{"mofka.json"};
 
     auto server = bedrock::Server("na+sm", config);
     ENSURE(server.finalize());
@@ -25,7 +25,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
     SECTION("Producer/consumer") {
         auto client = mofka::Client{engine};
         REQUIRE(static_cast<bool>(client));
-        auto sh = client.connect("mofka_flock.json");
+        auto sh = client.connect("mofka.json");
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));

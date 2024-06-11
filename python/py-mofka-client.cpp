@@ -100,7 +100,7 @@ PYBIND11_MODULE(pymofka_client, m) {
              [](const mofka::Client& client, std::string_view filename) -> mofka::ServiceHandle {
                 return client.connect(std::string{filename});
              },
-            "ssg_file"_a)
+            "group_file"_a)
     ;
 
     py::class_<mofka::Validator>(m, "Validator")

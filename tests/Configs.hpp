@@ -22,7 +22,7 @@ static inline const char* config = R"(
             "provider_id" : 1,
             "config": {
                 "bootstrap": "self",
-                "file": "mofka_flock.json",
+                "file": "mofka.json",
                 "group": {
                     "type": "static"
                 }

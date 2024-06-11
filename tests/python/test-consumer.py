@@ -34,7 +34,7 @@ class TestConsumer(unittest.TestCase):
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
         self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect("mofka_flock.json")
+        self.service = self.client.connect("mofka.json")
 
         # create data and metadata
         self.metadata = dict()
