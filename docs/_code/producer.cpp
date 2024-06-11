@@ -21,9 +21,6 @@ int main(int argc, char** argv) {
         mofka::Client client = mofka::Client{engine};
         mofka::ServiceHandle sh = client.connect(group_file);
 
-        sh.createTopic(topic_name);
-        sh.addMemoryPartition(topic_name, 0);
-
         mofka::TopicHandle topic = sh.openTopic(topic_name);
 
         mofka::Producer producer = topic.producer();

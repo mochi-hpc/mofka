@@ -93,7 +93,7 @@ implementation.
 
       The group file is the name/path of the SSG group file specified in the
       server's JSON configuration. If not provided, :code:`mofkactl` will
-      look for a *"mofka.ssg"* file in the current working directory.
+      look for a *"mofka.json"* file in the current working directory.
 
 Let's take a look at the implementation of the validator, partition selector,
 and serializer classes.

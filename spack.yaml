@@ -8,10 +8,10 @@ spack:
   - nlohmann-json-schema-validator
   - spdlog
   - fmt
-  - mochi-bedrock+python
+  - mochi-bedrock+python+mpi
   - mochi-warabi+bedrock
   - mochi-yokan+bedrock
-  - mochi-flock+python+bedrock
+  - mochi-flock+python+bedrock+mpi
   - py-pybind11
   - py-mochi-margo
   concretizer:

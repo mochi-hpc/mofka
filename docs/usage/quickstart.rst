@@ -20,8 +20,8 @@ client API for producers and consumer applications.
 Deploying Mofka
 ---------------
 
-Like other Mochi services, Mofka is defined by a composition of microservices
-expressed using a JSON configuration fed to `Bedrock <https://mochi.readthedocs.io/en/latest/bedrock.html>`_,
+The composition of microservices that defines Mofka is expressed using a JSON
+configuration fed to `Bedrock <https://mochi.readthedocs.io/en/latest/bedrock.html>`_,
 Mochi's bootstrapping service. Hereafter is a minimal JSON configuration for Mofka.
 
 .. literalinclude:: ../_code/simple-config.json
@@ -34,17 +34,19 @@ as follows.
 
    bedrock na+sm -c config.json
 
-You now have a Mofka service running locally. It will have created a *mofka.ssg*
-file that client applications will use to connect to it.
+You now have a Mofka service running locally. It will have created a *mofka.json*
+file that client applications will use to connect to it (if you examine the content
+of this file, you will find the address of your Mofka server, among other things).
 
 .. note::
 
    If you encounter errors related to *dlopen*, make sure your `LD_LIBRARY_PATH`
    environment variable contains the path to the Bedrock modules that will be
-   needed: *libyokan-bedrock-module.so*, *libwarabi-bedrock-module.so*, and
-   *libmofka-bedrock-module.so*. If you are using a Spack environment,
-   activate it then type :code:`spack config edit config` and add the :code:`modules`
-   section as follows.
+   needed: *libflock-bedrock-module.so*, *libyokan-bedrock-module.so*,
+   *libwarabi-bedrock-module.so*, and *libmofka-bedrock-module.so*. If you are using
+   a Spack environment, activate it then type :code:`spack config edit config` and add
+   the :code:`modules` section as follows. Deactivate it, and reactivate it for the
+   changes to be taken into account.
 
    .. code-block:: yaml
 
@@ -56,12 +58,30 @@ file that client applications will use to connect to it.
              lib64: [LD_LIBRARY_PATH]
 
 
+Creating a topic and a partition
+--------------------------------
+
+You can now use the :code:`mofkactl` command-line tool to create a topic.
+In a separate terminate, with your Spack environment activated, enter the following command.
+
+.. code-block:: bash
+
+   mofkactl topic create my_topic --groupfile mofka.json
+
+The topic *my_topic* has been created, but it does not have any partitions attached to it.
+Add an in-memory partition using the following command.
+
+.. code-block:: bash
+
+   mofkactl partition add my_topic --type memory --rank 0 --groupfile mofka.json
+
+Your topic now has a partition, we can start producing events into it.
+
 Using the Mofka library
 -----------------------
 
-Mofka can be used in C++ or in Python (if built with Python support).
-The following *CMakeLists.txt* file shows how to link an application
-against the Mofka library in CMake.
+Mofka can be used in C++ or in Python (if built with Python support). The following
+*CMakeLists.txt* file shows how to link an application against the Mofka library in CMake.
 
 
 .. literalinclude:: ../_code/CMakeLists.txt
@@ -72,13 +92,10 @@ against the Mofka library in CMake.
 Simple producer application
 ---------------------------
 
-The following code examplified a producer. For conciseness, it also creates
-a topic and adds a partition to it, though these operations would typically
-be done using Mofka's command-line interface ahead of time.
-
-We first need to initialize a :code:`thallium::engine`, which is the runtime
-used by all the Mochi libraries. Then, we also initialize SSG with :code:`ssg_init`
-and tell the engine to finalize it when it is itself finalized.
+The following code examplified a producer. We first need to initialize a
+:code:`thallium::engine`, which is the runtime used by all the Mochi libraries.
+Then, we also initialize SSG with :code:`ssg_init` and tell the engine to finalize
+it when it is itself finalized.
 
 .. important::
 
@@ -86,12 +103,8 @@ and tell the engine to finalize it when it is itself finalized.
    This is because Mofka servers will send RPCs to the clients.
 
 Next, we create a :code:`mofka::Client` object and use it to create a
-:code:`mofka::ServiceHandle`. The latter is initialized using the SSG file
+:code:`mofka::ServiceHandle`. The latter is initialized using the file
 created by our running Mofka server (*mofka.ssg*).
-
-We call :code:`createTopic` and :code:`addPartition` on the :code:`ServiceHandle`.
-This respectively creates the specified topic and adds an in-memory partition for
-it (by default, topics are created with no partition initially).
 
 We then open the topic we have created, using :code:`service_handle.openTopic()`,
 which gives us a :code:`TopicHandle` to interact with the topic.
@@ -111,6 +124,7 @@ have all been sent, we call :code:`producer.flush()`.
 
    You may see a warning on your standard output about event ordering.
    You can ignore it for now.
+
 
 Simple consumer application
 ---------------------------
