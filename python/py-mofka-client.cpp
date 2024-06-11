@@ -97,15 +97,10 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def_property_readonly("engine", &mofka::Client::engine)
         .def(py::init<py_margo_instance_id>(), "mid"_a)
         .def("connect",
-             [](const mofka::Client& client, std::string_view ssgfile) -> mofka::ServiceHandle {
-                return client.connect(mofka::SSGFileName{ssgfile});
+             [](const mofka::Client& client, std::string_view filename) -> mofka::ServiceHandle {
+                return client.connect(std::string{filename});
              },
-            "ssg_file"_a)
-        .def("connect",
-             [](const mofka::Client& client, uint64_t ssgid) -> mofka::ServiceHandle {
-                return client.connect(mofka::SSGGroupID{ssgid});
-             },
-            "ssg_group_id"_a)
+            "group_file"_a)
     ;
 
     py::class_<mofka::Validator>(m, "Validator")

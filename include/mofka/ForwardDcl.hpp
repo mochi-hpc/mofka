@@ -33,8 +33,6 @@ class Result;
 class SerializerInterface;
 class Serializer;
 class ServiceHandle;
-struct SSGFileName;
-struct SSGGroupID;
 class PartitionInfo;
 class PartitionSelectorInterface;
 class PartitionSelector;

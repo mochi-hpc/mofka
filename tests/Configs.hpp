@@ -11,14 +11,27 @@ static inline const char* config = R"(
 {
     "libraries" : {
         "mofka" : "libmofka-bedrock-module.so",
+        "flock" : "libflock-bedrock-module.so",
         "warabi" : "libwarabi-bedrock-module.so",
         "yokan" : "libyokan-bedrock-module.so"
     },
     "providers" : [
         {
+            "name" : "my_flock_provider",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "self",
+                "file": "mofka.json",
+                "group": {
+                    "type": "static"
+                }
+            }
+        },
+        {
             "name" : "my_warabi_provider",
             "type" : "warabi",
-            "provider_id" : 1,
+            "provider_id" : 2,
             "config" : {
                 "target" : {
                     "type": "memory",
@@ -29,23 +42,13 @@ static inline const char* config = R"(
         {
             "name" : "my_yokan_provider",
             "type" : "yokan",
-            "provider_id" : 2,
+            "provider_id" : 3,
             "tags" : [ "mofka:master" ],
             "config" : {
                 "database" : {
                     "type": "map",
                     "config": {}
                 }
-            }
-        }
-    ],
-    "ssg" : [
-        {
-            "name" : "mofka_group",
-            "method" : "init",
-            "group_file" : "mofka.ssg",
-            "swim" : {
-                "period_length_ms" : 100
             }
         }
     ]

@@ -6,8 +6,20 @@
     },
     "providers": [
         {
+            "name" : "my_group_manager",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "self",
+                "file": "mofka.json",
+                "group": {
+                    "type": "static"
+                }
+            }
+        },
+        {
             "name": "master",
-            "provider_id": 1,
+            "provider_id": 2,
             "type": "yokan",
             "tags" : [ "mofka:master" ],
             "config" : {
@@ -16,7 +28,7 @@
         },
         {
             "name": "my_metadata_provider",
-            "provider_id": 2,
+            "provider_id": 3,
             "type": "yokan",
             "tags" : [ "mofka:metadata" ],
             "config" : {
@@ -25,19 +37,12 @@
         },
         {
             "name": "my_data_provider",
-            "provider_id": 3,
+            "provider_id": 4,
             "type": "warabi",
             "tags" : [ "mofka:data" ],
             "config" : {
                 "target" : { "type": "memory" }
             }
-        }
-    ],
-    "ssg": [
-        {
-            "name": "mofka",
-            "method" : "init",
-            "group_file" : "mofka.ssg"
         }
     ]
 }

@@ -7,7 +7,7 @@ mofkactl topic create collisions \
 	--partition-selector.energy_max 100 \
 	--serializer energy_serializer:libenergy_serializer.so \
 	--serializer.energy_max 100 \
-	--groupfile mofka.ssg
+	--groupfile mofka.json
 
 # shorter version
 mofkactl topic create collisions \
@@ -17,7 +17,7 @@ mofkactl topic create collisions \
 	--p.energy_max 100 \
 	-s energy_serializer:libenergy_serializer.so \
 	--s.energy_max 100 \
-	-g mofka.ssg
+	-g mofka.json
 # END CREATE TOPIC
 
 # START ADD PARTITION
@@ -25,7 +25,7 @@ mofkactl topic create collisions \
 mofkactl partition add collisions \
 	--type memory \
 	--rank 0 \
-	--groupfile mofka.ssg
+	--groupfile mofka.json
 
 # long argument version, with default type
 mofkactl partition add collisions \
@@ -33,12 +33,12 @@ mofkactl partition add collisions \
 	--metadata my_metadata_provider@local \
 	--data my_data_provider@local \
 	--rank 0 \
-	--groupfile mofka.ssg
+	--groupfile mofka.json
 
 # shorter version, with default type,
 # and not specifying metadata/data providers
 mofkactl partition add collisions \
 	-t default \
 	-r 0 \
-	-g mofka.ssg
+	-g mofka.json
 # END ADD PARTITION

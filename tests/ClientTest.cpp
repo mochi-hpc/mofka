@@ -17,11 +17,10 @@ TEST_CASE("Client test", "[client]") {
     auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
     CAPTURE(partition_type);
 
-    auto remove_file = EnsureFileRemoved{"mofka.ssg"};
+    auto remove_file = EnsureFileRemoved{"mofka.json"};
 
     auto server = bedrock::Server("na+sm", config);
     ENSURE(server.finalize());
-    auto gid = server.getSSGManager().getGroup("mofka_group")->getHandle<uint64_t>();
     auto engine = server.getMargoManager().getThalliumEngine();
 
     SECTION("Initialize a client") {
@@ -33,7 +32,7 @@ TEST_CASE("Client test", "[client]") {
         SECTION("Initialize a service handle") {
             mofka::ServiceHandle sh;
             REQUIRE(!static_cast<bool>(sh));
-            REQUIRE_NOTHROW(sh = client.connect(mofka::SSGGroupID{gid}));
+            REQUIRE_NOTHROW(sh = client.connect("mofka.json"));
             REQUIRE(static_cast<bool>(sh));
 
             SECTION("Create a topic") {

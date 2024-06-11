@@ -24,11 +24,9 @@ class TestClient(unittest.TestCase):
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
-        self.gid = self.bedrock_server.ssg["mofka_group"].handle
 
     def tearDown(self):
         del self.mid
-        del self.gid
         self.bedrock_server.finalize()
 
     def test_create_client(self):
@@ -36,9 +34,9 @@ class TestClient(unittest.TestCase):
         client = mofka.Client(mid=self.mid)
 
     def test_connect_client(self):
-        """Test connecting a client to a ssg group"""
+        """Test connecting a client to a group"""
         client = mofka.Client(mid=self.mid)
-        service = client.connect(self.gid)
+        service = client.connect("mofka.json")
 
     def test_get_config(self):
         """Test get client config"""
@@ -144,9 +142,8 @@ class TestServiceHandle(unittest.TestCase):
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
-        self.gid = self.bedrock_server.ssg["mofka_group"].handle
         self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect(self.gid)
+        self.service = self.client.connect("mofka.json")
         self.metadata = dict()
         letters = string.ascii_letters
         key_len = random.randint(8, 64)
@@ -161,7 +158,6 @@ class TestServiceHandle(unittest.TestCase):
 
     def tearDown(self):
         del self.mid
-        del self.gid
         del self.service
         del self.client
         del self.metadata
@@ -213,9 +209,8 @@ class TestTopicHandle(unittest.TestCase):
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
-        self.gid = self.bedrock_server.ssg["mofka_group"].handle
         self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect(self.gid)
+        self.service = self.client.connect("mofka.json")
 
         self.metadata = dict()
         letters = string.ascii_letters
@@ -239,7 +234,6 @@ class TestTopicHandle(unittest.TestCase):
 
     def tearDown(self):
         del self.mid
-        del self.gid
         del self.service
         del self.client
         del self.topic
@@ -283,9 +277,8 @@ class TestProducer(unittest.TestCase):
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
-        self.gid = self.bedrock_server.ssg["mofka_group"].handle
         self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect(self.gid)
+        self.service = self.client.connect("mofka.json")
 
         # create data and metadata
         self.metadata = dict()
@@ -317,7 +310,6 @@ class TestProducer(unittest.TestCase):
 
     def tearDown(self):
         del self.mid
-        del self.gid
         del self.metadata
         del self.str_data
         del self.service

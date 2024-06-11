@@ -33,9 +33,8 @@ class TestConsumer(unittest.TestCase):
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
-        self.gid = self.bedrock_server.ssg["mofka_group"].handle
         self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect(self.gid)
+        self.service = self.client.connect("mofka.json")
 
         # create data and metadata
         self.metadata = dict()
@@ -70,7 +69,6 @@ class TestConsumer(unittest.TestCase):
 
     def tearDown(self):
         del self.mid
-        del self.gid
         del self.service
         del self.client
         del self.topic
