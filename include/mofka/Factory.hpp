@@ -8,6 +8,7 @@
 
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
+#include <fmt/format.h>
 #include <dlfcn.h>
 #include <unordered_map>
 #include <functional>
@@ -36,14 +37,16 @@ class Factory {
             const auto path = key.substr(found + 1);
             auto it = factory.m_creator_fn.find(name);
             if (it == factory.m_creator_fn.end()) {
-                dlopen(path.c_str(), RTLD_NOW);
+                if(dlopen(path.c_str(), RTLD_NOW) == nullptr) {
+                    throw Exception(fmt::format("Could not dlopen {}: {}", name, dlerror()));
+                }
             }
         }
         auto it = factory.m_creator_fn.find(name);
         if (it != factory.m_creator_fn.end()) {
             return it->second(std::forward<Args>(args)...);
         } else {
-            throw Exception("Creator not found");
+            throw Exception(fmt::format("Factory method not found for type {}", name));
         }
     }
 
