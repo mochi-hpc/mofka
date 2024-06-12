@@ -9,21 +9,25 @@ class ServiceContext:
 
     def __init__(self, groupfile="mofka.json"):
         self.groupfile = groupfile
-        with open(groupfile) as f:
-            content = json.load(f)
-            if (not isinstance(content, dict)) or ("members" not in content):
-                print(f"Error: group file's content seems invalid")
-                raise typer.Exit(code=-1)
-            members = content["members"]
-            if (not isinstance(members, list)) or (len(members) == 0):
-                print(f"Error: group file's content seems invalid")
-                raise typer.Exit(code=-1)
-            member = members[0]
-            if (not isinstance(member, dict)) or ("address" not in member):
-                print(f"Error: group file's content seems invalid")
-                raise typer.Exit(code=-1)
-            address = member["address"]
-            self.protocol = address.split(":")[0]
+        try:
+            with open(groupfile) as f:
+                content = json.load(f)
+                if (not isinstance(content, dict)) or ("members" not in content):
+                    print(f"Error: group file's content seems invalid")
+                    raise typer.Exit(code=-1)
+                members = content["members"]
+                if (not isinstance(members, list)) or (len(members) == 0):
+                    print(f"Error: group file's content seems invalid")
+                    raise typer.Exit(code=-1)
+                member = members[0]
+                if (not isinstance(member, dict)) or ("address" not in member):
+                    print(f"Error: group file's content seems invalid")
+                    raise typer.Exit(code=-1)
+                address = member["address"]
+                self.protocol = address.split(":")[0]
+        except FileNotFoundError:
+            print(f"Error: could not find file {self.groupfile}")
+            raise typer.Exit(code=-1)
 
     def __enter__(self):
         self.engine = Engine(self.protocol)
