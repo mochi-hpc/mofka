@@ -8,6 +8,15 @@ TopicHandle = pymofka_client.TopicHandle
 Validator = pymofka_client.Validator
 PartitionSelector = pymofka_client.PartitionSelector
 Serializer = pymofka_client.Serializer
+ThreadPool = pymofka_client.ThreadPool
+AdaptiveBatchSize = pymofka_client.AdaptiveBatchSize
+ServiceHandle = pymofka_client.ServiceHandle
+Producer = pymofka_client.Producer
+Consumer = pymofka_client.Consumer
+DataDescriptor = pymofka_client.DataDescriptor
+Event = pymofka_client.Event
+FutureUint = pymofka_client.FutureUint
+FutureEvent = pymofka_client.FutureEvent
 
 
 class Client:
