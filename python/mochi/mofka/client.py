@@ -14,7 +14,7 @@ class Client:
     def __init__(self, arg):
         self._engine = None
         if isinstance(arg, pymargo.core.Engine):
-            self._mid = self._engine.mid
+            self._mid = arg.mid
         elif isinstance(arg, str):
             self._engine = pymargo.core.Engine(arg, pymargo.server)
             self._mid = self._engine.mid
