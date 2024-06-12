@@ -385,6 +385,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 [](mofka::Event& event) {
                     return mofka::PythonBindingHelper::GetDataContext(event.data());
                 })
+        .def_property_readonly("event_id", &mofka::Event::id)
         .def_property_readonly("partition", &mofka::Event::partition)
         .def("acknowledge",
              [](const mofka::Event& event){

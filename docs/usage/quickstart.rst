@@ -38,6 +38,9 @@ You now have a Mofka service running locally. It will have created a *mofka.json
 file that client applications will use to connect to it (if you examine the content
 of this file, you will find the address of your Mofka server, among other things).
 
+In :ref:`this section<Deployment>` we will see how to deploy a more complex,
+multi-node Mofka service.
+
 .. note::
 
    If you encounter errors related to *dlopen*, make sure your `LD_LIBRARY_PATH`

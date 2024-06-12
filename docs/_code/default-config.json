@@ -1,5 +1,6 @@
 {
     "libraries": {
+        "flock": "libflock-bedrock-module.so",
         "yokan": "libyokan-bedrock-module.so",
         "warabi": "libwarabi-bedrock-module.so",
         "mofka" : "libmofka-bedrock-module.so"

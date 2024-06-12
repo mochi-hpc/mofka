@@ -51,34 +51,40 @@ metadata of each event.
    part of an event's metadata, we could serialize this value into a single byte (:code:`uint8_t`),
    drastically reducing the metadata size compared with a string like :code:`{"energy":42}`.
 
-.. important::
+We will deploy a Mofka server using the following *config.json* file, **not** the file
+used in :ref:`Getting started`.
 
-   In the following, we will still run a single-process Mofka server. Multi-process/node
-   deployments will be covered in :ref:`Deployment`.
+.. literalinclude:: ../_code/default-config.json
+   :language: json
+
+Deploy this Mofka configuration using Bedrock as follows before proceeding with the next sections.
+
+.. code-block:: bash
+
+   bedrock na+sm -c config.json
+
+.. note::
+
+   Multi-process/node deployments will be covered in the :ref:`Deployment` section.
 
 
 Creating a topic
 ----------------
 
-The following code snippets show how to create a topic in C++, in Python,
-and with Mofka's :code:`mofkactl` command-line tool. Our custom validator, partition selector,
+The following code snippets show how to create a topic. Such topic creation should generally
+be done using Mofka's :code:`mofkactl` command-line tool, however it is also possible to create
+topics in C++, and in Python, Our custom validator, partition selector,
 and serializer are provided using the :code:`"name:library.so"` format. This tells the
-Mofka client to dynamically load the specified libraries to get access to their
-implementation.
+Mofka client to dynamically load the specified libraries to get access to their implementation.
+
+.. important::
+
+   If you get an error indicating that :code:`dlopen` has failed to find your library for
+   the validator, partition selector, or serializer, make sure that :code:`LD_LIBRARY_PATH`
+   contains the path to find these libraries.
+
 
 .. tabs::
-
-   .. group-tab:: C++
-
-      .. literalinclude:: ../_code/energy_topic.cpp
-         :language: cpp
-         :start-after: START CREATE TOPIC
-         :end-before: END CREATE TOPIC
-         :dedent: 8
-
-   .. group-tab:: Python
-
-      Work in progress...
 
    .. group-tab:: mofkactl
 
@@ -94,6 +100,18 @@ implementation.
       The group file is the name/path of the SSG group file specified in the
       server's JSON configuration. If not provided, :code:`mofkactl` will
       look for a *"mofka.json"* file in the current working directory.
+
+   .. group-tab:: C++
+
+      .. literalinclude:: ../_code/energy_topic.cpp
+         :language: cpp
+         :start-after: START CREATE TOPIC
+         :end-before: END CREATE TOPIC
+         :dedent: 8
+
+   .. group-tab:: Python
+
+      Work in progress...
 
 Let's take a look at the implementation of the validator, partition selector,
 and serializer classes.
