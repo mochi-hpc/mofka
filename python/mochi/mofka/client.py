@@ -1,4 +1,5 @@
 import pymofka_client
+import pymargo
 from pymargo.core import Engine
 
 
