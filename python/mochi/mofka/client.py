@@ -14,12 +14,12 @@ class Client:
     def __init__(self, arg):
         self._engine = None
         if isinstance(arg, pymargo.core.Engine):
-            self._mid = arg.mid
+            mid = arg.mid
         elif isinstance(arg, str):
             self._engine = pymargo.core.Engine(arg, pymargo.server)
-            self._mid = self._engine.mid
+            mid = self._engine.mid
         else:
-            self._mid = arg
+            mid = arg
         self._internal = pymofka_client.Client(mid)
 
     def connect(self, group_file: str):
