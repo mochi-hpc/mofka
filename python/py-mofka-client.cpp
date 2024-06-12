@@ -249,7 +249,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                PythonDataBroker broker,
                PythonDataSelector selector,
                std::optional<std::vector<mofka::PartitionInfo>> targets) -> mofka::Consumer {
-                auto cpp_broker =
+                auto cpp_broker = broker ?
                     [broker=std::move(broker)]
                     (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::Data {
                         auto segments = broker(metadata.json(), descriptor);
@@ -264,12 +264,14 @@ PYBIND11_MODULE(pymofka_client, m) {
                         auto data = mofka::Data{std::move(cpp_segments)};
                         mofka::PythonBindingHelper::SetDataContext(data, std::move(segments));
                         return data;
-                };
-                auto cpp_selector =
+                }
+                : mofka::DataBroker{};
+                auto cpp_selector = selector ?
                     [selector=std::move(selector)]
                     (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::DataDescriptor {
                         return selector(metadata.json(), descriptor);
-                    };
+                    }
+                : mofka::DataSelector{};
                 return topic.consumer(
                     name, mofka::BatchSize(batch_size),
                     thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
@@ -278,8 +280,8 @@ PYBIND11_MODULE(pymofka_client, m) {
                     targets.value_or(topic.partitions()));
                },
             "name"_a, "batch_size"_a=mofka::BatchSize::Adaptive().value,
-            "thread_pool"_a=std::nullopt, "data_broker"_a=mofka::DataBroker{},
-            "data_selector"_a=mofka::DataSelector{}, "targets"_a=std::optional<std::vector<mofka::PartitionInfo>>{})
+            "thread_pool"_a=std::nullopt, "data_broker"_a=PythonDataBroker{},
+            "data_selector"_a=PythonDataSelector{}, "targets"_a=std::optional<std::vector<mofka::PartitionInfo>>{})
     ;
 
     py::class_<mofka::Producer>(m, "Producer")
