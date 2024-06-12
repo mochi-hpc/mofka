@@ -4,6 +4,7 @@ from pymargo.core import Engine
 
 
 ClientException = pymofka_client.Exception
+TopicHandle = pymofka_client.TopicHandle
 Validator = pymofka_client.Validator
 PartitionSelector = pymofka_client.PartitionSelector
 Serializer = pymofka_client.Serializer

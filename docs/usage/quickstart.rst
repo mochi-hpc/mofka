@@ -81,7 +81,7 @@ Using the Mofka library
 -----------------------
 
 Mofka can be used in C++ or in Python (if built with Python support). The following
-*CMakeLists.txt* file shows how to link an application against the Mofka library in CMake.
+*CMakeLists.txt* file shows how to link a C++ application against the Mofka library in CMake.
 
 
 .. literalinclude:: ../_code/CMakeLists.txt
@@ -89,36 +89,51 @@ Mofka can be used in C++ or in Python (if built with Python support). The follow
    :end-before: CUSTOM TOPIC OBJECTS
 
 
+In Python, most of Mofka's client interface is located in the :code:`mochi.mofka.client` module.
+The sections hereafter show how to use both the C++ and Python interface to produce and consume events.
+
+
 Simple producer application
 ---------------------------
 
-The following code examplified a producer. We first need to initialize a
-:code:`thallium::engine`, which is the runtime used by all the Mochi libraries.
-Then, we also initialize SSG with :code:`ssg_init` and tell the engine to finalize
-it when it is itself finalized.
+The following code examplified a producer.
+
+We first need to initialize a :code:`thallium::engine` in C++, or a :code:`pymargo.core.Engine` in
+Python, which handles the Mochi runtime.
 
 .. important::
 
-   The Thallium engine needs to be initialized in *server mode* for Mofka to work.
+   The engine needs to be initialized in *server mode* for Mofka to work.
    This is because Mofka servers will send RPCs to the clients.
 
-Next, we create a :code:`mofka::Client` object and use it to create a
-:code:`mofka::ServiceHandle`. The latter is initialized using the file
-created by our running Mofka server (*mofka.ssg*).
+Next, we create a :code:`Client` object and use it to create a
+:code:`ServiceHandle`. The latter is initialized using the file
+created by our running Mofka server (*mofka.json*).
 
-We then open the topic we have created, using :code:`service_handle.openTopic()`,
-which gives us a :code:`TopicHandle` to interact with the topic.
+We then open the topic we have created, using :code:`service_handle.openTopic()`
+(:code:`server.open_topic()` in Python), which gives us a :code:`TopicHandle`
+to interact with the topic.
 
-We create a :code:`mofka::Producer` using :code:`topic.producer()`, and we use
+We create a :code:`Producer` using :code:`topic.producer()`, and we use
 it in a loop to create 100 events with their :code:`Metadata` and :code:`Data`
 parts (we always send the same metadata here and we don't provide any data).
+In Python, the metadata part can be a :code:`dict` convertible to JSON,
+and the data part can be anything that satisfies the buffer protocol.
 
 The :code:`push()` function is non-blocking. To ensure that the events
 have all been sent, we call :code:`producer.flush()`.
 
-.. literalinclude:: ../_code/producer.cpp
-   :language: cpp
+.. tabs::
 
+   .. group-tab:: C++
+
+      .. literalinclude:: ../_code/producer.cpp
+         :language: cpp
+
+   .. group-tab:: Python
+
+      .. literalinclude:: ../_code/producer.py
+         :language: python
 
 .. note::
 
@@ -129,25 +144,33 @@ have all been sent, we call :code:`producer.flush()`.
 Simple consumer application
 ---------------------------
 
-The following code shows how to create a consumer and use it to consume
-the events. It starts the same as the producer application (except for the
-topic creation), but we then create a :code:`mofka::Consumer` object.
+The following code shows how to create a consumer and use it to consume the events.
 
 The consumer object is created with a name. This is for Mofka to associate
 the name with the last event that was acknowledged by the application.
 In case of a crash of the application, it will be able to restart from the
 last acknowledged event. This acknowledgement is done using the
-:code:`mofka::Event::acknowledge()` function, which in the example bellow
+:code:`Event`'s :code:`acknowledge()` function, which in the example bellow
 is called every 10 events.
 
-:code:`consumer.pull()` is a non-blocking function returning a :code`mofka::Future`.
-Waiting for this future with :code:`.wait()` returns a :code:`mofka::Event` object
-from which we can retrieve an event ID as well as the event's metadata.
+:code:`consumer.pull()` is a non-blocking function returning a :code`Future`.
+Waiting for this future with :code:`.wait()` returns an :code:`Event` object
+from which we can retrieve an event ID as well as the event's metadata and data.
 
 As it is, the data associated with an event will not be pulled automatically
 by the consumer, contrary to the event's metadata. Further in this documentation
 you will learn how to pull this data, or part of it.
 
-.. literalinclude:: ../_code/consumer.cpp
-   :language: cpp
+.. tabs::
+
+   .. group-tab:: C++
+
+      .. literalinclude:: ../_code/consumer.cpp
+         :language: cpp
+
+   .. group-tab:: Python
+
+      .. literalinclude:: ../_code/consumer.py
+         :language: python
+
 
