@@ -43,6 +43,6 @@ Installation options
 --------------------
 
 Mofka will be built with Python support by default. This Python support provides
-not just a Python-based client API for Mofka, but also a command-line interface
-to manage deployments. It is therefore recommended to keep this option on.
-Should you wish to disable it, simply install `mofka~python`.
+not just a Python-based client API for Mofka, but also a command-line interface,
+:code:`mofkactl`, to manage deployments. It is therefore recommended to keep this
+option on. Should you wish to disable it, simply install `mofka~python`.

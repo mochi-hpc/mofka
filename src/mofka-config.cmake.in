@@ -2,19 +2,18 @@
 # mofka-config.cmake.in
 #
 
-set(MOFKA_VERSION @MOFKA_VERSION@)
+set (MOFKA_VERSION @MOFKA_VERSION@)
 
 @PACKAGE_INIT@
 
-set_and_check(MOFKA_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
+set_and_check (MOFKA_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
 
-check_required_components(mofka)
+check_required_components (mofka)
 
 include (CMakeFindDependencyMacro)
 find_dependency (thallium)
 find_dependency (PkgConfig)
 pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
-find_dependency (RapidJSON)
 find_dependency (nlohmann_json)
 find_dependency (bedrock)
 

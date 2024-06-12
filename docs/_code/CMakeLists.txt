@@ -5,7 +5,7 @@ set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (PROJECT_IS_TOP_LEVEL) # allows building from inside Mofka's source tree
-    find_package (mofka REQUIRE)
+    find_package (mofka REQUIRED)
 endif ()
 
 add_executable (myproducer producer.cpp)
