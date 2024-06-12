@@ -111,10 +111,19 @@ Mofka client to dynamically load the specified libraries to get access to their 
 
    .. group-tab:: Python
 
-      Work in progress...
+      .. literalinclude:: ../_code/energy_topic.py
+         :language: python
+         :start-after: START CREATE TOPIC
+         :end-before: END CREATE TOPIC
+         :dedent: 4
 
 Let's take a look at the implementation of the validator, partition selector,
 and serializer classes.
+
+.. important::
+
+   Validators, partition selectors, and serializers must currently be implemented
+   in C++, event when used in Python.
 
 .. literalinclude:: ../_code/energy_validator.cpp
    :language: cpp
@@ -154,7 +163,7 @@ Adding partitions
 -----------------
 
 Topics are created without any partitions, so trying to push events into our "collisions"
-topic will result in an error right now. We need add partitions to it.
+topic will result in an error right now. We need to add partitions to it.
 
 .. note::
 
@@ -181,17 +190,12 @@ Mofka already comes with two implementations.
   including Pmem.
 
 A "memory" partition manager was used in the :ref:`Getting started` example. In the following
-we will deploy a "memory" partition manager as well as a "default" partition manager. Since the
-latter relies on Yokan and Warabi, we need to start Bedrock with a slightly longer
-JSON configuration, shown hereafter.
+we will deploy a "memory" partition manager as well as a "default" partition manager.
 
-.. literalinclude:: ../_code/default-config.json
-   :language: json
-
-This configuration instantiates three providers: two Yokan providers and a Warabi provider.
-The first Yokan provider is used to store information about the topics created. The second
-Yokan provider will be used to store event metadata for some Mofka partitions. The Warabi
-provider will store the data.
+The configuration we are using with Bedrock instantiates four providers: a Flock provider,
+two Yokan providers and a Warabi provider. The first Yokan provider is used to store information
+about the topics created. The second Yokan provider will be used to store event metadata for some
+Mofka partitions. The Warabi provider will store the data.
 
 .. note::
 
@@ -204,6 +208,13 @@ We can now add a partition that uses these providers.
 
 .. tabs::
 
+   .. group-tab:: mofkactl
+
+      .. literalinclude:: ../_code/energy_topic.sh
+         :language: bash
+         :start-after: START ADD PARTITION
+         :end-before: END ADD PARTITION
+
    .. group-tab:: C++
 
       .. literalinclude:: ../_code/energy_topic.cpp
@@ -214,8 +225,8 @@ We can now add a partition that uses these providers.
 
       Adding a partition is done via the :code:`ServiceHandle` instance by calling
       :code:`addMemoryPartition()` or :code:`addDefaultPartition()`. These functions
-      takes at least two arguments: the topic name, and the rank of the server in which
-      to add the partition. Servers are number contiguously from :code:`0` to :code:`N-1`
+      take at least two arguments: the topic name, and the rank of the server in which
+      to add the partition. Servers are numbered contiguously from :code:`0` to :code:`N-1`
       where `N` can be obtained by calling :code:`sh.numServers()`.
 
       An optional argument is the Argobots pool to use to execute RPCs sent to the partition
@@ -223,14 +234,20 @@ We can now add a partition that uses these providers.
 
    .. group-tab:: Python
 
-      Work in progress...
-
-   .. group-tab:: mofkactl
-
-      .. literalinclude:: ../_code/energy_topic.sh
-         :language: bash
+      .. literalinclude:: ../_code/energy_topic.py
+         :language: python
          :start-after: START ADD PARTITION
          :end-before: END ADD PARTITION
+         :dedent: 4
+
+      Adding a partition is done via the :code:`ServiceHandle` instance by calling
+      :code:`add_memory_partition()` or :code:`add_default_partition()`. These functions
+      take at least two arguments: the topic name, and the rank of the server in which
+      to add the partition. Servers are numbered contiguously from :code:`0` to :code:`N-1`
+      where `N` can be obtained by calling :code:`service.num_servers`.
+
+      An optional argument is the name of the Argobots pool to use to execute RPCs sent to
+      the partition manager.
 
 Two required arguments when adding partitions are the name of the topic and the rank
 of the server to which the partition should be added. Here because we only have one
