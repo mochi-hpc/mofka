@@ -17,6 +17,7 @@ DataDescriptor = pymofka_client.DataDescriptor
 Event = pymofka_client.Event
 FutureUint = pymofka_client.FutureUint
 FutureEvent = pymofka_client.FutureEvent
+Ordering = pymofka_client.Ordering
 
 
 class Client:
