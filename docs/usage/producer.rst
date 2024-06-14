@@ -3,8 +3,8 @@ Producers
 
 Applications that need to produce events into one or more topics will need
 to create a :code:`Producer` instance. This object is an interface to produce
-events into a designated topic. It will internally run the Validator, Partition
-selector, and Serializer on the events it is being passed to validate the event's
+events into a designated topic. It will internally run the validator, partition
+selector, and serializer on the events it is being passed to validate the event's
 metadata and data, select a destination partition for each event, and serialize
 the event's metadata into batches aimed at the same partition.
 
@@ -37,7 +37,11 @@ as examplified hereafter.
 
    .. group-tab:: Python
 
-      Work in progress...
+      .. literalinclude:: ../_code/energy_topic.py
+         :language: python
+         :start-after: START PRODUCER
+         :end-before: END PRODUCER
+         :dedent: 4
 
 A producer can be created with four optional parameters.
 
@@ -53,18 +57,20 @@ A producer can be created with four optional parameters.
   and send RPCs whenever the user code blocks on a Mofka Future.
 
 * **Batch size**: the batch size is the number of events to batch together before the batch
-  is sent to the target partition. :code:`mofka::BatchSize::Adaptive()` can be used to tell
-  the producer to adapt the batch size at run time: the producer will aim to send batches
-  as soon as possible but will increase the batch size if the server is not responding fast
-  enough.
+  is sent to the target partition. :code:`mofka::BatchSize::Adaptive()` (:code:`AdaptiveBatchSize`
+  in Python) can be used to tell the producer to adapt the batch size at run time: the
+  producer will aim to send batches as soon as possible but will increase the batch size
+  if the server is not responding fast enough.
 
 * **Ordering**: because the producer runs the validator, partition selector, and serializer
   in user-level threads posted to the thread pool, one could imagine an application posting
   event A then event B, but event A takes more time being validated than event B and event B
-  ends up in the batch before event A. :code:`mofka::Ordering::Loose` allows this behavior.
-  :code:`mofka::Ordering::Strict` forces events that target the same batch to be added to the
-  batch in the same order they were produced by the application. This constraint may limit
-  parallelism opportunities in the producer and should be used only if necessary.
+  ends up in the batch before event A. :code:`mofka::Ordering::Loose` (:code:`Ordering.Loose`
+  in Python) allows this behavior.
+  :code:`mofka::Ordering::Strict` (:code:`Ordering.Strict`) forces events that target the
+  same batch to be added to the batch in the same order they were produced by the application.
+  This constraint may limit parallelism opportunities in the producer and should be used only
+  if necessary.
 
 
 Producing events
@@ -82,8 +88,7 @@ by a JSON fragment containing the timestamp and detector information (e.g., call
 parameters), as well as information about the images (e.g., dimensions, pixel format).
 The data part of an event would be the image itself.
 
-The code bellow shows how to create the data and metadata pieces of an event
-in the form of a :code:`Data` instance and a :code:`Metadata` instance respectively.
+The code bellow shows how to create the data and metadata pieces of an event.
 
 .. tabs::
 
@@ -106,7 +111,23 @@ in the form of a :code:`Data` instance and a :code:`Metadata` instance respectiv
 
    .. group-tab:: Python
 
-      Work in progress...
+      .. literalinclude:: ../_code/energy_topic.py
+         :language: python
+         :start-after: START EVENT
+         :end-before: END EVENT
+         :dedent: 4
+
+      The first variable :code:`data1` is a read-only :code:`bytes` buffer. :code:`data2`
+      is a :code:`bytearray`, and :code:`data3` is a :code:`memoryview` of :code:`data1`.
+      All three types adhere to the buffer protocol and can be used for the data part of
+      an event. Other types such as NumPy arrays also adhere to this protocol.
+      :code:`data4`, as a list of objects following the buffer protocol, can also be used
+      to handle non-regular memory.
+
+      The first metadata object, :code:`metadata1`, is a string containing JSON information.
+      The second, :code:`metadata2`, is a dictionary. Both can be used for the metadata part
+      of the event.
+
 
 .. important::
 
@@ -121,7 +142,7 @@ in the form of a :code:`Data` instance and a :code:`Metadata` instance respectiv
    (e.g., bytes, bytearray, numpy arrays, etc.).
    When pushing the data into a producer, the producer will share ownership of
    this list, there is therefore no danger that the memory underlying these objects
-   is freed. Howeber the user should still take care that they are not written to
+   is freed. However the user should still take care that they are not written to
    until the data has been transferred.
 
 Having created the metadata and the data part of an event, we can now push the event
@@ -139,15 +160,20 @@ into the producer, as shown in the code bellow.
 
    .. group-tab:: Python
 
-      Work in progress...
+      .. literalinclude:: ../_code/energy_topic.py
+         :language: python
+         :start-after: START PRODUCE EVENT
+         :end-before: END PRODUCE EVENT
+         :dedent: 4
 
-The producer's :code:`push` function takes the :code:`Metadata` and the :code:`Data`
-objects and returns a :code:`Future`. Such a future can be tested for completion
-(:code:`future.completed()`) and can be blocked on until it completes (:code:`future.wait()`).
-The latter method returns the event ID of the created event (64-bits unsigned integer).
+
+The producer's :code:`push` function takes the metadata and data objects and returns a
+:code:`Future`. Such a future can be tested for completion (:code:`future.completed`) and
+can be blocked on until it completes (:code:`future.wait()`). The latter method returns the
+event ID of the created event (64-bits unsigned integer).
 It is perfectly OK to drop the future if you do not care to wait for its completion or
 for the resulting event ID, as examplified with the second event. Event IDs are monotonically
-ncreasing and are per-partition, so two events stored in distinct partitions may end up with the same ID.
+increasing and are per-partition, so two events stored in distinct partitions can end up with the same ID.
 
 Calling :code:`producer.flush()` is a blocking call that will force all the pending batches of events
 to be sent, regardless of whether they have reached the requested size. It can be useful to ensure
@@ -155,7 +181,7 @@ that all the events have been sent either periodically or before terminating the
 
 .. important::
 
-   If the batch size used by the producer is anything else than :code:`mofka::BatchSize::Adaptive()`,
+   If the batch size used by the producer is anything else than adaptive,
    a call to :code:`future.wait()` will block until the batch containing the corresponding event
    has been filled up to the requested size and sent to its target partition. Hence, an easy
    mistake to do is to call :code:`future.wait()` when the batch is not full and with no other threads

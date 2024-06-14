@@ -73,7 +73,7 @@ def main(engine: Engine, group_file: str):
 
     # START PRODUCE EVENT
     future = producer.push(metadata=metadata1, data=data1)
-    future.completed() # returns True if the future has completed
+    future.completed # returns True if the future has completed
     event_id = future.wait()
 
     producer.flush()
@@ -89,7 +89,7 @@ def main(engine: Engine, group_file: str):
         if metadata["energy"] > 20:
             return descriptor
         else:
-            return DataDescriptor()
+            return None
 
     def data_broker(metadata, descriptor):
         # note that we return a *list* of objects satisfying the buffer protocol
@@ -105,7 +105,7 @@ def main(engine: Engine, group_file: str):
 
     # START CONSUME EVENTS
     future = consumer.pull()
-    future.completed() # returns true if the future has completed
+    future.completed # returns true if the future has completed
 
     event    = future.wait()
     data     = event.data

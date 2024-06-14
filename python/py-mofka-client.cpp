@@ -79,7 +79,7 @@ static auto data_helper(const py::list& buffers) {
     return result;
 }
 
-using PythonDataSelector = std::function<mofka::DataDescriptor(const nlohmann::json&, const mofka::DataDescriptor&)>;
+using PythonDataSelector = std::function<std::optional<mofka::DataDescriptor>(const nlohmann::json&, const mofka::DataDescriptor&)>;
 using PythonDataBroker   = std::function<py::list(const nlohmann::json&, const mofka::DataDescriptor&)>;
 
 PYBIND11_MODULE(pymofka_client, m) {
@@ -269,7 +269,9 @@ PYBIND11_MODULE(pymofka_client, m) {
                 auto cpp_selector = selector ?
                     [selector=std::move(selector)]
                     (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::DataDescriptor {
-                        return selector(metadata.json(), descriptor);
+                        std::optional<mofka::DataDescriptor> result = selector(metadata.json(), descriptor);
+                        if(result) return result.value();
+                        else return mofka::DataDescriptor::Null();
                     }
                 : mofka::DataSelector{};
                 return topic.consumer(
@@ -395,7 +397,7 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::Future<std::uint64_t>, std::shared_ptr<mofka::Future<std::uint64_t>>>(m, "FutureUint")
         .def("wait", &mofka::Future<std::uint64_t>::wait)
-        .def("completed", &mofka::Future<std::uint64_t>::completed)
+        .def_property_readonly("completed", &mofka::Future<std::uint64_t>::completed)
     ;
 
     py::class_<mofka::Future<mofka::Event>, std::shared_ptr<mofka::Future<mofka::Event>>>(m, "FutureEvent")
