@@ -31,6 +31,6 @@ spack:
     mochi-bedrock:
       require: "@0.10.0:"
     mochi-flock:
-      require: "@0.2.1:"
+      require: "@0.2.2:"
     nlohmann-json-schema-validator:
       require: "@2.3.0:"

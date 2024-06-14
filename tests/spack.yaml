@@ -36,7 +36,7 @@ spack:
     mochi-bedrock:
       require: "@0.10.0:"
     mochi-flock:
-      require: "@0.2.1:"
+      require: "@0.2.2:"
     mercury:
       require: "~checksum~boostsys"
     libfabric:
