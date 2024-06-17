@@ -79,8 +79,8 @@ endif ()
 
 # library version set here (e.g. for shared libs).
 set (MOFKA_VERSION_MAJOR 0)
-set (MOFKA_VERSION_MINOR 0)
-set (MOFKA_VERSION_PATCH 5)
+set (MOFKA_VERSION_MINOR 1)
+set (MOFKA_VERSION_PATCH 0)
 set (MOFKA_VERSION
      "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}.${MOFKA_VERSION_PATCH}")
 
