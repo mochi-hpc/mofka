@@ -1,0 +1,20 @@
+{
+    "libraries": {
+        "flock": "libflock-bedrock-module.so",
+        "mofka" : "libmofka-bedrock-module.so"
+    },
+    "providers": [
+        {
+            "name" : "my_group_manager",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "join",
+                "file": "mofka.json",
+                "group": {
+                    "type": "centralized"
+                }
+            }
+        }
+    ]
+}

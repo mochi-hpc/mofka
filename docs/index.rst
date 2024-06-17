@@ -35,6 +35,7 @@ which manipulate large datasets and their metadata.
    usage/producer.rst
    usage/consumer.rst
    usage/deployment.rst
+   usage/restarting.rst
 
 
 

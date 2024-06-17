@@ -1,0 +1,29 @@
+{
+    "libraries": {
+        "flock": "libflock-bedrock-module.so",
+        "yokan": "libyokan-bedrock-module.so"
+    },
+    "providers": [
+        {
+            "name" : "my_group_manager",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "self",
+                "file": "mofka.json",
+                "group": {
+                    "type": "centralized"
+                }
+            }
+        },
+        {
+            "name": "master",
+            "provider_id": 2,
+            "type": "yokan",
+            "tags" : [ "mofka:controller" ],
+            "config" : {
+                "database" : { "type": "map" }
+            }
+        }
+    ]
+}

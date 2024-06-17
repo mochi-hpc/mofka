@@ -1,0 +1,35 @@
+{
+    "libraries": {
+        "flock": "libflock-bedrock-module.so",
+        "warabi": "libwarabi-bedrock-module.so"
+    },
+    "providers": [
+        {
+            "name" : "my_group_manager",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "join",
+                "file": "mofka.json",
+                "group": {
+                    "type": "centralized"
+                }
+            }
+        },
+        {
+            "name": "my_data_provider",
+            "provider_id": 4,
+            "type": "warabi",
+            "tags" : [ "mofka:data" ],
+            "config" : {
+                "target" : {
+                    "type": "pmdk",
+                    "config": {
+                        "path": "/tmp/mofka/data",
+                        "create_if_missing_with_size": 10485760
+                    }
+                }
+            }
+        }
+    ]
+}

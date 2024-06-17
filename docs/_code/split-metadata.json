@@ -1,0 +1,35 @@
+{
+    "libraries": {
+        "flock": "libflock-bedrock-module.so",
+        "yokan": "libyokan-bedrock-module.so"
+    },
+    "providers": [
+        {
+            "name" : "my_group_manager",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "join",
+                "file": "mofka.json",
+                "group": {
+                    "type": "centralized"
+                }
+            }
+        },
+        {
+            "name": "my_metadata_provider",
+            "provider_id": 3,
+            "type": "yokan",
+            "tags" : [ "mofka:metadata" ],
+            "config" : {
+                "database" : {
+                    "type": "rocksdb",
+                    "config": {
+                        "create_if_missing": true,
+                        "path": "/tmp/mofka/metadata"
+                    }
+                }
+            }
+        }
+    ]
+}

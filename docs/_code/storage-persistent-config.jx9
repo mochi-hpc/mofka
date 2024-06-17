@@ -1,0 +1,55 @@
+$database_path = sprintf("/tmp/mofka/metadata_$id");
+$target_path = sprintf("/tmp/mofka/data_$id");
+
+return {
+    "libraries": {
+        "flock": "libflock-bedrock-module.so",
+        "yokan": "libyokan-bedrock-module.so",
+        "warabi": "libwarabi-bedrock-module.so",
+        "mofka" : "libmofka-bedrock-module.so"
+    },
+    "providers": [
+        {
+            "name" : "my_group_manager",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "join",
+                "file": "mofka.json",
+                "group": {
+                    "type": "centralized"
+                }
+            }
+        },
+        {
+            "name": "my_metadata_provider",
+            "provider_id": 3,
+            "type": "yokan",
+            "tags" : [ "mofka:metadata" ],
+            "config" : {
+                "database" : {
+                    "type": "rocksdb",
+                    "config": {
+                        "create_if_missing": true,
+                        "path": $database_path
+                    }
+                }
+            }
+        },
+        {
+            "name": "my_data_provider",
+            "provider_id": 4,
+            "type": "warabi",
+            "tags" : [ "mofka:data" ],
+            "config" : {
+                "target" : {
+                    "type": "pmdk",
+                    "config": {
+                        "path": $target_path,
+                        "create_if_missing_with_size": 10485760
+                    }
+                }
+            }
+        }
+    ]
+};
