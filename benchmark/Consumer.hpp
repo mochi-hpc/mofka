@@ -45,7 +45,7 @@ class BenchmarkConsumer {
     , m_run_in_thread{run_in_thread}
     {
         m_mofka_service_handle = m_mofka_client.connect(
-            mofka::SSGFileName{config["group_file"].get<std::string>()}
+            config["group_file"].get<std::string>()
         );
         m_mofka_topic_handle = m_mofka_service_handle.openTopic(
             config["topic_name"].get_ref<const json::string_t&>()

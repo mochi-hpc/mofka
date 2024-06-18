@@ -56,7 +56,7 @@ class BenchmarkProducer {
     , m_comm(comm)
     {
         m_mofka_service_handle = m_mofka_client.connect(
-            mofka::SSGFileName{config["group_file"].get<std::string>()}
+            config["group_file"].get<std::string>()
         );
 
         int rank = comm.rank();
