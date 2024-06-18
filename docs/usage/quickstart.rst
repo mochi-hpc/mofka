@@ -177,3 +177,13 @@ you will learn how to pull this data, or part of it.
          :language: python
 
 
+Shutting down Mofka
+-------------------
+
+To shutdown Mofka properly, the :code:`bedrock-shutdown` command can be used as
+follows.
+
+.. code-block:: bash
+
+   bedrock-shutdown na+sm -f mofka.json
+
