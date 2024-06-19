@@ -13,6 +13,8 @@
 #include <mpi.h>
 #include <thallium.hpp>
 #include <unistd.h>
+#include <spdlog/spdlog.h>
+
 
 class BenchmarkProducer {
 
@@ -55,19 +57,20 @@ class BenchmarkProducer {
     , m_config(config)
     , m_comm(comm)
     {
-        m_mofka_service_handle = m_mofka_client.connect(
-            config["group_file"].get<std::string>()
-        );
+        auto& group_file = config["group_file"].get_ref<const std::string&>();
+        spdlog::trace("[producer] Connecting to mofka file \"{}\"", group_file);
+        m_mofka_service_handle = m_mofka_client.connect(group_file);
 
+        auto& topic_name = config["topic"]["name"].get_ref<const std::string&>();
         int rank = comm.rank();
         if(rank == 0) {
+            spdlog::trace("[producer] Creating topic \"{}\"", topic_name);
             createTopic(config["topic"]);
         }
         comm.barrier();
 
-        m_mofka_topic_handle = m_mofka_service_handle.openTopic(
-            config["topic"]["name"].get_ref<const json::string_t&>()
-        );
+        spdlog::trace("[producer] Opening topic \"{}\"", topic_name);
+        m_mofka_topic_handle = m_mofka_service_handle.openTopic(topic_name);
 
         auto batch_size = mofka::BatchSize::Adaptive();
         if(config.contains("batch_size") && config["batch_size"].is_number_unsigned()) {
@@ -79,6 +82,7 @@ class BenchmarkProducer {
         auto thread_pool = mofka::ThreadPool{
             mofka::ThreadCount{config.value("thread_count", (size_t)0)}};
 
+        spdlog::trace("[producer] Creating mofka::Producer for topic \"{}\"", topic_name);
         m_mofka_producer = m_mofka_topic_handle.producer(
             batch_size, ordering, thread_pool);
     }
@@ -142,6 +146,7 @@ class BenchmarkProducer {
         bool flush_between_bursts = m_config.value("flush_between_bursts", false);
 
         m_comm.barrier();
+        spdlog::info("[producer] Starting to produce events");
         double t_start = MPI_Wtime();
         size_t next_burst = burst_size_dist(rng);
         size_t next_flush = flush_every_dist(rng);
@@ -150,40 +155,48 @@ class BenchmarkProducer {
             auto metadata = m_metadata_generator.generate();
             // TODO handle data
             m_mofka_producer.push(metadata);
-            std::cerr << "Pushing event " << i << std::endl;
+            spdlog::trace("[producer] Pushing event {}", i);
             // TODO add push interval and flush frequency
             next_burst -= 1;
             if(next_burst == 0) {
                 if(flush_between_bursts) {
-                    std::cerr << "Flushing after burst" << std::endl;
+                    spdlog::trace("[producer] Flushing after burst of events");
                     m_mofka_producer.flush();
+                    spdlog::trace("[producer] Done flushing after burst of events");
                 }
                 size_t wait_between_bursts_ms = wait_between_bursts_ms_dist(rng);
                 if(wait_between_bursts_ms) {
-                    std::cerr << "Waiting " << wait_between_bursts_ms << " msec after burst" << std::endl;
+                    spdlog::trace("[producer] Waiting {} msec after burst", wait_between_bursts_ms);
                     usleep(1000*wait_between_bursts_ms);
+                    spdlog::trace("[producer] Done waiting after burst", wait_between_bursts_ms);
                 }
                 next_burst = burst_size_dist(rng);
             } else {
                 size_t wait_between_events_ms = wait_between_events_ms_dist(rng);
                 if(wait_between_events_ms) {
-                    std::cerr << "Waiting " << wait_between_events_ms << " msec after event" << std::endl;
+                    spdlog::trace("[producer] Waiting {} msec after event", wait_between_events_ms);
                     usleep(1000*wait_between_events_ms);
+                    spdlog::trace("[producer] Done waiting after event");
                 }
             }
             if(max_flush_every != 0) {
                 next_flush -= 1;
                 if(next_flush == 0) {
-                    std::cerr << "Flushing" << std::endl;
+                    spdlog::trace("[poducer] Random flush");
                     next_flush = flush_every_dist(rng);
                     m_mofka_producer.flush();
+                    spdlog::trace("[poducer] Done with random flush");
                 }
             }
         }
+        spdlog::trace("[poducer] Last flush");
         m_mofka_producer.flush();
-        m_comm.barrier();
+        spdlog::trace("[poducer] Done with last flush");
         double t_end = MPI_Wtime();
-        std::cerr << "Producer finished in " << (t_end - t_start) << " seconds" << std::endl;
+        spdlog::info("[producer] Local producer finished in {} seconds", (t_end - t_start));
+        m_comm.barrier();
+        t_end = MPI_Wtime();
+        spdlog::info("[producer] Producer app finished in {} seconds", (t_end - t_start));
     }
 
     void createTopic(const json& config) {

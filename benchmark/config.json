@@ -82,6 +82,10 @@
                 {
                     "type":"memory",
                     "rank": 0
+                },
+                {
+                    "type":"memory",
+                    "rank": 0
                 }
             ]
         }
@@ -91,6 +95,6 @@
         "topic_name": "mytopic",
         "consumer_name": "myconsumer",
         "num_events": 100,
-        "ranks": [2]
+        "ranks": [2,3]
     }
 }
