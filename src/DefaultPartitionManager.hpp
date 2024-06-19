@@ -105,6 +105,11 @@ class DefaultPartitionManager : public mofka::PartitionManager {
           const BulkRef& bulk) override;
 
     /**
+     * @see PartitionManager::markAsComplete.
+     */
+    Result<void> markAsComplete() override;
+
+    /**
      * @brief Destroys the underlying topic.
      *
      * @return a Result<bool> instance indicating

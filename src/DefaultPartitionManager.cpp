@@ -92,6 +92,13 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
     return m_data_store->load(descriptors, bulk);
 }
 
+Result<void> DefaultPartitionManager::markAsComplete() {
+    Result<void> result;
+    result.success() = true;
+    // TODO
+    return result;
+}
+
 Result<bool> DefaultPartitionManager::destroy() {
     Result<bool> result;
     // TODO wait for all the consumers to be done consuming

@@ -138,10 +138,18 @@ Result<void> MemoryPartitionManager::feedConsumer(
                 size_t max_available_events = m_events_metadata_sizes.size() - first_id;
                 num_events_to_send = std::min(batchSize.value, max_available_events);
                 should_stop = consumerHandle.shouldStop();
-                if(num_events_to_send != 0 || should_stop) break;
+                if(num_events_to_send != 0 || should_stop || m_is_marked_complete) break;
                 m_events_cv.wait(g);
             }
             if(should_stop) break;
+
+            if(num_events_to_send == 0) { // m_is_marked_complete must be true
+                // feed consumer 0 events with first_id = NoMoreEvents to indicate
+                // that there are no more events to consume from this partition
+                consumerHandle.feed(
+                        0, NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
+                break;
+            }
 
             // find the range of metadata sizes
             const auto metadata_sizes_ptr = m_events_metadata_sizes.data() + first_id;
@@ -227,6 +235,14 @@ Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
         result.success() = false;
         return result;
     }
+    return result;
+}
+
+Result<void> MemoryPartitionManager::markAsComplete() {
+    Result<void> result;
+    m_is_marked_complete = true;
+    m_events_cv.notify_all();
+    result.success() = true;
     return result;
 }
 

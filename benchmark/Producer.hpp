@@ -197,6 +197,11 @@ class BenchmarkProducer {
         m_comm.barrier();
         t_end = MPI_Wtime();
         spdlog::info("[producer] Producer app finished in {} seconds", (t_end - t_start));
+        spdlog::trace("[producer] Mark topic as completed");
+        if(m_comm.rank() == 0) {
+            m_mofka_topic_handle.markAsComplete();
+        }
+        spdlog::trace("[producer] Done marking the topic as completed");
     }
 
     void createTopic(const json& config) {

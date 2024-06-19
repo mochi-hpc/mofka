@@ -117,6 +117,7 @@ class BenchmarkConsumer {
                 auto event = m_mofka_consumer.pull().wait();
                 spdlog::trace("[consumer] Done pulling event {}: received event {} from partition {}",
                              i, event.id(), event.partition().uuid().to_string());
+                if(event.id() == mofka::NoMoreEvents) break;
                 auto uuid = event.partition().uuid();
                 auto it = events_received.find(uuid);
                 if(it == events_received.end())

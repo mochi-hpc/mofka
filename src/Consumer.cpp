@@ -61,8 +61,19 @@ Future<Event> Consumer::pull() const {
         // previous calls to pull() that haven't completed
         Promise<Event> promise;
         std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
-        self->m_futures.emplace_back(std::move(promise), future);
-        self->m_futures_credit = true;
+        if(self->m_completed_partitions != self->m_partitions.size()) {
+            // there are uncompleted partitions, put the future in the queue
+            // and it will be picked up by a recvBatch RPC from any partition
+            self->m_futures.emplace_back(std::move(promise), future);
+            self->m_futures_credit = true;
+        } else {
+            // all partitions are completed, create a NoMoreEvents event
+            // (arbitrarily from partition 0)
+            // create new event instance
+            auto event_impl = std::make_shared<EventImpl>(
+                    NoMoreEvents, std::make_shared<PartitionInfoImpl>(), self);
+            promise.setValue(Event{event_impl});
+        }
     } else {
         // the queue of futures has futures already
         // created by the consumer
@@ -152,6 +163,27 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
                              const BulkRef &metadata,
                              const BulkRef &data_desc_sizes,
                              const BulkRef &data_desc) {
+
+    if(count == 0) { // no more events from this partition
+        m_completed_partitions += 1;
+        // check if there will be no more events any more, if so, set
+        // the promise of all the pending Futures to NoMoreEvents.
+        std::unique_lock<thallium::mutex> guard{m_futures_mtx};
+        if(m_completed_partitions != m_partitions.size()) {
+            return;
+        }
+        if(!m_futures_credit) return;
+        while(!m_futures.empty()) {
+            auto promise = std::move(m_futures.front().first);
+            m_futures.pop_front();
+            m_futures_credit = true;
+            auto event_impl = std::make_shared<EventImpl>(
+                    NoMoreEvents, std::make_shared<PartitionInfoImpl>(),
+                    shared_from_this());
+            promise.setValue(Event{event_impl});
+        }
+        return;
+    }
 
     auto& partition = m_partitions[partition_info_index];
 

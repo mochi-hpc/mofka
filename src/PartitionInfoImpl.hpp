@@ -15,6 +15,8 @@ class PartitionInfoImpl {
 
     public:
 
+    PartitionInfoImpl() = default;
+
     PartitionInfoImpl(UUID uuid, thallium::provider_handle ph)
     : m_uuid(uuid)
     , m_ph(std::move(ph))

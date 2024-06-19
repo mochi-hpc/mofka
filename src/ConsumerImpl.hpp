@@ -40,6 +40,8 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
 
     const std::string m_self_addr;
 
+    std::atomic<size_t> m_completed_partitions = 0;
+
     /* The futures/promises queue works as follows:
      *
      * If m_futures_credit is true, it means the futures in the queue
