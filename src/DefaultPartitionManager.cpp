@@ -93,10 +93,7 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
 }
 
 Result<void> DefaultPartitionManager::markAsComplete() {
-    Result<void> result;
-    result.success() = true;
-    // TODO
-    return result;
+    return m_event_store->markAsComplete();
 }
 
 Result<bool> DefaultPartitionManager::destroy() {

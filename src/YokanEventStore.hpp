@@ -28,12 +28,14 @@ namespace mofka {
 class YokanEventStore {
 
     thallium::engine             m_engine;
+    std::string                  m_topic_name;
     yokan::Database              m_database;
     yokan::Collection            m_metadata_coll;
     yokan::Collection            m_descriptors_coll;
     size_t                       m_num_events = 0;
     thallium::mutex              m_num_events_mtx;
     thallium::condition_variable m_num_events_cv;
+    std::atomic<bool>            m_is_marked_complete = false;
 
     public:
 
@@ -112,6 +114,17 @@ class YokanEventStore {
         return result;
     }
 
+    Result<void> markAsComplete() {
+        Result<void> result;
+        result.success() = true;
+        std::string marked_as_complete_key = "#";
+        marked_as_complete_key += m_topic_name + "#completed";
+        m_database.put(marked_as_complete_key.c_str(), marked_as_complete_key.size(), nullptr, 0);
+        m_is_marked_complete = true;
+        m_num_events_cv.notify_all();
+        return result;
+    }
+
     Result<void> feed(
             ConsumerHandle consumerHandle,
             EventID firstID,
@@ -177,15 +190,24 @@ class YokanEventStore {
         while(!consumerHandle.shouldStop()) {
 
             bool should_stop = false;
+            size_t num_available_events = 0;
             while(true) {
                 auto g = std::unique_lock{m_num_events_mtx};
                 // find the number of events we can send
-                auto num_available_events = m_num_events - firstID;
+                num_available_events = m_num_events - firstID;
                 should_stop = consumerHandle.shouldStop();
-                if(num_available_events > 0 || should_stop) break;
+                if(num_available_events > 0 || should_stop || m_is_marked_complete) break;
                 m_num_events_cv.wait(g);
             }
             if(should_stop) break;
+
+            if(num_available_events == 0) { // m_is_marked_complete must be true
+                                            // feed consumer 0 events with first_id = NoMoreEvents to indicate
+                                            // that there are no more events to consume from this partition
+                consumerHandle.feed(
+                        0, NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
+                break;
+            }
 
             // list metadata documents
             m_metadata_coll.listBulk(
@@ -229,15 +251,19 @@ class YokanEventStore {
 
     YokanEventStore(
         thallium::engine engine,
+        std::string topic_name,
         yokan::Database db,
         yokan::Collection metadata_coll,
         yokan::Collection descriptors_coll,
-        size_t num_events)
+        size_t num_events,
+        bool marked_as_complete)
     : m_engine(std::move(engine))
+    , m_topic_name(std::move(topic_name))
     , m_database(std::move(db))
     , m_metadata_coll(std::move(metadata_coll))
     , m_descriptors_coll(std::move(descriptors_coll))
-    , m_num_events(num_events) {}
+    , m_num_events(num_events)
+    , m_is_marked_complete{marked_as_complete} {}
 
     static std::unique_ptr<YokanEventStore> create(
             thallium::engine engine,
@@ -245,6 +271,13 @@ class YokanEventStore {
             const UUID& partition_uuid,
             yk_database_handle_t db) {
         auto database = yokan::Database{db};
+        std::string marked_as_complete_key = "#";
+        marked_as_complete_key += topic_name + "#completed";
+
+        bool marked_as_complete = database.exists(
+            marked_as_complete_key.c_str(),
+            marked_as_complete_key.size());
+
         auto metadataCollName = topic_name + "/" + partition_uuid.to_string() + "/md";
         auto descriptorsCollName = topic_name + "/" + partition_uuid.to_string() + "/dd";
         if(!database.collectionExists(metadataCollName.c_str())) {
@@ -258,10 +291,12 @@ class YokanEventStore {
         auto num_events = metadata_coll.size();
         return std::make_unique<YokanEventStore>(
             std::move(engine),
+            std::move(topic_name),
             std::move(database),
             std::move(metadata_coll),
             std::move(descriptors_coll),
-            num_events);
+            num_events,
+            marked_as_complete);
     }
 
 };

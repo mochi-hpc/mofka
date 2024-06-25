@@ -71,7 +71,6 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                     REQUIRE_NOTHROW(event.acknowledge());
             }
             // Consume extra events, we should get events with NoMoreEvents as event IDs
-            if(partition_type == "memory") // TODO remove when NoMoreEvents is implemented for default
             for(unsigned i=0; i < 10; ++i) {
                 mofka::Event event;
                 REQUIRE_NOTHROW(event = consumer.pull().wait());
