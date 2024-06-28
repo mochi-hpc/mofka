@@ -2,6 +2,7 @@
 #define BENCHMARK_CONSUMER_H
 
 #include "Communicator.hpp"
+#include "Statistics.hpp"
 
 #include <mofka/Client.hpp>
 #include <mofka/ServiceHandle.hpp>
@@ -26,6 +27,9 @@ class BenchmarkConsumer {
     json                 m_config;
     bool                 m_run_in_thread;
     bool                 m_has_partitions;
+    Statistics           m_pull_stats;
+    Statistics           m_ack_stats;
+    double               m_runtime;
 
     thallium::managed<thallium::pool>    m_run_pool;
     thallium::managed<thallium::xstream> m_run_es;
@@ -111,10 +115,14 @@ class BenchmarkConsumer {
         m_comm.barrier();
         spdlog::info("[consumer] Starting to consume events");
         double t_start = MPI_Wtime();
+        double t1, t2;
         if(m_has_partitions) {
             for(size_t i = 0; i < num_events; ++i) {
                 spdlog::trace("[consumer] Pulling event {}", i);
+                t1 = MPI_Wtime();
                 auto event = m_mofka_consumer.pull().wait();
+                t2 = MPI_Wtime();
+                m_pull_stats << (t2 - t1);
                 spdlog::trace("[consumer] Done pulling event {}: received event {} from partition {}",
                              i, event.id(), event.partition().uuid().to_string());
                 if(event.id() == mofka::NoMoreEvents) break;
@@ -125,7 +133,10 @@ class BenchmarkConsumer {
                 it->second += 1;
                 if(it->second % ack == 0 || i == num_events-1) {
                     spdlog::trace("[consumer] Acknowledging event {}", i);
+                    t1 = MPI_Wtime();
                     event.acknowledge();
+                    t2 = MPI_Wtime();
+                    m_ack_stats << (t2 - t1);
                     spdlog::trace("[consumer] Done acknowledging event {}", i);
                 }
             }
@@ -134,7 +145,18 @@ class BenchmarkConsumer {
         spdlog::info("[consumer] Local consumer finished in {} seconds", (t_end - t_start));
         m_comm.barrier();
         t_end = MPI_Wtime();
+        m_runtime = t_end - t_start;
         spdlog::info("[consumer] Consumer app finished in {} seconds", (t_end - t_start));
+    }
+
+    public:
+
+    json getStatistics() const {
+        auto result = json::object();
+        result["runtime"] = m_runtime;
+        result["pull"] = m_pull_stats.to_json();
+        result["ack"] = m_ack_stats.to_json();
+        return result;
     }
 };
 

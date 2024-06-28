@@ -196,8 +196,8 @@ static const json configSchema = R"(
 
 int main(int argc, char** argv) {
 
-    if(argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <config.json>" << std::endl;
+    if(argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <config.json> <results.json>" << std::endl;
         exit(-1);
     }
 
@@ -298,9 +298,28 @@ int main(int argc, char** argv) {
             config["servers"]["config"].dump() : std::string{"{}"};
         server = std::make_shared<bedrock::Server>(address, server_config);
     } else {
-        auto server_config = R"({"margo":{"use_progress_thread":true}})";
+        auto server_config = R"({
+            "margo": {
+                "use_progress_thread": true,
+                "monitoring": {
+                    "config": {
+                        "filename_prefix": "client.mofka",
+                        "statistics": {
+                            "disable":false
+                        },
+                        "time_series": {
+                            "disable":true
+                        }
+                    }
+                }
+            }
+        })";
         server = std::make_shared<bedrock::Server>(address, server_config);
     }
+
+    // register a warmup RPC
+    auto engine = server->getMargoManager().getThalliumEngine();
+    auto warmup = engine.define("warmup", std::function{[](const thallium::request& req){ req.respond(0); }});
 
     server->getMargoManager().addPool(
         R"({"name":"__mpi_pool__", "kind":"fifo_wait", "access":"mpmc"})");
@@ -311,6 +330,21 @@ int main(int argc, char** argv) {
         server->getMargoManager().getPool("__mpi_pool__")->getHandle<ABT_pool>()};
 
     auto world = Communicator{mpi_pool, MPI_COMM_WORLD};
+    world.barrier();
+
+    // exchange addresses
+    std::vector<char> addresses(256*world.size());
+    auto myaddress = static_cast<std::string>(engine.self());
+    myaddress.resize(256, '\0');
+    world.allgather(myaddress.c_str(), 256, addresses.data());
+
+    // send a warmup RPC
+    for(int i = 0; i < world.size(); ++i) {
+        int j = (i + world.rank()) % world.size();
+        const char* addr = addresses.data() + 256*j;
+        warmup.on(engine.lookup(addr))();
+    }
+    world.barrier();
 
     auto server_comm   = world.split(is_server ? 1 : 0);
     auto producer_comm = world.split(is_producer ? 1 : 0);;
@@ -340,6 +374,28 @@ int main(int argc, char** argv) {
     if(is_producer) producer->wait();
 
     world.barrier();
+
+    // create local result JSON structure
+    json local_result = json::object();
+    if(is_producer) local_result["producer"] = producer->getStatistics();
+    if(is_consumer) local_result["consumer"] = consumer->getStatistics();
+
+    // aggregate results across ranks
+    auto local_result_str = local_result.dump();
+    unsigned long local_result_size = local_result_str.size();
+    unsigned long max_local_result_size;
+    world.allreduce(&local_result_size, &max_local_result_size, 1, MPI_UNSIGNED_LONG, MPI_MAX);
+    local_result_str.resize(max_local_result_size+1, '\0');
+    std::vector<char> all_results((max_local_result_size+1)*world.size());
+    world.allgather(local_result_str.data(), local_result_str.size(), all_results.data());
+    if(world.rank() == 0) {
+        json result = json::object();
+        for(int i=0; i < world.size(); ++i) {
+            const char* addr = addresses.data() + 256*i;
+            result[addr] = json::parse(all_results.data() + i*(max_local_result_size+1));
+        }
+        std::ofstream{argv[2]} << result;
+    }
 
     producer.reset();
     consumer.reset();

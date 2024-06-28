@@ -3,6 +3,7 @@
 
 #include "MetadataGenerator.hpp"
 #include "Communicator.hpp"
+#include "Statistics.hpp"
 
 #include <mofka/Client.hpp>
 #include <mofka/ServiceHandle.hpp>
@@ -30,6 +31,9 @@ class BenchmarkProducer {
     bool                 m_run_in_thread;
     json                 m_config;
     Communicator         m_comm;
+    Statistics           m_push_stats;
+    Statistics           m_flush_stats;
+    double               m_runtime;
 
     thallium::managed<thallium::pool>    m_run_pool;
     thallium::managed<thallium::xstream> m_run_es;
@@ -151,17 +155,25 @@ class BenchmarkProducer {
         size_t next_burst = burst_size_dist(rng);
         size_t next_flush = flush_every_dist(rng);
 
+        double t1, t2;
+
         for(size_t i = 0; i < num_events; ++i) {
             auto metadata = m_metadata_generator.generate();
             // TODO handle data
+            t1 = MPI_Wtime();
             m_mofka_producer.push(metadata);
+            t2 = MPI_Wtime();
+            m_push_stats << (t2 - t1);
             spdlog::trace("[producer] Pushing event {}", i);
             // TODO add push interval and flush frequency
             next_burst -= 1;
             if(next_burst == 0) {
                 if(flush_between_bursts) {
                     spdlog::trace("[producer] Flushing after burst of events");
+                    t1 = MPI_Wtime();
                     m_mofka_producer.flush();
+                    t2 = MPI_Wtime();
+                    m_flush_stats << (t2 - t1);
                     spdlog::trace("[producer] Done flushing after burst of events");
                 }
                 size_t wait_between_bursts_ms = wait_between_bursts_ms_dist(rng);
@@ -184,7 +196,10 @@ class BenchmarkProducer {
                 if(next_flush == 0) {
                     spdlog::trace("[poducer] Random flush");
                     next_flush = flush_every_dist(rng);
+                    t1 = MPI_Wtime();
                     m_mofka_producer.flush();
+                    t2 = MPI_Wtime();
+                    m_flush_stats << (t2 - t1);
                     spdlog::trace("[poducer] Done with random flush");
                 }
             }
@@ -202,6 +217,7 @@ class BenchmarkProducer {
             m_mofka_topic_handle.markAsComplete();
         }
         spdlog::trace("[producer] Done marking the topic as completed");
+        m_runtime = t_end - t_start;
     }
 
     void createTopic(const json& config) {
@@ -258,6 +274,16 @@ class BenchmarkProducer {
                 v[0].get<size_t>(),
                 v[1].get<size_t>());
         }
+    }
+
+    public:
+
+    json getStatistics() const {
+        auto result = json::object();
+        result["runtime"] = m_runtime;
+        result["push"] = m_push_stats.to_json();
+        result["flush"] = m_flush_stats.to_json();
+        return result;
     }
 };
 

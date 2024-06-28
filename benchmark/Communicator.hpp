@@ -42,6 +42,17 @@ class Communicator {
             MPI_Bcast(buffer, count, MPI_BYTE, root, m_comm);})->join();
     }
 
+    void allgather(const char* sendbuf, int count, char* recvbuf) {
+        m_pool.make_thread([this, sendbuf, count, recvbuf](){
+            MPI_Allgather(sendbuf, count, MPI_BYTE,
+                          recvbuf, count, MPI_BYTE, m_comm);})->join();
+    }
+
+    void allreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype type, MPI_Op op) {
+        m_pool.make_thread([this, sendbuf, count, recvbuf, type, op](){
+            MPI_Allreduce(sendbuf, recvbuf, count, type, op, m_comm);})->join();
+    }
+
     Communicator split(int color) {
         int r = rank();
         MPI_Comm newcomm;
