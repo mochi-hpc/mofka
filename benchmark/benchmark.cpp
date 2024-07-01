@@ -102,13 +102,13 @@ static const json configSchema = R"(
                                     {"type": "array", "minItems":2, "maxItems":2,
                                      "items": {"type":"integer", "minimum": 0}}
                                 ]},
-                                "block_size": { "oneOf": [
+                                "total_size": { "oneOf": [
                                     {"type": "integer", "minimum": 1},
                                     {"type": "array", "minItems":2, "maxItems":2,
                                      "items": {"type":"integer", "minimum": 1}}
                                 ]}
                             },
-                            "required": [ "num_blocks", "block_size" ]
+                            "required": [ "num_blocks", "total_size" ]
                         },
                         "partitions": {
                             "type": "array",

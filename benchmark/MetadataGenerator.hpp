@@ -22,15 +22,15 @@ class MetadataGenerator {
 
     using json = nlohmann::json;
 
-    StringGenerator& m_strGenerator;
-    size_t           m_minValSize;
-    size_t           m_maxValSize;
-    json             m_schema    = json::object();
-    json             m_prototype = json::object();
+    StringGenerator<std::string>& m_strGenerator;
+    size_t                        m_minValSize;
+    size_t                        m_maxValSize;
+    json                          m_schema    = json::object();
+    json                          m_prototype = json::object();
 
     public:
 
-    MetadataGenerator(StringGenerator& strGen,
+    MetadataGenerator(StringGenerator<std::string>& strGen,
                       size_t numFields,
                       size_t minKeySize,
                       size_t maxKeySize,

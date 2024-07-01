@@ -13,6 +13,7 @@
  * [minSize, maxSize]. The content will be drawn uniformly from the generator's
  * alphabet.
  */
+template<typename String>
 class StringGenerator {
 
     std::mt19937 m_rng;
@@ -25,11 +26,11 @@ class StringGenerator {
     : m_rng(seed)
     , m_alphabet(std::move(alphabet)) {}
 
-    std::string generate(size_t minSize, size_t maxSize) {
+    String generate(size_t minSize, size_t maxSize) {
         std::uniform_int_distribution<size_t> sizeDistribution(minSize, maxSize);
         size_t size = sizeDistribution(m_rng);
         std::uniform_int_distribution<size_t> indexDistribution(0, m_alphabet.size()-1);
-        std::string result;
+        String result;
         result.resize(size);
         char* ptr = const_cast<char*>(result.data());
         for(size_t i = 0; i < size; ++i) {

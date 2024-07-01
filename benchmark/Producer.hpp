@@ -2,6 +2,7 @@
 #define BENCHMARK_PRODUCER_H
 
 #include "MetadataGenerator.hpp"
+#include "DataGenerator.hpp"
 #include "Communicator.hpp"
 #include "Statistics.hpp"
 
@@ -21,19 +22,20 @@ class BenchmarkProducer {
 
     using json = nlohmann::json;
 
-    thallium::engine     m_engine;
-    mofka::Client        m_mofka_client;
-    mofka::ServiceHandle m_mofka_service_handle;
-    mofka::TopicHandle   m_mofka_topic_handle;
-    mofka::Producer      m_mofka_producer;
-    StringGenerator      m_string_generator;
-    MetadataGenerator    m_metadata_generator;
-    bool                 m_run_in_thread;
-    json                 m_config;
-    Communicator         m_comm;
-    Statistics           m_push_stats;
-    Statistics           m_flush_stats;
-    double               m_runtime;
+    thallium::engine             m_engine;
+    mofka::Client                m_mofka_client;
+    mofka::ServiceHandle         m_mofka_service_handle;
+    mofka::TopicHandle           m_mofka_topic_handle;
+    mofka::Producer              m_mofka_producer;
+    StringGenerator<std::string> m_string_generator;
+    MetadataGenerator            m_metadata_generator;
+    DataGenerator                m_data_generator;
+    bool                         m_run_in_thread;
+    json                         m_config;
+    Communicator                 m_comm;
+    Statistics                   m_push_stats;
+    Statistics                   m_flush_stats;
+    double                       m_runtime;
 
     thallium::managed<thallium::pool>    m_run_pool;
     thallium::managed<thallium::xstream> m_run_es;
@@ -57,6 +59,13 @@ class BenchmarkProducer {
         getMax(config["topic"]["metadata"]["key_sizes"]),
         getMin(config["topic"]["metadata"]["val_sizes"]),
         getMax(config["topic"]["metadata"]["val_sizes"]))
+    , m_data_generator(
+        m_string_generator,
+        config["topic"].contains("data") ? getMin(config["topic"]["data"]["total_size"]) : 0,
+        config["topic"].contains("data") ? getMax(config["topic"]["data"]["total_size"]) : 0,
+        config["topic"].contains("data") ? getMin(config["topic"]["data"]["num_blocks"]) : 0,
+        config["topic"].contains("data") ? getMax(config["topic"]["data"]["num_blocks"]) : 0
+    )
     , m_run_in_thread(run_in_thread)
     , m_config(config)
     , m_comm(comm)
@@ -159,13 +168,12 @@ class BenchmarkProducer {
 
         for(size_t i = 0; i < num_events; ++i) {
             auto metadata = m_metadata_generator.generate();
-            // TODO handle data
+            auto data = m_data_generator.generate();
             t1 = MPI_Wtime();
-            m_mofka_producer.push(metadata);
+            m_mofka_producer.push(metadata, data);
             t2 = MPI_Wtime();
             m_push_stats << (t2 - t1);
             spdlog::trace("[producer] Pushing event {}", i);
-            // TODO add push interval and flush frequency
             next_burst -= 1;
             if(next_burst == 0) {
                 if(flush_between_bursts) {

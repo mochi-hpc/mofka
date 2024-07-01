@@ -9,6 +9,7 @@
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/Exception.hpp>
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -31,20 +32,23 @@ class Data {
         size_t size;
     };
 
+    using Context = void*;
+    using FreeCallback = std::function<void(Context)>;
+
     /**
      * @brief Constructor. The resulting Data handle will represent NULL.
      */
-    Data();
+    Data(Context ctx = nullptr, FreeCallback free_cb = FreeCallback{});
 
     /**
      * @brief Creates a Data object with a single segment.
      */
-    Data(void* ptr, size_t size);
+    Data(void* ptr, size_t size, Context ctx = nullptr, FreeCallback free_cb = FreeCallback{});
 
     /**
      * @brief Creates a Data object from a list of Segments.
      */
-    Data(std::vector<Segment> segments);
+    Data(std::vector<Segment> segments, Context ctx = nullptr, FreeCallback free_cb = FreeCallback{});
 
     /**
      * @brief Copy-constructor.
@@ -67,7 +71,7 @@ class Data {
     Data& operator=(Data&&);
 
     /**
-     * @brief Destructor.
+     * @brief Free.
      */
     ~Data();
 
@@ -87,6 +91,11 @@ class Data {
      */
     operator bool() const;
 
+    /**
+     * @brief Return the context of this Data object.
+     */
+    Context context() const;
+
     private:
 
     /**
@@ -101,7 +110,6 @@ class Data {
     friend class ProducerBatchImpl;
     friend class Event;
     friend class ConsumerImpl;
-    friend class PythonBindingHelper;
 
 };
 
