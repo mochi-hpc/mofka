@@ -55,6 +55,32 @@ const std::vector<PartitionInfo>& TopicHandle::partitions() const {
     return self->m_partitions;
 }
 
+void TopicHandle::markAsComplete() const {
+    auto engine = self->m_service->m_client->m_engine;
+    auto rpc = self->m_service->m_client->m_topic_mark_as_complete;
+    std::vector<tl::async_response> responses;
+    std::vector<Result<void>> results;
+    responses.reserve(self->m_partitions.size());
+    results.reserve(self->m_partitions.size());
+    try {
+        for(auto& partition : self->m_partitions) {
+            auto ph = tl::provider_handle{
+                engine.lookup(partition.address()),
+                    partition.providerID()};
+            responses.push_back(rpc.on(ph).async());
+        }
+        for(auto& response : responses)
+            results.push_back(static_cast<Result<void>>(response.wait()));
+    } catch(const std::exception& ex) {
+        throw Exception{
+            fmt::format("Could not mark topic as comleted: {}", ex.what())
+        };
+    }
+    for(auto& result : results) {
+        if(!result.success()) throw Exception{result.error()};
+    }
+}
+
 Ordering TopicHandle::defaultOrdering() {
 //    spdlog::warn("Ordering not specified when creating Producer. "
 //                 "Ordering will be strict by default. If this was intended, "

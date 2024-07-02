@@ -36,6 +36,7 @@ which manipulate large datasets and their metadata.
    usage/consumer.rst
    usage/deployment.rst
    usage/restarting.rst
+   usage/benchmarking.rst
 
 
 

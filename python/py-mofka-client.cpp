@@ -17,6 +17,7 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
+#if 0
 namespace mofka {
 class PythonBindingHelper {
 
@@ -34,6 +35,7 @@ class PythonBindingHelper {
     }
 };
 }
+#endif
 
 typedef py::capsule py_margo_instance_id;
 typedef py::capsule py_hg_addr_t;
@@ -55,12 +57,12 @@ static void check_buffer_is_writable(const py::buffer_info& buf_info) {
     if(buf_info.readonly) throw mofka::Exception("Python buffer is read-only");
 }
 
-static auto data_helper(const py::buffer& data) {
-    auto data_info = get_buffer_info(data);
-    check_buffer_is_contiguous(data_info);
-    auto result = mofka::Data(data_info.ptr, data_info.size);
-    mofka::PythonBindingHelper::SetDataContext(result, data);
-    return result;
+static auto data_helper(const py::buffer& buffer) {
+    auto buffer_info = get_buffer_info(buffer);
+    check_buffer_is_contiguous(buffer_info);
+    auto owner = new py::object(std::move(buffer));
+    auto free_cb = [owner](mofka::Data::Context) { delete owner; };
+    return mofka::Data(buffer_info.ptr, buffer_info.size, owner, std::move(free_cb));
 }
 
 static auto data_helper(const py::list& buffers) {
@@ -74,9 +76,9 @@ static auto data_helper(const py::list& buffers) {
                 buff_info.ptr,
                 static_cast<size_t>(buff_info.size)});
     }
-    auto result = mofka::Data(std::move(segments));
-    mofka::PythonBindingHelper::SetDataContext(result, buffers);
-    return result;
+    auto owner = new py::object(std::move(buffers));
+    auto free_cb = [owner](mofka::Data::Context) { delete owner; };
+    return mofka::Data(std::move(segments), owner, std::move(free_cb));
 }
 
 using PythonDataSelector = std::function<std::optional<mofka::DataDescriptor>(const nlohmann::json&, const mofka::DataDescriptor&)>;
@@ -261,8 +263,9 @@ PYBIND11_MODULE(pymofka_client, m) {
                             check_buffer_is_contiguous(buf_info);
                             cpp_segments.push_back({buf_info.ptr, (size_t)buf_info.size});
                         }
-                        auto data = mofka::Data{std::move(cpp_segments)};
-                        mofka::PythonBindingHelper::SetDataContext(data, std::move(segments));
+                        auto owner = new py::object{std::move(segments)};
+                        auto free_cb = [owner](mofka::Data::Context) { delete owner; };
+                        auto data = mofka::Data{std::move(cpp_segments), owner, std::move(free_cb)};
                         return data;
                 }
                 : mofka::DataBroker{};
@@ -385,7 +388,8 @@ PYBIND11_MODULE(pymofka_client, m) {
                 [](mofka::Event& event) { return event.metadata().string(); })
         .def_property_readonly("data",
                 [](mofka::Event& event) {
-                    return mofka::PythonBindingHelper::GetDataContext(event.data());
+                    auto owner = event.data().context();
+                    return *static_cast<py::object*>(owner);
                 })
         .def_property_readonly("event_id", &mofka::Event::id)
         .def_property_readonly("partition", &mofka::Event::partition)

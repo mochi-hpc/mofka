@@ -44,6 +44,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     tl::auto_remote_procedure m_consumer_ack_event;
     tl::auto_remote_procedure m_consumer_remove_consumer;
     tl::auto_remote_procedure m_consumer_request_data;
+    tl::auto_remote_procedure m_topic_mark_as_complete;
     /* RPC for Consumers */
     thallium::remote_procedure m_consumer_recv_batch;
     // PartitionManager
@@ -66,6 +67,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_consumer_ack_event(define("mofka_consumer_ack_event", &ProviderImpl::acknowledge, pool))
     , m_consumer_remove_consumer(define("mofka_consumer_remove_consumer", &ProviderImpl::removeConsumer, pool))
     , m_consumer_request_data(define("mofka_consumer_request_data", &ProviderImpl::requestData, pool))
+    , m_topic_mark_as_complete(define("mofka_topic_mark_as_complete", &ProviderImpl::markAsComplete, pool))
     , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch"))
     {
         /* Validate the configuration */
@@ -189,17 +191,15 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
         auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
         SP<ConsumerHandleImpl> consumer_handle_impl;
-        while(!consumer_handle_impl) {
+        {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             auto it = m_consumers.find(consumer_key);
             if(it != m_consumers.end()) {
                 consumer_handle_impl = it->second;
                 m_consumers.erase(it);
             }
-            if(!consumer_handle_impl)
-                m_consumers_cv.wait(g);
         }
-        consumer_handle_impl->stop();
+        if(consumer_handle_impl) consumer_handle_impl->stop();
         spdlog::trace("[mofka:{}] Successfully executed removeConsumer", id());
     }
 
@@ -212,6 +212,15 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         ENSURE_VALID_PARTITION_MANAGER(result);
         result = m_partition_manager->getData({descriptor.content}, remote_bulk);
         spdlog::trace("[mofka:{}] Successfully executed requestData", id());
+    }
+
+    void markAsComplete(const tl::request& req) {
+        spdlog::trace("[mofka:{}] Received markAsComplete request", id());
+        Result<void> result;
+        tl::auto_respond<decltype(result)> ensureResponse(req, result);
+        ENSURE_VALID_PARTITION_MANAGER(result);
+        result = m_partition_manager->markAsComplete();
+        spdlog::trace("[mofka:{}] Successfully executed markAsComplete", id());
     }
 
 };

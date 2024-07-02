@@ -9,6 +9,7 @@
 #include "MetadataImpl.hpp"
 #include "PimplUtil.hpp"
 #include "DefaultValidator.hpp"
+#include "SchemaValidator.hpp"
 #include <fmt/format.h>
 #include <unordered_map>
 
@@ -30,6 +31,7 @@ Metadata Validator::metadata() const {
 }
 
 MOFKA_REGISTER_VALIDATOR(default, DefaultValidator);
+MOFKA_REGISTER_VALIDATOR(schema, SchemaValidator);
 
 Validator Validator::FromMetadata(const Metadata& metadata) {
     auto& json = metadata.json();

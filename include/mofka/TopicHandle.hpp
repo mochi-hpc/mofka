@@ -119,6 +119,13 @@ class TopicHandle {
     const std::vector<PartitionInfo>& partitions() const;
 
     /**
+     * @brief Indicate to the partition servers that no more events will be produced
+     * in this topic. This will make any attempt to consume events return events with
+     * no metadata, no data, and an ID of NoMoreEvents.
+     */
+    void markAsComplete() const;
+
+    /**
      * @brief Checks if the TopicHandle instance is valid.
      */
     operator bool() const;

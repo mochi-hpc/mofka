@@ -35,6 +35,7 @@ class MemoryPartitionManager : public mofka::PartitionManager {
 
     thallium::engine m_engine;
 
+    bool                         m_is_marked_complete = false;
     std::vector<char>            m_events_metadata;
     std::vector<size_t>          m_events_metadata_offsets;
     std::vector<size_t>          m_events_metadata_sizes;
@@ -122,6 +123,11 @@ class MemoryPartitionManager : public mofka::PartitionManager {
     Result<std::vector<Result<void>>> getData(
           const std::vector<DataDescriptor>& descriptors,
           const BulkRef& bulk) override;
+
+    /**
+     * @see PartitionManager::markAsComplete.
+     */
+    Result<void> markAsComplete() override;
 
     /**
      * @brief Destroys the underlying topic.

@@ -53,6 +53,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                     mofka::Data{data.data(), data.size()});
                 future.wait();
             }
+            topic.markAsComplete();
         }
 
         SECTION("Consumer without data")
@@ -68,6 +69,12 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                 REQUIRE(doc["event_num"].get<int64_t>() == i);
                 if(i % 5 == 0)
                     REQUIRE_NOTHROW(event.acknowledge());
+            }
+            // Consume extra events, we should get events with NoMoreEvents as event IDs
+            for(unsigned i=0; i < 10; ++i) {
+                mofka::Event event;
+                REQUIRE_NOTHROW(event = consumer.pull().wait());
+                REQUIRE(event.id() == mofka::NoMoreEvents);
             }
         }
 

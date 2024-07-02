@@ -32,6 +32,8 @@ EventID Event::id() const {
 }
 
 void Event::acknowledge() const {
+    if(self->m_id == NoMoreEvents)
+        throw Exception{"Cannot acknowledge \"NoMoreEvents\""};
     auto consumer = self->m_consumer.lock();
     if(!consumer) {
         throw Exception{"Consumer of this Event has disappeared"};

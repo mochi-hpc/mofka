@@ -8,11 +8,14 @@
 
 #include <mofka/ForwardDcl.hpp>
 
+#include <limits>
 #include <cstdint>
 
 namespace mofka {
 
 using EventID = std::uint64_t;
+
+constexpr const EventID NoMoreEvents = std::numeric_limits<EventID>::max();
 
 }
 

@@ -1,0 +1,135 @@
+{
+    "address": "na+sm",
+    "options": {
+        "simultaneous": false
+    },
+    "servers" : {
+        "ranks": [0],
+        "config": {
+            "margo": {
+                "monitoring": {
+                    "config": {
+                        "filename_prefix": "server.mofka",
+                        "statistics": {
+                            "disable": false
+                        },
+                        "time_series": {
+                            "disable": true
+                        }
+                    }
+                },
+                "argobots": {
+                    "pools": [
+                        {
+                            "name": "rpc_and_progress_pool",
+                            "kind": "fifo_wait",
+                            "access": "mpmc"
+                        }
+                    ],
+                    "xstreams": [
+                        {
+                            "name": "rpc_and_progress_es",
+                            "scheduler": {
+                                "type": "basic_wait",
+                                "pools": ["rpc_and_progress_pool"]
+                            }
+                        }
+                    ]
+                },
+                "rpc_pool": "rpc_and_progress_pool",
+                "progress_pool": "rpc_and_progress_pool"
+            },
+            "libraries": {
+                "flock": "libflock-bedrock-module.so",
+                "yokan": "libyokan-bedrock-module.so",
+                "warabi": "libwarabi-bedrock-module.so",
+                "mofka" : "libmofka-bedrock-module.so"
+            },
+            "providers": [
+                {
+                    "name": "group",
+                    "provider_id": 1,
+                    "type": "flock",
+                    "config": {
+                        "bootstrap": "self",
+                        "file": "mofka.json",
+                        "group": {
+                            "type": "static"
+                        }
+                    }
+                },
+                {
+                    "__if__": "$MPI_COMM_WORLD.rank == 0",
+                    "name": "master",
+                    "provider_id": 2,
+                    "type": "yokan",
+                    "tags" : [ "mofka:master" ],
+                    "config" : {
+                        "database" : {
+                            "type": "map"
+                        }
+                    }
+                },
+                {
+                    "name": "metadata_provider",
+                    "provider_id": 3,
+                    "type": "yokan",
+                    "tags" : [ "mofka:metadata" ],
+                    "config" : {
+                        "database" : { "type": "map" }
+                    }
+                },
+                {
+                    "name": "data_provider",
+                    "provider_id": 4,
+                    "type": "warabi",
+                    "tags" : [ "mofka:data" ],
+                    "config" : {
+                        "target" : { "type": "memory" }
+                    }
+                }
+            ]
+        }
+    },
+    "producers": {
+        "ranks": [1],
+        "num_events": 100,
+        "burst_size": 5,
+        "wait_between_bursts_ms": 1000,
+        "wait_between_events_ms": [0, 300],
+        "flush_between_bursts": true,
+        "flush_every": 100,
+        "group_file": "mofka.json",
+        "topic": {
+            "name": "mytopic",
+            "metadata": {
+                "num_fields": 8,
+                "key_sizes": [8,16],
+                "val_sizes": [16,64]
+            },
+            "data": {
+                "num_blocks": [2,4],
+                "total_size": [128, 256]
+            },
+            "partitions": [
+                {
+                    "type":"default",
+                    "rank": 0
+                },
+                {
+                    "type":"default",
+                    "rank": 0
+                }
+            ]
+        }
+    },
+    "consumers.group_file": "mofka.json",
+    "consumers.topic_name": "mytopic",
+    "consumers.consumer_name": "myconsumer",
+    "consumers.ack_every": 10,
+    "consumers.ranks": [2,3],
+    "consumers.check_data": true,
+    "consumers.data_selector.selectivity": 0.6,
+    "consumers.data_selector": { "proportion": [0.5, 1.0] },
+    "consumers.data_broker.num_blocks": 1
+}

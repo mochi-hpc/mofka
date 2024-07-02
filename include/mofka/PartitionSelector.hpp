@@ -24,6 +24,7 @@ class TopicHandleImpl;
 class ClientImpl;
 class ServiceHandle;
 class ConsumerImpl;
+class Consumer;
 
 /**
  * @brief The PartitionInfo structure holds information about
@@ -95,6 +96,7 @@ class PartitionInfo {
     friend class Producer;
     friend class ServiceHandle;
     friend class ConsumerImpl;
+    friend class Consumer;
     friend class Event;
 };
 
