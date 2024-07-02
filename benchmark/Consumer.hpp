@@ -3,6 +3,7 @@
 
 #include "Communicator.hpp"
 #include "Statistics.hpp"
+#include "RNG.hpp"
 
 #include <mofka/Client.hpp>
 #include <mofka/ServiceHandle.hpp>
@@ -13,6 +14,7 @@
 #include <mpi.h>
 #include <thallium.hpp>
 #include <spdlog/spdlog.h>
+#include <random>
 
 class BenchmarkConsumer {
 
@@ -25,11 +27,19 @@ class BenchmarkConsumer {
     mofka::Consumer      m_mofka_consumer;
     Communicator         m_comm;
     json                 m_config;
+    RNG                  m_rng;
     bool                 m_run_in_thread;
     bool                 m_has_partitions;
     Statistics           m_pull_stats;
     Statistics           m_ack_stats;
     double               m_runtime;
+
+    double m_data_selectivity    = 1.0;
+    double m_data_proportion_min = 1.0;
+    double m_data_proportion_max = 1.0;
+    size_t m_data_num_blocks_min = 1;
+    size_t m_data_num_blocks_max = 1;
+    bool   m_check_data = false;
 
     thallium::managed<thallium::pool>    m_run_pool;
     thallium::managed<thallium::xstream> m_run_es;
@@ -47,6 +57,7 @@ class BenchmarkConsumer {
     , m_mofka_client{m_engine}
     , m_comm{comm}
     , m_config(config)
+    , m_rng(seed*33+42)
     , m_run_in_thread{run_in_thread}
     {
         auto& group_file = config["group_file"].get_ref<const std::string&>();
@@ -65,7 +76,30 @@ class BenchmarkConsumer {
         auto thread_pool = mofka::ThreadPool{
             mofka::ThreadCount{config.value("thread_count", (size_t)0)}};
 
-        // TODO add data selector and data broker
+        if(config.contains("data_selector")) {
+            m_data_selectivity = config["data_selector"].value("selectivity", m_data_selectivity);
+            if(config["data_selector"].contains("proportion")) {
+                auto& proportion = config["data_selector"]["proportion"];
+                if(proportion.is_number_float())
+                    m_data_proportion_max = m_data_proportion_min = proportion.get<double>();
+                else {
+                    m_data_proportion_min = proportion[0].get<double>();
+                    m_data_proportion_max = proportion[1].get<double>();
+                }
+            }
+        }
+        if(config.contains("data_broker")) {
+            if(config["data_broker"].contains("num_blocks")) {
+                auto& num_blocks = config["data_broker"]["num_blocks"];
+                if(num_blocks.is_number_unsigned())
+                    m_data_num_blocks_max = m_data_num_blocks_min = num_blocks.get<size_t>();
+                else {
+                    m_data_num_blocks_min = num_blocks[0].get<size_t>();
+                    m_data_num_blocks_max = num_blocks[1].get<size_t>();
+                }
+            }
+        }
+        m_check_data = config.value("check_data", m_check_data);
 
         std::vector<mofka::PartitionInfo> my_partitions;
         size_t comm_size = m_comm.size();
@@ -76,8 +110,17 @@ class BenchmarkConsumer {
         if(m_has_partitions) {
             spdlog::trace("[consumer] Creating consumer \"{}\" associated with {} partitions",
                           consumer_name, my_partitions.size());
+            mofka::DataSelector my_selector =
+                [this](const mofka::Metadata& md, const mofka::DataDescriptor& dd) {
+                    return selector(md, dd);
+                };
+            mofka::DataBroker my_broker =
+                [this](const mofka::Metadata& md, const mofka::DataDescriptor& dd) {
+                    return broker(md, dd);
+                };
             m_mofka_consumer = m_mofka_topic_handle.consumer(
-                consumer_name, batch_size, thread_pool, my_partitions);
+                consumer_name, batch_size, thread_pool, my_partitions,
+                my_selector, my_broker);
         } else {
             spdlog::trace("[consumer] Consumer \"{}\" has no partition on this process",
                           consumer_name);
@@ -104,6 +147,43 @@ class BenchmarkConsumer {
         if(!m_run_es->is_null()) m_run_es->join();
         m_run_es = decltype(m_run_es){};
         if(!m_run_pool->is_null()) m_run_pool = decltype(m_run_pool){};
+    }
+
+    mofka::DataDescriptor selector(const mofka::Metadata&, const mofka::DataDescriptor& descriptor) {
+        std::bernoulli_distribution dist{m_data_selectivity};
+        if(!dist(m_rng)) {
+            return mofka::DataDescriptor::Null();
+        }
+        if(m_data_proportion_min >= 1.0) {
+            return descriptor;
+        }
+        std::uniform_int_distribution<size_t> sizeDistribution(
+            m_data_proportion_min*descriptor.size(),
+            m_data_proportion_max*descriptor.size());
+        size_t selected_size = sizeDistribution(m_rng);
+        return descriptor.makeSubView(0, selected_size);
+    }
+
+    mofka::Data broker(const mofka::Metadata&, const mofka::DataDescriptor& descriptor) {
+        std::uniform_int_distribution<size_t> numBlocksDistribution(
+            m_data_num_blocks_min, m_data_num_blocks_max);
+        auto num_blocks = std::min(descriptor.size(), numBlocksDistribution(m_rng));
+        auto remaining_size = descriptor.size();
+        auto block_size = remaining_size/num_blocks;
+        std::vector<std::vector<char>>* blocks = new std::vector<std::vector<char>>();
+        blocks->reserve(num_blocks);
+        while(remaining_size != 0) {
+            auto this_block_size = std::min(remaining_size, block_size);
+            remaining_size -= this_block_size;
+            blocks->emplace_back(this_block_size, '\0');
+        }
+        std::vector<mofka::Data::Segment> segments{blocks->size()};
+        for(size_t i = 0; i < blocks->size(); ++i) {
+            segments[i] = mofka::Data::Segment{blocks->at(i).data(), blocks->at(i).size()};
+        }
+        return mofka::Data{segments, blocks,
+            [](void* ctx) {
+                delete static_cast<decltype(blocks)*>(ctx);}};
     }
 
     private:
@@ -139,6 +219,7 @@ class BenchmarkConsumer {
                     m_ack_stats << (t2 - t1);
                     spdlog::trace("[consumer] Done acknowledging event {}", i);
                 }
+                if(m_check_data) checkData(event);
             }
         }
         double t_end = MPI_Wtime();
@@ -147,6 +228,23 @@ class BenchmarkConsumer {
         t_end = MPI_Wtime();
         m_runtime = t_end - t_start;
         spdlog::info("[consumer] Consumer app finished in {} seconds", (t_end - t_start));
+    }
+
+    void checkData(const mofka::Event& event) {
+        auto data = event.data();
+        size_t x = 0;
+        unsigned s = 0;
+        for(auto& seg : data.segments()) {
+            auto seg_data = static_cast<const char*>(seg.ptr);
+            for(unsigned i=0; i < seg.size; ++i) {
+                if(seg_data[i] != ('A' + (x % 26))) {
+                    throw mofka::Exception{"Invalid data found in consumer"};
+                    return;
+                }
+                x += 1;
+            }
+            s += 1;
+        }
     }
 
     public:

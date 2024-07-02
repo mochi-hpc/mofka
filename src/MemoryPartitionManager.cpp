@@ -217,8 +217,14 @@ Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
         const std::vector<DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     Result<std::vector<Result<void>>> result;
-    result.value().resize(descriptors.size());
 
+    if(descriptors.size() != 1) {
+        result.error() = "Expected 1 descriptor";
+        result.success() = false;
+        return result;
+    }
+
+    result.value().resize(descriptors.size());
     OffsetSize location;
     location.fromDataDescriptor(descriptors[0]);
 
@@ -230,11 +236,6 @@ Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
         thallium::bulk_mode::read_only);
     bulk.handle.on(client) << local_data_bulk;
 
-    if(descriptors.size() != 1) {
-        result.error() = "Expected 1 descriptor";
-        result.success() = false;
-        return result;
-    }
     return result;
 }
 

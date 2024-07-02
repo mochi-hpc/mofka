@@ -1,6 +1,8 @@
 #ifndef STRING_GENERATOR_H
 #define STRING_GENERATOR_H
 
+#include "RNG.hpp"
+
 #include <iostream>
 #include <chrono>
 #include <random>
@@ -16,8 +18,8 @@
 template<typename String>
 class StringGenerator {
 
-    std::mt19937 m_rng;
-    std::string  m_alphabet;
+    RNG         m_rng;
+    std::string m_alphabet;
 
     public:
 
@@ -39,7 +41,7 @@ class StringGenerator {
         return result;
     }
 
-    std::mt19937& rng() {
+    RNG& rng() {
         return m_rng;
     }
 };

@@ -155,15 +155,16 @@ static const json configSchema = R"(
                     {"type": "integer", "minimum": 1},
                     {"enum": ["adaptive"]}
                 ]},
+                "check_data": {"type": "boolean"},
                 "thread_count": {"type": "integer", "minimum": 0},
                 "data_selector": {
                     "type":"object",
                     "properties": {
                         "selectivity": {"type":"number", "minimum":0, "maximum":1},
-                        "fragmentation": { "oneOf": [
-                            {"type": "integer", "minimum": 1},
+                        "proportion": { "oneOf": [
+                            {"type": "number", "minimum": 0, "maximum": 1},
                             {"type": "array", "minItems":2, "maxItems":2,
-                             "items": {"type":"integer", "minimum": 1}}
+                             "items": {"type":"number", "minimum": 0, "maximum": 1}}
                         ]}
                     }
                 },
@@ -171,7 +172,7 @@ static const json configSchema = R"(
                     "type":"object",
                     "properties": {
                         "reuse": {"type":"boolean"},
-                        "fragmentation": { "oneOf": [
+                        "num_blocks": { "oneOf": [
                             {"type": "integer", "minimum": 1},
                             {"type": "array", "minItems":2, "maxItems":2,
                              "items": {"type":"integer", "minimum": 1}}

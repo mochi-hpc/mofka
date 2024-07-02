@@ -91,7 +91,7 @@
             },
             "data": {
                 "num_blocks": [2,4],
-                "total_size": [1024, 2048]
+                "total_size": [128, 256]
             },
             "partitions": [
                 {
@@ -111,6 +111,14 @@
         "consumer_name": "myconsumer",
         "num_events": 100,
         "ack_every": 10,
-        "ranks": [2,3]
+        "ranks": [2,3],
+        "check_data": true,
+        "data_selector": {
+            "selectivity": 0.6,
+            "proportion": [0.5, 1.0]
+        },
+        "data_broker":{
+            "num_blocks": 1
+        }
     }
 }

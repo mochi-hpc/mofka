@@ -60,7 +60,7 @@ class BenchmarkProducer {
         getMin(config["topic"]["metadata"]["val_sizes"]),
         getMax(config["topic"]["metadata"]["val_sizes"]))
     , m_data_generator(
-        m_string_generator,
+        seed*42 + 33,
         config["topic"].contains("data") ? getMin(config["topic"]["data"]["total_size"]) : 0,
         config["topic"].contains("data") ? getMax(config["topic"]["data"]["total_size"]) : 0,
         config["topic"].contains("data") ? getMin(config["topic"]["data"]["num_blocks"]) : 0,
@@ -166,9 +166,11 @@ class BenchmarkProducer {
 
         double t1, t2;
 
+        std::vector<mofka::Data> active_data;
         for(size_t i = 0; i < num_events; ++i) {
             auto metadata = m_metadata_generator.generate();
             auto data = m_data_generator.generate();
+            active_data.push_back(data);
             t1 = MPI_Wtime();
             m_mofka_producer.push(metadata, data);
             t2 = MPI_Wtime();
@@ -180,6 +182,7 @@ class BenchmarkProducer {
                     spdlog::trace("[producer] Flushing after burst of events");
                     t1 = MPI_Wtime();
                     m_mofka_producer.flush();
+                    active_data.clear();
                     t2 = MPI_Wtime();
                     m_flush_stats << (t2 - t1);
                     spdlog::trace("[producer] Done flushing after burst of events");
@@ -206,6 +209,7 @@ class BenchmarkProducer {
                     next_flush = flush_every_dist(rng);
                     t1 = MPI_Wtime();
                     m_mofka_producer.flush();
+                    active_data.clear();
                     t2 = MPI_Wtime();
                     m_flush_stats << (t2 - t1);
                     spdlog::trace("[poducer] Done with random flush");
@@ -214,6 +218,7 @@ class BenchmarkProducer {
         }
         spdlog::trace("[poducer] Last flush");
         m_mofka_producer.flush();
+        active_data.clear();
         spdlog::trace("[poducer] Done with last flush");
         double t_end = MPI_Wtime();
         spdlog::info("[producer] Local producer finished in {} seconds", (t_end - t_start));
