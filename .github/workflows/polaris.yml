@@ -9,7 +9,7 @@ on:
 jobs:
   polaris:
     runs-on: ubuntu-22.04
-    steps: []
+    steps:
     - name: Trigger gitlab-ci
       run: |
         curl -X POST --fail -F token=${{ secrets.ALCF_GITLAB_CI_TOKEN }} -F ref=main \
