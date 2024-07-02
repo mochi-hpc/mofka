@@ -195,6 +195,8 @@ static const json configSchema = R"(
 }
 )"_json;
 
+static json expandSimplifiedJSON(const json& input);
+
 int main(int argc, char** argv) {
 
     if(argc != 3) {
@@ -230,7 +232,7 @@ int main(int argc, char** argv) {
         configStr.assign(
             (std::istreambuf_iterator<char>(configFile)),
             (std::istreambuf_iterator<char>()));
-        config = json::parse(configStr);
+        config = expandSimplifiedJSON(json::parse(configStr));
 
         // validate the configuration file against the schema
         mofka::JsonValidator validator{configSchema};
@@ -413,4 +415,33 @@ int main(int argc, char** argv) {
     MPI_Finalize();
 
     return 0;
+}
+
+static void expand_json(const json& input, json& output) {
+    for (auto it = input.begin(); it != input.end(); ++it) {
+        std::istringstream key_stream(it.key());
+        std::string segment;
+        json* current = &output;
+
+        while (std::getline(key_stream, segment, '.')) {
+            if (!key_stream.eof()) {
+                if (current->find(segment) == current->end() || !(*current)[segment].is_object()) {
+                    (*current)[segment] = json::object();
+                }
+                current = &(*current)[segment];
+            } else {
+                if (it.value().is_object()) {
+                    expand_json(it.value(), (*current)[segment]);
+                } else {
+                    (*current)[segment] = it.value();
+                }
+            }
+        }
+    }
+}
+
+static json expandSimplifiedJSON(const json& input) {
+    json output = json::object();
+    expand_json(input, output);
+    return output;
 }

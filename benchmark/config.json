@@ -105,20 +105,14 @@
             ]
         }
     },
-    "consumers": {
-        "group_file": "mofka.json",
-        "topic_name": "mytopic",
-        "consumer_name": "myconsumer",
-        "num_events": 100,
-        "ack_every": 10,
-        "ranks": [2,3],
-        "check_data": true,
-        "data_selector": {
-            "selectivity": 0.6,
-            "proportion": [0.5, 1.0]
-        },
-        "data_broker":{
-            "num_blocks": 1
-        }
-    }
+    "consumers.group_file": "mofka.json",
+    "consumers.topic_name": "mytopic",
+    "consumers.consumer_name": "myconsumer",
+    "consumers.num_events": 100,
+    "consumers.ack_every": 10,
+    "consumers.ranks": [2,3],
+    "consumers.check_data": true,
+    "consumers.data_selector.selectivity": 0.6,
+    "consumers.data_selector": { "proportion": [0.5, 1.0] },
+    "consumers.data_broker.num_blocks": 1
 }
