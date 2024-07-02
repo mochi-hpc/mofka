@@ -69,6 +69,24 @@
                             "type": "map"
                         }
                     }
+                },
+                {
+                    "name": "metadata_provider",
+                    "provider_id": 3,
+                    "type": "yokan",
+                    "tags" : [ "mofka:metadata" ],
+                    "config" : {
+                        "database" : { "type": "map" }
+                    }
+                },
+                {
+                    "name": "data_provider",
+                    "provider_id": 4,
+                    "type": "warabi",
+                    "tags" : [ "mofka:data" ],
+                    "config" : {
+                        "target" : { "type": "memory" }
+                    }
                 }
             ]
         }
@@ -95,11 +113,11 @@
             },
             "partitions": [
                 {
-                    "type":"memory",
+                    "type":"default",
                     "rank": 0
                 },
                 {
-                    "type":"memory",
+                    "type":"default",
                     "rank": 0
                 }
             ]
