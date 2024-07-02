@@ -1,8 +1,11 @@
 {
     "address": "na+sm",
+    // BEGIN OPTIONS
     "options": {
         "simultaneous": false
     },
+    // END OPTIONS
+    // BEGIN SERVERS
     "servers" : {
         "ranks": [0],
         "config": {
@@ -91,8 +94,13 @@
             ]
         }
     },
+    // END SERVERS
+    // BEGIN PRODUCERS
     "producers": {
         "ranks": [1],
+        "batch_size": "adaptive",
+        "ordering": "strict",
+        "thread_count": 0,
         "num_events": 100,
         "burst_size": 5,
         "wait_between_bursts_ms": 1000,
@@ -102,6 +110,9 @@
         "group_file": "mofka.json",
         "topic": {
             "name": "mytopic",
+            "validator": "default",
+            "partition_selector": "default",
+            "serializer": "default",
             "metadata": {
                 "num_fields": 8,
                 "key_sizes": [8,16],
@@ -114,22 +125,28 @@
             "partitions": [
                 {
                     "type":"default",
-                    "rank": 0
+                    "rank": 0,
+                    "pool": "__primary__"
                 },
                 {
                     "type":"default",
-                    "rank": 0
+                    "rank": 0,
+                    "pool": "__primary__"
                 }
             ]
         }
     },
+    // END PRODUCERS
+    // BEGIN CONSUMERS
     "consumers.group_file": "mofka.json",
     "consumers.topic_name": "mytopic",
     "consumers.consumer_name": "myconsumer",
+    "consumers.num_events": 100,
     "consumers.ack_every": 10,
     "consumers.ranks": [2,3],
     "consumers.check_data": true,
     "consumers.data_selector.selectivity": 0.6,
     "consumers.data_selector": { "proportion": [0.5, 1.0] },
     "consumers.data_broker.num_blocks": 1
+    // END CONSUMERS
 }

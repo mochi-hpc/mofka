@@ -180,12 +180,12 @@ static const json configSchema = R"(
                     }
                 }
             },
-            "required": ["ranks", "group_file", "topic_name", "num_events", "consumer_name"]
+            "required": ["ranks", "group_file", "topic_name", "consumer_name"]
         },
         "options": {
             "type": "object",
             "properties": {
-                "concurrent": {"type": "boolean"}
+                "simultaneous": {"type": "boolean"}
             }
         }
     },
@@ -232,7 +232,8 @@ int main(int argc, char** argv) {
         configStr.assign(
             (std::istreambuf_iterator<char>(configFile)),
             (std::istreambuf_iterator<char>()));
-        config = expandSimplifiedJSON(json::parse(configStr));
+        config = expandSimplifiedJSON(json::parse(configStr, nullptr, true, true));
+        configStr = config.dump();
 
         // validate the configuration file against the schema
         mofka::JsonValidator validator{configSchema};

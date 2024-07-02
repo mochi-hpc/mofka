@@ -190,14 +190,14 @@ class BenchmarkConsumer {
 
     void runThread() {
         std::unordered_map<mofka::UUID, size_t> events_received;
-        auto num_events = m_config["num_events"].get<size_t>();
+        auto num_events = m_config.value("num_events", (ssize_t)(-1));
         auto ack        = m_config.value("ack_every", num_events);
         m_comm.barrier();
         spdlog::info("[consumer] Starting to consume events");
         double t_start = MPI_Wtime();
         double t1, t2;
         if(m_has_partitions) {
-            for(size_t i = 0; i < num_events; ++i) {
+            for(ssize_t i = 0; i < num_events || num_events == -1; ++i) {
                 spdlog::trace("[consumer] Pulling event {}", i);
                 t1 = MPI_Wtime();
                 auto event = m_mofka_consumer.pull().wait();
@@ -211,7 +211,7 @@ class BenchmarkConsumer {
                 if(it == events_received.end())
                     it = events_received.insert(std::make_pair(uuid, 0)).first;
                 it->second += 1;
-                if(it->second % ack == 0 || i == num_events-1) {
+                if(it->second % ack == 0 || (num_events != -1 && i == num_events-1)) {
                     spdlog::trace("[consumer] Acknowledging event {}", i);
                     t1 = MPI_Wtime();
                     event.acknowledge();
