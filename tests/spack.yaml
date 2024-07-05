@@ -9,10 +9,10 @@ spack:
   - nlohmann-json-schema-validator
   - spdlog
   - fmt
-  - mochi-bedrock+python+mpi
-  - mochi-warabi+bedrock
-  - mochi-yokan+bedrock
-  - mochi-flock+bedrock+python+mpi
+  - mochi-bedrock +python+mpi+flock~ssg
+  - mochi-warabi +bedrock
+  - mochi-yokan +bedrock
+  - mochi-flock +bedrock+python+mpi
   - py-coverage
   - py-pybind11
   - py-mochi-margo
@@ -30,13 +30,13 @@ spack:
     argobots:
       require: "@1.2:"
     mochi-yokan:
-      require: "@0.4.2:"
+      require: "@0.5.0:"
     mochi-warabi:
-      require: "@0.3.0:"
+      require: "@0.4.0:"
     mochi-bedrock:
-      require: "@0.11.0:"
+      require: "@0.13.0:"
     mochi-flock:
-      require: "@0.2.2:"
+      require: "@0.3.0:"
     mercury:
       require: "~checksum~boostsys"
     libfabric:
