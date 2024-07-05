@@ -41,7 +41,7 @@ target_link_libraries (mofka-client
     PUBLIC
     thallium
     PkgConfig::uuid
-    bedrock-client
+    bedrock::client
     nlohmann_json::nlohmann_json
     PRIVATE
     yokan::client
@@ -87,7 +87,7 @@ set_target_properties (mofka-server
 # bedrock module library
 add_library (mofka-bedrock-module ${module-src-files})
 target_link_libraries (mofka-bedrock-module
-    PUBLIC mofka-server mofka-client bedrock-server
+    PUBLIC mofka-server mofka-client bedrock::module-api
     PRIVATE coverage_config warnings_config)
 target_include_directories (mofka-bedrock-module PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (mofka-bedrock-module BEFORE PUBLIC

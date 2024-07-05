@@ -71,6 +71,7 @@ find_package (spdlog REQUIRED)
 # search for fmt package
 find_package (fmt REQUIRED)
 # search fo bedrock
+find_package (bedrock-module-api REQUIRED)
 find_package (bedrock REQUIRED)
 # search for warabi
 find_package (warabi REQUIRED)
