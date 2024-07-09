@@ -355,10 +355,30 @@ static std::function<bool(const json&)> matchWildcard(const json& wildcardPatter
         throw Exception{
             "Invalid Eventbridge \"wildcard\" rule: "
             "pattern should be a string"};
-    std::string regexPattern = std::regex_replace(
-            wildcardPattern.get_ref<const std::string&>(),
-            std::regex("\\*"), ".*");
-    auto regex = std::regex(regexPattern);
+
+    auto splitStringAtDoubleBackslash = [](const std::string &input) {
+        std::vector<std::string> result;
+        size_t start = 0;
+        size_t end = input.find("\\\\");
+        while (end != std::string::npos) {
+            result.push_back(input.substr(start, end - start));
+            start = end + 2;
+            end = input.find("\\\\", start);
+        }
+        result.push_back(input.substr(start));
+        return result;
+    };
+
+    auto splitPattern = splitStringAtDoubleBackslash(wildcardPattern.get_ref<const std::string&>());
+    auto wildcardRegex = std::regex(R"(\*)");
+    for(auto& segment : splitPattern)
+        segment = std::regex_replace(segment, wildcardRegex, ".*");
+    auto finalRegex = splitPattern[0];
+    for(size_t i = 0; i < splitPattern.size(); i++) {
+        finalRegex += "\\\\";
+        finalRegex += splitPattern[i];
+    }
+    auto regex = std::regex(finalRegex);
     return [regex=std::move(regex)](const json& dataValue) {
         if (!dataValue.is_string()) return false;
         return std::regex_match(dataValue.get_ref<const std::string&>(), regex);
