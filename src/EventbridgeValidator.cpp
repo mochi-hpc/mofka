@@ -41,7 +41,9 @@ template<typename CondList>
 static std::function<bool(const json&)> allOf(CondList&& list) {
     return [list=std::move(list)](const json& dataValue) {
         for(auto& cond : list) {
-            if(!cond(dataValue)) return false;
+            if(!cond(dataValue)) {
+                return false;
+            }
         }
         return true;
     };
@@ -61,7 +63,7 @@ static std::function<bool(const json&)> matchRule(const json& rule);
 static std::function<bool(const json&)> matchAnythingBut(const json& patternValue) {
     if(patternValue.is_primitive())
         return [patternValue](const json& dataValue) {
-            return dataValue == patternValue;
+            return dataValue != patternValue;
         };
     else if(patternValue.is_array()) {
         for(auto& pattern : patternValue) {
@@ -73,7 +75,9 @@ static std::function<bool(const json&)> matchAnythingBut(const json& patternValu
         }
         return [patternValue](const json& dataValue) {
             for (const auto& value : patternValue) {
-                if (dataValue == value) return false;
+                if (dataValue == value) {
+                    return false;
+                }
             }
             return true;
         };
@@ -374,7 +378,7 @@ static std::function<bool(const json&)> matchWildcard(const json& wildcardPatter
     for(auto& segment : splitPattern)
         segment = std::regex_replace(segment, wildcardRegex, ".*");
     auto finalRegex = splitPattern[0];
-    for(size_t i = 0; i < splitPattern.size(); i++) {
+    for(size_t i = 1; i < splitPattern.size(); i++) {
         finalRegex += "\\\\";
         finalRegex += splitPattern[i];
     }
@@ -530,7 +534,7 @@ void EventbridgeValidator::validate(const Metadata& metadata, const Data& data) 
 
 Metadata EventbridgeValidator::metadata() const {
     json config = json::object();
-    config["type"] = "eventbridge";
+    config["__type__"] = "eventbridge";
     config["schema"] = m_schema;
     return Metadata{std::move(config)};
 }
@@ -544,7 +548,6 @@ std::unique_ptr<ValidatorInterface> EventbridgeValidator::create(const Metadata&
     if(!schema.is_object()) {
         throw InvalidMetadata{"\"schema\" field in EventbridgeValidator configuration should be an object"};
     }
-
     return std::make_unique<EventbridgeValidator>(schema, matchJson(schema));
 }
 
