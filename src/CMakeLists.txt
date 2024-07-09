@@ -18,6 +18,7 @@ set (client-src-files
      PartitionSelector.cpp
      PartitionInfo.cpp
      Validator.cpp
+     EventbridgeValidator.cpp
      ThreadPool.cpp
      Event.cpp
      PrioPool.cpp)
