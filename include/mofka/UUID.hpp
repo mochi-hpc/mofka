@@ -10,6 +10,7 @@
 
 #include <stdexcept>
 #include <uuid/uuid.h>
+#include <cstdint>
 #include <string>
 #include <cstring>
 
