@@ -88,6 +88,7 @@ endif ()
 
 add_subdirectory (src)
 add_subdirectory (docs/_code)
+add_subdirectory (example)
 
 if (${ENABLE_TESTS})
     enable_testing ()
