@@ -9,8 +9,8 @@ spack:
   - spdlog
   - fmt
   - mochi-bedrock +python+mpi+flock
-  - mochi-warabi +bedrock
-  - mochi-yokan +bedrock
+  - mochi-warabi +bedrock+python
+  - mochi-yokan +bedrock+python
   - mochi-flock +python+bedrock+mpi
   - py-pybind11
   - py-mochi-margo
