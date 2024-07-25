@@ -32,7 +32,7 @@ static const json configSchema = R"(
             "properties": {
                 "ranks": { "type": "array", "minItems": 1, "uniqueItems": true,
                            "items": {"type":"integer", "minimum":0}},
-                "config": { "type": "object"}
+                "config": { "oneOf": [ {"type": "object"}, {"type": "array" } ] }
             },
             "required": ["ranks"]
         },
