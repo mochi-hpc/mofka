@@ -90,7 +90,7 @@ class TestConfigSpace(unittest.TestCase):
         config = space.sample_configuration()
         #print(config)
         config = BenchmarkSpec.from_config(config=config, num_events=100, address='ofi+tcp')
-        print(json.dumps(config, indent=4))
+        #print(json.dumps(config, indent=4))
 
 if __name__ == "__main__":
     unittest.main()
