@@ -81,12 +81,14 @@ class TestConfigSpace(unittest.TestCase):
     def test_benchmark_config_space(self):
         import json
         space = BenchmarkSpec.space(num_servers=2, num_producers=2, num_consumers=1,
+                                    num_data_storage_per_proc=(1,2),
+                                    num_metadata_db_per_proc=(1,3),
                                     num_pools_in_servers=(2,3), num_partitions=(1,3),
                                     metadata_key_sizes=8, metadata_val_sizes=16,
                                     metadata_num_fields=10)
-        print(space)
+        #print(space)
         config = space.sample_configuration()
-        print(config)
+        #print(config)
         config = BenchmarkSpec.from_config(config=config, num_events=100, address='ofi+tcp')
         print(json.dumps(config, indent=4))
 

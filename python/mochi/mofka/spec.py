@@ -30,10 +30,11 @@ class MofkaServiceSpec(ServiceSpec):
               master_db_needs_persistence: bool = False,
               metadata_db_needs_persistence: bool = False,
               data_storage_needs_persistence: bool = False,
-              num_pools: int|tuple[int,int] = 1,
+              num_pools_in_servers: int|tuple[int,int] = 1,
               **kwargs):
         import copy
-        max_num_pools = num_pools if isinstance(num_pools, int) else num_pools[1]
+        max_num_pools = num_pools_in_servers if isinstance(num_pools_in_servers, int) \
+                                             else num_pools_in_servers[1]
         # Master database provider
         master_db_cs = YokanProviderSpec.space(
             paths=[f'{p}/master' for p in master_db_path_prefixes],
@@ -73,13 +74,13 @@ class MofkaServiceSpec(ServiceSpec):
         ]
         # Process containing the master database
         main_proc_cs = ProcSpec.space(
-            num_pools=num_pools,
+            num_pools=num_pools_in_servers,
             provider_space_factories=provider_space_factories,
             **kwargs)
         # Processes not containing the master database
         del provider_space_factories[0] # delete master database provider
         secondary_proc_cs = ProcSpec.space(
-            num_pools=num_pools,
+            num_pools=num_pools_in_servers,
             provider_space_factories=provider_space_factories,
             **kwargs)
         # Service configuration space
@@ -133,25 +134,45 @@ class BenchmarkTopicPartitionSpec:
     @staticmethod
     def space(*,
               num_servers: int,
-              num_pools_in_servers: int|tuple[int,int]):
+              num_pools_in_servers: int|tuple[int,int] = 1,
+              num_metadata_db_per_proc: int|tuple[int,int] = 1,
+              num_data_storage_per_proc: int|tuple[int,int] = 1):
         from ConfigSpace import ConfigurationSpace, Categorical, Float, EqualsCondition
         from mochi.bedrock.spec import _CategoricalOrConst
+        # FIXME: because we can't add multiple conditions to the same parameters
+        # in different points of the code (https://github.com/automl/ConfigSpace/issues/380)
+        # we cannot constrain the pool_weight variables here. Their conditions are added in
+        # BenchmarkSpec.space instead.
         cs = ConfigurationSpace()
         cs.add(Categorical('rank', list(range(num_servers)), default=0))
         max_num_pools = num_pools_in_servers if isinstance(num_pools_in_servers, int) \
                                              else num_pools_in_servers[1]
+        # Create pool association weights
         for i in range(num_servers):
             for j in range(max_num_pools):
                 cs.add(Float(f'pool_weight[{i}][{j}]', (0.0, 1.0)))
-                # FIXME: because we can't add multiple conditions to the same parameters
-                # in different points of the code (https://github.com/automl/ConfigSpace/issues/380)
-                # we cannot constrain the pool weights as follows. We need to keep all the pool_weights
-                # and sample them even if many of them don't actually mean anything once we know the
-                # actual number of pools in each server, the actual number of servers, and partitions.
-                #
                 # cs.add(EqualsCondition(
                 #     cs[f'pool_weight[{i}][{j}]'],
                 #     cs[f'rank'], i))
+
+        # NOTE: Contrary to the pool, which has to be selected after the rank of the server
+        # is selected, for the metadata and data providers we select among all the available
+        # ones (i.e. we don't sample a server rank first).
+
+        # Create metadata provider association weights
+        max_num_metadata_dbs = num_metadata_db_per_proc if isinstance(num_metadata_db_per_proc, int) \
+                                                        else num_metadata_db_per_proc[1]
+        for i in range(num_servers):
+            for j in range(max_num_metadata_dbs):
+                cs.add(Float(f'metadata_provider_weight[{i}][{j}]', (0.0, 1.0)))
+
+        # Create data provider association weights
+        max_num_data_targets = num_data_storage_per_proc if isinstance(num_data_storage_per_proc, int) \
+                                                         else num_data_storage_per_proc[1]
+        for i in range(num_servers):
+            for j in range(max_num_data_targets):
+                cs.add(Float(f'data_provider_weight[{i}][{j}]', (0.0, 1.0)))
+
         return cs
 
     def from_config(*,
@@ -161,16 +182,47 @@ class BenchmarkTopicPartitionSpec:
         def get_from_config(key):
             return config[f'{prefix}{key}']
         rank = int(get_from_config('rank'))
-        i = 0
         pool_weights = []
-        while f'{prefix}pool_weight[{rank}][{i}]' in config:
-            pool_weights.append((get_from_config(f'pool_weight[{rank}][{i}]'),i))
-            i += 1
+        try:
+            # NOTE: we can't check if 'pool_weight[{rank}][{i}]' is in config
+            # because of this bug: https://github.com/automl/ConfigSpace/issues/383,
+            # we have to catch the KeyError exception to get out of the loop.
+            i = 0
+            while True:
+                pool_weights.append((get_from_config(f'pool_weight[{rank}][{i}]'),i))
+                i += 1
+        except KeyError:
+            pass
         pool_weights = sorted(pool_weights)
         pool_index = pool_weights[-1][1]
+
+        import re
+        metadata_provider_weights = []
+        for param in config:
+            if not param.startswith(f'{prefix}metadata_provider_weight'):
+                continue
+            match = re.search('metadata_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
+            rank = int(match[1])
+            index = int(match[2])
+            metadata_provider_weights.append((float(config[param]), f'metadata_{index}@{rank}'))
+        metadata_provider_weights = sorted(metadata_provider_weights)
+
+        data_provider_weights = []
+        for param in config:
+            if not param.startswith(f'{prefix}data_provider_weight'):
+                continue
+            match = re.search('data_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
+            rank = int(match[1])
+            index = int(match[2])
+            data_provider_weights.append((float(config[param]), f'data_{index}@{rank}'))
+        data_provider_weights = sorted(data_provider_weights)
+
         partition = {
             'rank': rank,
-            'pool': f'pool_{pool_index}'
+            'pool': f'pool_{pool_index}',
+            'type': 'default',
+            'metadata_provider': metadata_provider_weights[-1][1],
+            'data_provider': data_provider_weights[-1][1]
         }
         return partition
 
@@ -414,7 +466,7 @@ class BenchmarkSpec:
         cs = ConfigurationSpace()
         # Mofka service configuration space
         mofka_cs = MofkaServiceSpec.space(
-            num_pools=num_pools_in_servers,
+            num_pools_in_servers=num_pools_in_servers,
             num_procs=num_servers, **kwargs)
         cs.add_configuration_space(
             prefix='servers', delimiter='.',
@@ -465,6 +517,32 @@ class BenchmarkSpec:
                 cs.add(conditions[0])
             else:
                 cs.add(AndConjunction(*conditions))
+
+        # Add constraints on the metadata_provider_weight variables
+        import re
+        for param in cs:
+            if not '.metadata_provider_weight' in param:
+                  continue
+            match = re.search('metadata_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
+            rank = int(match[1])
+            index = int(match[2])
+            f = 'main[0]' if rank == 0 else f'secondary[{rank-1}]'
+            hp_num_metadata_dbs = cs[f'servers.processes.{f}.providers.metadata.count']
+            if index >= hp_num_metadata_dbs.lower:
+                cs.add(GreaterThanCondition(cs[param], hp_num_metadata_dbs, index))
+
+        # Add constraints on the data_provider_weight variables
+        import re
+        for param in cs:
+            if not '.data_provider_weight' in param:
+                  continue
+            match = re.search('data_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
+            rank = int(match[1])
+            index = int(match[2])
+            f = 'main[0]' if rank == 0 else f'secondary[{rank-1}]'
+            hp_num_data_targets = cs[f'servers.processes.{f}.providers.data.count']
+            if index >= hp_num_data_targets.lower:
+                cs.add(GreaterThanCondition(cs[param], hp_num_data_targets, index))
 
         # Consumers configuration space
         consumer_cs = BenchmarkConsumerSpec.space(
