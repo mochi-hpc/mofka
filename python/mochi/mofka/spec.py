@@ -128,10 +128,58 @@ class MofkaServiceSpec(ServiceSpec):
         return spec
 
 
+class BenchmarkTopicPartitionSpec:
+
+    @staticmethod
+    def space(*,
+              num_servers: int,
+              num_pools_in_servers: int|tuple[int,int]):
+        from ConfigSpace import ConfigurationSpace, Categorical, Float, EqualsCondition
+        from mochi.bedrock.spec import _CategoricalOrConst
+        cs = ConfigurationSpace()
+        cs.add(Categorical('rank', list(range(num_servers)), default=0))
+        max_num_pools = num_pools_in_servers if isinstance(num_pools_in_servers, int) \
+                                             else num_pools_in_servers[1]
+        for i in range(num_servers):
+            for j in range(max_num_pools):
+                cs.add(Float(f'pool_weight[{i}][{j}]', (0.0, 1.0)))
+                # FIXME: because we can't add multiple conditions to the same parameters
+                # in different points of the code (https://github.com/automl/ConfigSpace/issues/380)
+                # we cannot constrain the pool weights as follows. We need to keep all the pool_weights
+                # and sample them even if many of them don't actually mean anything once we know the
+                # actual number of pools in each server, the actual number of servers, and partitions.
+                #
+                # cs.add(EqualsCondition(
+                #     cs[f'pool_weight[{i}][{j}]'],
+                #     cs[f'rank'], i))
+        return cs
+
+    def from_config(*,
+                    config: 'Configuration',
+                    prefix: str = '',
+                    **kwargs):
+        def get_from_config(key):
+            return config[f'{prefix}{key}']
+        rank = int(get_from_config('rank'))
+        i = 0
+        pool_weights = []
+        while f'{prefix}pool_weight[{rank}][{i}]' in config:
+            pool_weights.append((get_from_config(f'pool_weight[{rank}][{i}]'),i))
+            i += 1
+        pool_weights = sorted(pool_weights)
+        pool_index = pool_weights[-1][1]
+        partition = {
+            'rank': rank,
+            'pool': f'pool_{pool_index}'
+        }
+        return partition
+
+
 class BenchmarkTopicSpec:
 
     @staticmethod
     def space(*,
+              num_partitions: int|tuple[int,int] = 1,
               metadata_num_fields: int|tuple[int,int]|list[int|tuple[int,int]],
               metadata_key_sizes: int|tuple[int,int]|list[int|tuple[int,int]],
               metadata_val_sizes: int|tuple[int,int]|list[int|tuple[int,int]],
@@ -141,7 +189,7 @@ class BenchmarkTopicSpec:
               partition_selector: list[str] = ['default'],
               serializer: list[str] = ['default', 'property_list_serialized'],
               **kwargs):
-        from ConfigSpace import ConfigurationSpace, Constant, Categorical
+        from ConfigSpace import ConfigurationSpace, Constant, Categorical, GreaterThanCondition
         from mochi.bedrock.spec import _IntegerOrConst, _CategoricalOrConst
         cs = ConfigurationSpace()
         if isinstance(metadata_num_fields, list):
@@ -175,15 +223,36 @@ class BenchmarkTopicSpec:
                                    default=partition_selector[0]))
         cs.add(_CategoricalOrConst('serialized', serializer,
                                    default=serializer[0]))
+        cs.add(_IntegerOrConst('num_partitions', num_partitions))
+        min_num_partitions = num_partitions if isinstance(num_partitions, int) else num_partitions[0]
+        max_num_partitions = num_partitions if isinstance(num_partitions, int) else num_partitions[1]
+        for i in range(max_num_partitions):
+            partition_cs = BenchmarkTopicPartitionSpec.space(**kwargs)
+            cs.add_configuration_space(
+                prefix=f'partition[{i}]', delimiter='.',
+                configuration_space=partition_cs)
+            # FIXME: see comment in BenchmarkTopicPartitionSpec.space
+            #
+            # if i <= min_num_partitions:
+            #     continue
+            # for param in partition_cs:
+            #     cs.add(GreaterThanCondition(
+            #         cs[f'partition[{i}].{param}'],
+            #         cs['num_partitions'], i))
+
         return cs
 
     @staticmethod
     def from_config(config: 'Configuration', prefix: str = '', **kwargs):
         topic = {'name': kwargs.get('topic_name', 'benchmark')}
         for param in config:
-            if not param.startswith(prefix):
+            if not param.startswith(prefix) or 'partition' in param:
                 continue
             topic[param[len(prefix):]] = config[param]
+        topic['partitions'] = [
+            BenchmarkTopicPartitionSpec.from_config(
+                config=config, prefix=f'{prefix}partition[{i}].',
+                **kwargs) for i in range(int(config[f'{prefix}num_partitions'])) ]
         return topic
 
 
@@ -338,8 +407,10 @@ class BenchmarkSpec:
               num_producers: int = 1,
               num_consumers: int = 0,
               num_pools_in_servers: int|tuple[int,int] = 1,
+              num_partitions: int|tuple[int,int] = 1,
               **kwargs):
-        from ConfigSpace import ConfigurationSpace, Constant
+        from ConfigSpace import ConfigurationSpace, Constant, AndConjunction, \
+                                EqualsCondition, GreaterThanCondition
         cs = ConfigurationSpace()
         # Mofka service configuration space
         mofka_cs = MofkaServiceSpec.space(
@@ -349,12 +420,55 @@ class BenchmarkSpec:
             prefix='servers', delimiter='.',
             configuration_space=mofka_cs)
         # Producers configuration space
-        producer_cs = BenchmarkProducerSpec.space(num_producers=num_producers, **kwargs)
+        producer_cs = BenchmarkProducerSpec.space(
+            num_servers=num_servers,
+            num_pools_in_servers=num_pools_in_servers,
+            num_producers=num_producers,
+            num_partitions=num_partitions, **kwargs)
         cs.add_configuration_space(
             prefix='producers', delimiter='.',
             configuration_space=producer_cs)
+        # Add constraints on the pool_weights of topic partitions
+        # Note: we add them here because we don't have access to
+        # the number of pools in each server and to the number of
+        # partitions in BenchmarkTopicPartitionSpec.
+        hp_num_partitions = cs['producers.topic.num_partitions']
+        import itertools
+        max_num_partitions = num_partitions if isinstance(num_partitions, int) \
+                                            else num_partitions[1]
+        max_num_pools = num_pools_in_servers if isinstance(num_pools_in_servers, int) \
+                                             else num_pools_in_servers[1]
+        for p, r, i in itertools.product(
+                range(max_num_partitions),
+                range(num_servers),
+                range(max_num_pools)):
+            rank_param = f'producers.topic.partition[{p}].rank'
+            hp_rank = cs[rank_param]
+            f = 'main[0]' if r == 0 else f'secondary[{r-1}]'
+            num_pools_param = f'servers.processes.{f}.margo.argobots.num_pools'
+            hp_num_pools =  cs[num_pools_param]
+            pool_weight_param = f'producers.topic.partition[{p}].pool_weight[{r}][{i}]'
+            hp_pool_weight = cs[pool_weight_param]
+            conditions = [
+                # partition[p].pool_weight[r][i] exists only if rank == r
+                EqualsCondition(hp_pool_weight, hp_rank, r)
+            ]
+            if i >= hp_num_pools.lower:
+                conditions.append(
+                    # partition[p].pool_weight[r][i] exists if num_pools > i on this server
+                    GreaterThanCondition(hp_pool_weight, hp_num_pools, i))
+            if p >= hp_num_partitions.lower:
+                conditions.append(
+                    # partition[p].pool_weight[r][i] exists if num_partitions > p
+                    GreaterThanCondition(hp_pool_weight, hp_num_partitions, p))
+            if len(conditions) == 1:
+                cs.add(conditions[0])
+            else:
+                cs.add(AndConjunction(*conditions))
+
         # Consumers configuration space
-        consumer_cs = BenchmarkConsumerSpec.space(num_consumers=num_consumers, **kwargs)
+        consumer_cs = BenchmarkConsumerSpec.space(
+            num_consumers=num_consumers, **kwargs)
         cs.add_configuration_space(
             prefix='consumers', delimiter='.',
             configuration_space=consumer_cs)
@@ -377,7 +491,10 @@ class BenchmarkSpec:
             process_config['__if__'] = f'$MPI_COMM_WORLD.rank == {rank}'
         # producers configuration
         c['producers'] = BenchmarkProducerSpec.from_config(
-            config=config, prefix=f'{prefix}producers.', rank_offset=num_servers, **kwargs)
+            config=config, prefix=f'{prefix}producers.',
+            rank_offset=num_servers,
+            num_pools_in_server=[len(p.margo.argobots.pools) for p in mofka_spec.processes],
+            **kwargs)
         num_producers = len(c['producers']['ranks'])
         # consumers configuration
         c['consumers'] = BenchmarkConsumerSpec.from_config(
