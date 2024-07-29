@@ -21,7 +21,7 @@ from mochi.warabi.spec import WarabiProviderSpec
 class MofkaServiceSpec(ServiceSpec):
 
     @staticmethod
-    def space(*, num_procs: int = 1,
+    def space(*, num_servers: int = 1,
               num_metadata_db_per_proc: int|tuple[int,int] = 1,
               num_data_storage_per_proc: int|tuple[int,int] = 1,
               master_db_path_prefixes: list[str] = ['/tmp/mofka'],
@@ -93,7 +93,7 @@ class MofkaServiceSpec(ServiceSpec):
             {
                 'family': 'secondary',
                 'space' : secondary_proc_cs,
-                'count' : num_procs-1
+                'count' : num_servers-1
             }
         ]
         mofka_cs = ServiceSpec.space(process_space_factories=process_space_factories)
@@ -466,8 +466,8 @@ class BenchmarkSpec:
         cs = ConfigurationSpace()
         # Mofka service configuration space
         mofka_cs = MofkaServiceSpec.space(
-            num_pools_in_servers=num_pools_in_servers,
-            num_procs=num_servers, **kwargs)
+            num_servers=num_servers,
+            num_pools_in_servers=num_pools_in_servers, **kwargs)
         cs.add_configuration_space(
             prefix='servers', delimiter='.',
             configuration_space=mofka_cs)
@@ -584,5 +584,3 @@ class BenchmarkSpec:
             'simultaneous': kwargs.get('simultaneous_producer_and_consumer', False)
         }
         return c
-
-
