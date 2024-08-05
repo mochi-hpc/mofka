@@ -31,6 +31,7 @@ class MofkaServiceSpec(ServiceSpec):
               metadata_db_needs_persistence: bool = False,
               data_storage_needs_persistence: bool = False,
               num_pools_in_servers: int|tuple[int,int] = 1,
+              num_xstreams_in_servers: int|tuple[int,int] = 1,
               **kwargs):
         import copy
         max_num_pools = num_pools_in_servers if isinstance(num_pools_in_servers, int) \
@@ -75,12 +76,14 @@ class MofkaServiceSpec(ServiceSpec):
         # Process containing the master database
         main_proc_cs = ProcSpec.space(
             num_pools=num_pools_in_servers,
+            num_xstreams=num_xstreams_in_servers,
             provider_space_factories=provider_space_factories,
             **kwargs)
         # Processes not containing the master database
         del provider_space_factories[0] # delete master database provider
         secondary_proc_cs = ProcSpec.space(
             num_pools=num_pools_in_servers,
+            num_xstreams=num_xstreams_in_servers,
             provider_space_factories=provider_space_factories,
             **kwargs)
         # Service configuration space
@@ -119,7 +122,7 @@ class MofkaServiceSpec(ServiceSpec):
                         'bootstrap': 'mpi',
                         'file': kwargs.get('flock_group_file', 'mofka.flock.json'),
                         'group': { 'type': 'static' }
-                    })
+                        })
             for p in proc.providers:
                 if p.type == 'yokan' and 'path' in p.config:
                     p.config['path'] = p.config['path'] + '_' + str(uuid.uuid4())[:6]
@@ -136,13 +139,14 @@ class BenchmarkTopicPartitionSpec:
               num_servers: int,
               num_pools_in_servers: int|tuple[int,int] = 1,
               num_metadata_db_per_proc: int|tuple[int,int] = 1,
-              num_data_storage_per_proc: int|tuple[int,int] = 1):
-        from ConfigSpace import ConfigurationSpace, Categorical, Float, EqualsCondition
-        from mochi.bedrock.spec import _CategoricalOrConst
-        # FIXME: because we can't add multiple conditions to the same parameters
-        # in different points of the code (https://github.com/automl/ConfigSpace/issues/380)
-        # we cannot constrain the pool_weight variables here. Their conditions are added in
-        # BenchmarkSpec.space instead.
+              num_data_storage_per_proc: int|tuple[int,int] = 1,
+              **kwargs):
+        from mochi.bedrock.config_space import (
+                CategoricalOrConst,
+                ConfigurationSpace,
+                Categorical,
+                Float,
+                EqualsCondition)
         cs = ConfigurationSpace()
         cs.add(Categorical('rank', list(range(num_servers)), default=0))
         max_num_pools = num_pools_in_servers if isinstance(num_pools_in_servers, int) \
@@ -151,9 +155,9 @@ class BenchmarkTopicPartitionSpec:
         for i in range(num_servers):
             for j in range(max_num_pools):
                 cs.add(Float(f'pool_weight[{i}][{j}]', (0.0, 1.0)))
-                # cs.add(EqualsCondition(
-                #     cs[f'pool_weight[{i}][{j}]'],
-                #     cs[f'rank'], i))
+                cs.add(EqualsCondition(
+                    cs[f'pool_weight[{i}][{j}]'],
+                    cs[f'rank'], i))
 
         # NOTE: Contrary to the pool, which has to be selected after the rank of the server
         # is selected, for the metadata and data providers we select among all the available
@@ -183,16 +187,10 @@ class BenchmarkTopicPartitionSpec:
             return config[f'{prefix}{key}']
         rank = int(get_from_config('rank'))
         pool_weights = []
-        try:
-            # NOTE: we can't check if 'pool_weight[{rank}][{i}]' is in config
-            # because of this bug: https://github.com/automl/ConfigSpace/issues/383,
-            # we have to catch the KeyError exception to get out of the loop.
-            i = 0
-            while True:
-                pool_weights.append((get_from_config(f'pool_weight[{rank}][{i}]'),i))
-                i += 1
-        except KeyError:
-            pass
+        i = 0
+        while f'{prefix}pool_weight[{rank}][{i}]' in config:
+            pool_weights.append((get_from_config(f'pool_weight[{rank}][{i}]'),i))
+            i += 1
         pool_weights = sorted(pool_weights)
         pool_index = pool_weights[-1][1]
 
@@ -202,9 +200,9 @@ class BenchmarkTopicPartitionSpec:
             if not param.startswith(f'{prefix}metadata_provider_weight'):
                 continue
             match = re.search('metadata_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
-            rank = int(match[1])
+            server = int(match[1])
             index = int(match[2])
-            metadata_provider_weights.append((float(config[param]), f'metadata_{index}@{rank}'))
+            metadata_provider_weights.append((float(config[param]), f'metadata_{index}@{server}'))
         metadata_provider_weights = sorted(metadata_provider_weights)
 
         data_provider_weights = []
@@ -212,14 +210,14 @@ class BenchmarkTopicPartitionSpec:
             if not param.startswith(f'{prefix}data_provider_weight'):
                 continue
             match = re.search('data_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
-            rank = int(match[1])
+            server = int(match[1])
             index = int(match[2])
-            data_provider_weights.append((float(config[param]), f'data_{index}@{rank}'))
+            data_provider_weights.append((float(config[param]), f'data_{index}@{server}'))
         data_provider_weights = sorted(data_provider_weights)
 
         partition = {
             'rank': rank,
-            'pool': f'pool_{pool_index}',
+            'pool': '__primary__' if pool_index == 0 else f'__pool_{pool_index}__',
             'type': 'default',
             'metadata_provider': metadata_provider_weights[-1][1],
             'data_provider': data_provider_weights[-1][1]
@@ -232,17 +230,22 @@ class BenchmarkTopicSpec:
     @staticmethod
     def space(*,
               num_partitions: int|tuple[int,int] = 1,
-              metadata_num_fields: int|tuple[int,int]|list[int|tuple[int,int]],
-              metadata_key_sizes: int|tuple[int,int]|list[int|tuple[int,int]],
-              metadata_val_sizes: int|tuple[int,int]|list[int|tuple[int,int]],
+              metadata_num_fields: int|tuple[int,int]|list[int|tuple[int,int]] = 8,
+              metadata_key_sizes: int|tuple[int,int]|list[int|tuple[int,int]] = 8,
+              metadata_val_sizes: int|tuple[int,int]|list[int|tuple[int,int]] = 16,
               data_num_blocks: int|tuple[int,int]|list[int|tuple[int,int]] = 0,
               data_total_size: int|tuple[int,int]|list[int|tuple[int,int]] = 0,
               validator: list[str] = ['default', 'schema'],
               partition_selector: list[str] = ['default'],
               serializer: list[str] = ['default', 'property_list_serialized'],
               **kwargs):
-        from ConfigSpace import ConfigurationSpace, Constant, Categorical, GreaterThanCondition
-        from mochi.bedrock.spec import _IntegerOrConst, _CategoricalOrConst
+        from mochi.bedrock.config_space import (
+                ConfigurationSpace,
+                Constant,
+                Categorical,
+                GreaterThanCondition,
+                IntegerOrConst,
+                CategoricalOrConst)
         cs = ConfigurationSpace()
         if isinstance(metadata_num_fields, list):
             cs.add(Categorical('metadata.num_fields', metadata_num_fields,
@@ -269,13 +272,13 @@ class BenchmarkTopicSpec:
                                default=data_total_size[0]))
         else:
             cs.add(Constant('data.total_size', data_total_size))
-        cs.add(_CategoricalOrConst('validator', validator,
+        cs.add(CategoricalOrConst('validator', validator,
                                    default=validator[0]))
-        cs.add(_CategoricalOrConst('partition_selector', partition_selector,
+        cs.add(CategoricalOrConst('partition_selector', partition_selector,
                                    default=partition_selector[0]))
-        cs.add(_CategoricalOrConst('serialized', serializer,
+        cs.add(CategoricalOrConst('serialized', serializer,
                                    default=serializer[0]))
-        cs.add(_IntegerOrConst('num_partitions', num_partitions))
+        cs.add(IntegerOrConst('num_partitions', num_partitions))
         min_num_partitions = num_partitions if isinstance(num_partitions, int) else num_partitions[0]
         max_num_partitions = num_partitions if isinstance(num_partitions, int) else num_partitions[1]
         for i in range(max_num_partitions):
@@ -283,14 +286,12 @@ class BenchmarkTopicSpec:
             cs.add_configuration_space(
                 prefix=f'partition[{i}]', delimiter='.',
                 configuration_space=partition_cs)
-            # FIXME: see comment in BenchmarkTopicPartitionSpec.space
-            #
-            # if i <= min_num_partitions:
-            #     continue
-            # for param in partition_cs:
-            #     cs.add(GreaterThanCondition(
-            #         cs[f'partition[{i}].{param}'],
-            #         cs['num_partitions'], i))
+            if i <= min_num_partitions:
+                continue
+            for param in partition_cs:
+                cs.add(GreaterThanCondition(
+                    cs[f'partition[{i}].{param}'],
+                    cs['num_partitions'], i))
 
         return cs
 
@@ -327,27 +328,32 @@ class BenchmarkProducerSpec:
               producer_flush_every_min: int|tuple[int,int] = 1,
               producer_flush_every_max: int|tuple[int,int] = 1,
               **kwargs):
-        from ConfigSpace import Constant, ConfigurationSpace,  EqualsCondition, ForbiddenGreaterThanRelation
-        from mochi.bedrock.spec import _IntegerOrConst, _CategoricalOrConst
+        from mochi.bedrock.config_space import (
+                Constant,
+                ConfigurationSpace,
+                EqualsCondition,
+                ForbiddenGreaterThanRelation,
+                IntegerOrConst,
+                CategoricalOrConst)
         cs = ConfigurationSpace()
         cs.add(Constant('count', num_producers))
-        cs.add(_IntegerOrConst('batch_size', producer_batch_size))
-        cs.add(_CategoricalOrConst('adaptive_batch_size', producer_adaptive_batch_size))
+        cs.add(IntegerOrConst('batch_size', producer_batch_size))
+        cs.add(CategoricalOrConst('adaptive_batch_size', producer_adaptive_batch_size))
         cs.add(EqualsCondition(cs['batch_size'], cs['adaptive_batch_size'], False))
-        cs.add(_CategoricalOrConst('ordering', producer_ordering))
-        cs.add(_IntegerOrConst('thread_count', producer_thread_count))
-        cs.add(_IntegerOrConst('burst_size_min', producer_burst_size_min))
-        cs.add(_IntegerOrConst('burst_size_max', producer_burst_size_max))
+        cs.add(CategoricalOrConst('ordering', producer_ordering))
+        cs.add(IntegerOrConst('thread_count', producer_thread_count))
+        cs.add(IntegerOrConst('burst_size_min', producer_burst_size_min))
+        cs.add(IntegerOrConst('burst_size_max', producer_burst_size_max))
         cs.add(ForbiddenGreaterThanRelation(cs['burst_size_min'], cs['burst_size_max']))
-        cs.add(_IntegerOrConst('wait_between_events_ms_min', producer_wait_between_events_ms_min))
-        cs.add(_IntegerOrConst('wait_between_events_ms_max', producer_wait_between_events_ms_max))
+        cs.add(IntegerOrConst('wait_between_events_ms_min', producer_wait_between_events_ms_min))
+        cs.add(IntegerOrConst('wait_between_events_ms_max', producer_wait_between_events_ms_max))
         cs.add(ForbiddenGreaterThanRelation(cs['wait_between_events_ms_min'], cs['wait_between_events_ms_max']))
-        cs.add(_IntegerOrConst('wait_between_bursts_ms_min', producer_wait_between_bursts_ms_min))
-        cs.add(_IntegerOrConst('wait_between_bursts_ms_max', producer_wait_between_bursts_ms_max))
+        cs.add(IntegerOrConst('wait_between_bursts_ms_min', producer_wait_between_bursts_ms_min))
+        cs.add(IntegerOrConst('wait_between_bursts_ms_max', producer_wait_between_bursts_ms_max))
         cs.add(ForbiddenGreaterThanRelation(cs['wait_between_bursts_ms_min'], cs['wait_between_bursts_ms_max']))
-        cs.add(_CategoricalOrConst('flush_between_bursts', producer_flush_between_bursts))
-        cs.add(_IntegerOrConst('flush_every_min', producer_flush_every_min))
-        cs.add(_IntegerOrConst('flush_every_max', producer_flush_every_max))
+        cs.add(CategoricalOrConst('flush_between_bursts', producer_flush_between_bursts))
+        cs.add(IntegerOrConst('flush_every_min', producer_flush_every_min))
+        cs.add(IntegerOrConst('flush_every_max', producer_flush_every_max))
         cs.add(ForbiddenGreaterThanRelation(cs['flush_every_min'], cs['flush_every_max']))
         topic_cs = BenchmarkTopicSpec.space(**kwargs)
         cs.add_configuration_space(
@@ -402,24 +408,30 @@ class BenchmarkConsumerSpec:
               consumer_data_broker_num_blocks_min: int|tuple[int,int] = 1,
               consumer_data_broker_num_blocks_max: int|tuple[int,int] = 1,
               **kwargs):
-        from ConfigSpace import Constant, ConfigurationSpace,  EqualsCondition, ForbiddenGreaterThanRelation
-        from mochi.bedrock.spec import _IntegerOrConst, _CategoricalOrConst, _FloatOrConst
+        from mochi.bedrock.config_space import (
+                Constant,
+                ConfigurationSpace,
+                EqualsCondition,
+                ForbiddenGreaterThanRelation,
+                IntegerOrConst,
+                CategoricalOrConst,
+                FloatOrConst)
         cs = ConfigurationSpace()
         cs.add(Constant('count', num_consumers))
         if num_consumers == 0:
             return cs
-        cs.add(_IntegerOrConst('batch_size', consumer_batch_size))
-        cs.add(_CategoricalOrConst('adaptive_batch_size', consumer_adaptive_batch_size))
-        cs.add(_CategoricalOrConst('check_data', consumer_check_data))
+        cs.add(IntegerOrConst('batch_size', consumer_batch_size))
+        cs.add(CategoricalOrConst('adaptive_batch_size', consumer_adaptive_batch_size))
+        cs.add(CategoricalOrConst('check_data', consumer_check_data))
         cs.add(EqualsCondition(cs['batch_size'], cs['adaptive_batch_size'], False))
-        cs.add(_IntegerOrConst('thread_count', consumer_thread_count))
-        cs.add(_FloatOrConst('data_selector.selectivity', consumer_data_selector_selectivity))
-        cs.add(_FloatOrConst('data_selector_proportion_min', consumer_data_selector_proportion_min))
-        cs.add(_FloatOrConst('data_selector_proportion_max', consumer_data_selector_proportion_max))
+        cs.add(IntegerOrConst('thread_count', consumer_thread_count))
+        cs.add(FloatOrConst('data_selector.selectivity', consumer_data_selector_selectivity))
+        cs.add(FloatOrConst('data_selector_proportion_min', consumer_data_selector_proportion_min))
+        cs.add(FloatOrConst('data_selector_proportion_max', consumer_data_selector_proportion_max))
         cs.add(ForbiddenGreaterThanRelation(
             cs['data_selector_proportion_min'], cs['data_selector_proportion_min']))
-        cs.add(_IntegerOrConst('data_broker_num_blocks_min', consumer_data_broker_num_blocks_min))
-        cs.add(_IntegerOrConst('data_broker_num_blocks_max', consumer_data_broker_num_blocks_min))
+        cs.add(IntegerOrConst('data_broker_num_blocks_min', consumer_data_broker_num_blocks_min))
+        cs.add(IntegerOrConst('data_broker_num_blocks_max', consumer_data_broker_num_blocks_min))
         cs.add(ForbiddenGreaterThanRelation(
             cs['data_broker_num_blocks_min'], cs['data_broker_num_blocks_min']))
         return cs
@@ -461,8 +473,12 @@ class BenchmarkSpec:
               num_pools_in_servers: int|tuple[int,int] = 1,
               num_partitions: int|tuple[int,int] = 1,
               **kwargs):
-        from ConfigSpace import ConfigurationSpace, Constant, AndConjunction, \
-                                EqualsCondition, GreaterThanCondition
+        from mochi.bedrock.config_space import (
+                ConfigurationSpace,
+                Constant,
+                AndConjunction,
+                EqualsCondition,
+                GreaterThanCondition)
         cs = ConfigurationSpace()
         # Mofka service configuration space
         mofka_cs = MofkaServiceSpec.space(
@@ -527,7 +543,7 @@ class BenchmarkSpec:
             rank = int(match[1])
             index = int(match[2])
             f = 'main[0]' if rank == 0 else f'secondary[{rank-1}]'
-            hp_num_metadata_dbs = cs[f'servers.processes.{f}.providers.metadata.count']
+            hp_num_metadata_dbs = cs[f'servers.processes.{f}.providers.metadata.num_providers']
             if index >= hp_num_metadata_dbs.lower:
                 cs.add(GreaterThanCondition(cs[param], hp_num_metadata_dbs, index))
 
@@ -540,7 +556,7 @@ class BenchmarkSpec:
             rank = int(match[1])
             index = int(match[2])
             f = 'main[0]' if rank == 0 else f'secondary[{rank-1}]'
-            hp_num_data_targets = cs[f'servers.processes.{f}.providers.data.count']
+            hp_num_data_targets = cs[f'servers.processes.{f}.providers.data.num_providers']
             if index >= hp_num_data_targets.lower:
                 cs.add(GreaterThanCondition(cs[param], hp_num_data_targets, index))
 
@@ -559,6 +575,12 @@ class BenchmarkSpec:
         mofka_spec = MofkaServiceSpec.from_config(
             config=config, prefix=f'{prefix}servers.', **kwargs)
         num_servers = len(mofka_spec.processes)
+        # add mpi_ranks to flock providers
+        for proc in mofka_spec.processes:
+            for provider in proc.providers:
+                if provider.type != 'flock':
+                    continue
+                provider.config['mpi_ranks'] = list(range(num_servers))
         c = {}
         c['address'] = kwargs['address']
         c['servers'] = {

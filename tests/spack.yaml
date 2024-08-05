@@ -16,6 +16,7 @@ spack:
   - py-coverage
   - py-pybind11
   - py-mochi-margo
+  - py-configspace
   concretizer:
     unify: true
     reuse: true
@@ -43,6 +44,8 @@ spack:
       require: "fabrics=tcp,rxm"
     nlohmann-json-schema-validator:
       require: "@2.3.0:"
+    py-configspace:
+      require: "@1.1.4:"
   mirrors:
     mochi-buildcache:
       url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache

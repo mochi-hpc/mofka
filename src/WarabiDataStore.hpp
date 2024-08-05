@@ -64,11 +64,15 @@ class WarabiDataStore {
         /* transfer size of each region */
         sizesBulk << remoteBulk.handle.on(source)(remoteBulk.offset, dataOffset);
 
-        /* forward data as region into Warabi */
+        /* forward data as region into Warabi, if size > 0 */
         warabi::RegionID region_id;
-        m_target.createAndWrite(
-            &region_id, remoteBulk.handle, remoteBulk.address,
-            remoteBulk.offset + dataOffset, remoteBulk.size - dataOffset, true);
+        if(remoteBulk.size - dataOffset > 0) {
+            m_target.createAndWrite(
+                &region_id, remoteBulk.handle, remoteBulk.address,
+                remoteBulk.offset + dataOffset, remoteBulk.size - dataOffset, true);
+        } else {
+            memset(region_id.data(), 0, region_id.size());
+        }
 
         /* update the result vector */
         WarabiDataDescriptor wdescriptor{0, region_id};
@@ -109,6 +113,7 @@ class WarabiDataStore {
             const auto region         = descriptor->region_id;
             const auto offsetInRegion = descriptor->offset;
             const auto size           = descriptors[i].size();
+            if(size == 0) continue;
             m_target.read(region, {{offsetInRegion, size}},
                           remoteBulk.handle,
                           remoteBulk.address,
@@ -119,6 +124,7 @@ class WarabiDataStore {
 
         // wait for all the requests
         for(size_t i = 0; i < requests.size(); ++i) {
+            if(!requests[i]) continue;
             try {
                 requests[i].wait();
             } catch(const warabi::Exception& ex) {

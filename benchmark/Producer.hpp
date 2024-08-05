@@ -205,21 +205,21 @@ class BenchmarkProducer {
             if(max_flush_every != 0) {
                 next_flush -= 1;
                 if(next_flush == 0) {
-                    spdlog::trace("[poducer] Random flush");
+                    spdlog::trace("[producer] Random flush");
                     next_flush = flush_every_dist(rng);
                     t1 = MPI_Wtime();
                     m_mofka_producer.flush();
                     active_data.clear();
                     t2 = MPI_Wtime();
                     m_flush_stats << (t2 - t1);
-                    spdlog::trace("[poducer] Done with random flush");
+                    spdlog::trace("[producer] Done with random flush");
                 }
             }
         }
-        spdlog::trace("[poducer] Last flush");
+        spdlog::trace("[producer] Last flush");
         m_mofka_producer.flush();
         active_data.clear();
-        spdlog::trace("[poducer] Done with last flush");
+        spdlog::trace("[producer] Done with last flush");
         double t_end = MPI_Wtime();
         spdlog::info("[producer] Local producer finished in {} seconds", (t_end - t_start));
         m_comm.barrier();

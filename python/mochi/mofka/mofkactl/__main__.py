@@ -12,6 +12,12 @@ app.add_typer(topic_app, name="topic", help="Manipulate topics in a service")
 from .partition import app as partition_app
 app.add_typer(partition_app, name="partition", help="Manipulate partitions")
 
+from .config import app as config_app
+app.add_typer(config_app, name="config", help="Generate (random) initial Mofka configurations")
+
+from .benchmark import app as benchmark_app
+app.add_typer(benchmark_app, name="benchmark", help="Generate (random) Benchmark configurations")
+
 
 if __name__ == "__main__":
     app()

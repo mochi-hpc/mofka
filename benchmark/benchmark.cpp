@@ -15,6 +15,7 @@
 #include <iostream>
 #include <chrono>
 #include <random>
+#include <spdlog/spdlog.h>
 #include <mpi.h>
 
 MOFKA_REGISTER_SERIALIZER(property_list_serializer, PropertyListSerializer);
@@ -103,7 +104,7 @@ static const json configSchema = R"(
                                      "items": {"type":"integer", "minimum": 0}}
                                 ]},
                                 "total_size": { "oneOf": [
-                                    {"type": "integer", "minimum": 1},
+                                    {"type": "integer", "minimum": 0},
                                     {"type": "array", "minItems":2, "maxItems":2,
                                      "items": {"type":"integer", "minimum": 1}}
                                 ]}
@@ -204,6 +205,8 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
+    spdlog::set_level(spdlog::level::from_str("trace"));
+
     int provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
     if(provided != MPI_THREAD_SERIALIZED) {
@@ -239,7 +242,7 @@ int main(int argc, char** argv) {
         mofka::JsonValidator validator{configSchema};
         auto errors = validator.validate(config);
         if(!errors.empty()) {
-            std::cerr << "Invalid configuration:\n";
+            std::cerr << "Invalid configuration: ";
             for(auto& err : errors) std::cerr << err << "\n";
             MPI_Abort(MPI_COMM_WORLD, -1);
             return 0;
@@ -297,12 +300,15 @@ int main(int argc, char** argv) {
     std::shared_ptr<BenchmarkProducer> producer;
     std::shared_ptr<BenchmarkConsumer> consumer;
 
+    auto server_config = std::string{"{}"};
     if(is_server) {
-        auto server_config = config["servers"].contains("config") ?
-            config["servers"]["config"].dump() : std::string{"{}"};
-        server = std::make_shared<bedrock::Server>(address, server_config);
+        if(config["servers"].contains("config")) {
+            auto& cfg = config["servers"]["config"];
+            if(cfg.is_object()) server_config = cfg.dump();
+            else server_config = cfg[comm_rank].dump();
+        }
     } else {
-        auto server_config = R"({
+        server_config = R"({
             "margo": {
                 "use_progress_thread": true,
                 "monitoring": {
@@ -318,12 +324,14 @@ int main(int argc, char** argv) {
                 }
             }
         })";
-        server = std::make_shared<bedrock::Server>(address, server_config);
     }
+    server = std::make_shared<bedrock::Server>(address, server_config);
 
     // register a warmup RPC
     auto engine = server->getMargoManager().getThalliumEngine();
-    auto warmup = engine.define("warmup", std::function{[](const thallium::request& req){ req.respond(0); }});
+    auto warmup = engine.define("warmup", std::function{[](const thallium::request& req){
+        req.respond();
+    }});
 
     server->getMargoManager().addPool(
         R"({"name":"__mpi_pool__", "kind":"fifo_wait", "access":"mpmc"})");
