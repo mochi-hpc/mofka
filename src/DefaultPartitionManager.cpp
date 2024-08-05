@@ -70,7 +70,6 @@ Result<void> DefaultPartitionManager::feedConsumer(
             m_consumer_cursor[consumerHandle.name()] = 0;
         first_id = m_consumer_cursor[consumerHandle.name()];
     }
-
     m_event_store->feed(consumerHandle, first_id, batchSize);
 
     return result;

@@ -154,8 +154,9 @@ class ActiveProducerBatchQueue {
             }
             last_batch->push(metadata, serializer, data, std::move(promise));
         }
-        if(need_notification)
+        if(need_notification) {
             m_cv.notify_one();
+        }
     }
 
     void stop() {
@@ -179,8 +180,8 @@ class ActiveProducerBatchQueue {
         {
             std::unique_lock<thallium::mutex> guard{m_mutex};
             m_request_flush = true;
+            m_cv.wait(guard, [this]() { return m_batch_queue.empty(); });
         }
-        m_cv.notify_one();
     }
 
     private:
@@ -198,7 +199,10 @@ class ActiveProducerBatchQueue {
                 return false;
             });
             if(m_batch_queue.empty()) {
-                m_request_flush = false;
+                if(m_request_flush) {
+                    m_request_flush = false;
+                    m_cv.notify_one();
+                }
                 continue;
             }
             auto batch = m_batch_queue.front();
@@ -206,7 +210,6 @@ class ActiveProducerBatchQueue {
             guard.unlock();
             sendBatch(batch);
             guard.lock();
-            m_request_flush = false;
         }
         m_running = false;
         m_terminated.set_value();
@@ -232,10 +235,11 @@ class ActiveProducerBatchQueue {
                 batch->count(),
                 BulkRef{metadata_content, 0, batch->metadataBulkSize(), self_addr},
                 BulkRef{data_content, 0, batch->dataBulkSize(), self_addr});
-            if(result.success())
+            if(result.success()) {
                 batch->setPromises(result.value());
-            else
+            } else {
                 batch->setPromises(Exception{result.error()});
+            }
         } catch(const std::exception& ex) {
             batch->setPromises(
                 Exception{fmt::format("Unexpected error when sending batch: {}", ex.what())});
