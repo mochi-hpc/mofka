@@ -205,7 +205,7 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
-    spdlog::set_level(spdlog::level::from_str("trace"));
+    //spdlog::set_level(spdlog::level::from_str("trace"));
 
     int provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
