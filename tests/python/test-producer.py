@@ -46,7 +46,7 @@ class TestProducer(unittest.TestCase):
         # Create a producer
         self.topic = self.service.open_topic(name)
         batchsize = mofka.AdaptiveBatchSize
-        thread_pool = mofka.ThreadPool(random.randint(1,10))
+        thread_pool = mofka.ThreadPool(0)
         ordering = mofka.Ordering.Strict
         self.producer = self.topic.producer(name, batchsize, thread_pool, ordering)
 
