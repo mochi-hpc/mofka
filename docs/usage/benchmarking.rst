@@ -20,7 +20,13 @@ Configuration
 -------------
 
 The benchmark's first argument is a *config.json* file describing the setup.
-This configuration has the following basic format.
+The following sections describe the format of this configuration.
+The :ref:`Generating configurations` section provides ways to
+more simply generate valid benchmark configurations, rather than writing it
+from scratch.
+
+
+Benchmark configurations overall follow the format bellow.
 
 .. code-block:: json-object
 
@@ -28,9 +34,9 @@ This configuration has the following basic format.
        "address": "na+sm",
        "servers": {
            "ranks": [0],
-           "config": {
+           "config": [
                // ...
-           }
+           ]
        },
        "producers": {
            "ranks": [1]
@@ -242,3 +248,83 @@ of the producers and consumers. These statistics are presented in the format bel
 In the above, :code:`runtime` is the total runtime of the producer or consumer.
 Statistics include min, max, average (:code:`avg`), variance (:code:`var`) for
 the specified operations: push, flush, pull, and acknowledgements.
+
+
+Generating configurations
+-------------------------
+
+Writing a JSON configuration by hand can be tedious. Assuming Mofka was installed
+with the :code:`+space` variant, the *mofkactl* tool allows us to generate
+valid configurations using a CLI. This can be done as follows.
+
+.. code-block:: bash
+
+   mofkactl benchmark generate --address na+sm --num-events 100 [options...]
+
+:code:`--address` and :code:`--num-events` are the only two mandatory options.
+Without any other options, this command will print on its standard output a JSON
+configuration for a 3-process setup of the benchark: one server, one producer,
+and one consumer. The rest of this section lists the available options
+(which can also be listed via :code:`mofkactl benchmark generate --help`).
+
+Additionally, most of these arguments can be set to ranges or lists of choices,
+in which case *mofkactl* will generate a random configuration based on the
+provided ranges or choices. Unless specified otherwise, any argument expecting an
+integer value :code:`X` can also accept a range :code:`X,Y`. For example,
+:code:`--num-metadata-db-per-proc 2,4` will make *mofkactl* randomly select
+2, 3, or 4 metadata databases per server process. Any argument expecting an enumeration
+value can also accept a comma-separate list of options. For example,
+:code:`--validator default,schema` will make *mofkactl* randomly pick either
+:code:`default` or :code:`schema`.
+
+
+* ``--num-servers``: number of servers (default 1, cannot be randomized).
+* ``--num-metadata-db-per-proc``: number of metadata providers per server process (default 1).
+* ``--num-data-storage-per-proc``: number of data providers per server process (default 1).
+* ``--master-db-path-prefixes``: prefix for the path to the master database (default "/tmp/mofka-benchmark").
+* ``--metadata-db-path-prefixes``: prefix for the path to metadata databases (default "/tmp/mofka-benchmark").
+* ``--data-storage-path-prefixes``: prefix for the path to storage targets (default "/tmp/mofka-benchmark").
+* ``--master-db-needs-persistence``: whether the master database needs persistence (default False, cannot be randomized).
+* ``--metadata-db-needs-persistence``: whether the metadata databases need persistence (default False, cannot be randomized).
+* ``--data-storage-needs-persistence``: whether the storage targets need persistence (default False, cannot be randomized).
+* ``--num-pools-in-servers``: number of Argobots pool in each server (default 1).
+* ``--num-xstreams-in-servers``: number of Argobots xstreams in each server (default 1).
+* ``--allow-more-pools-than-xstreams``: whether to allow more xstreams than pools (default False, cannot be randomized, not recommended to set to True).
+* ``--num-partitions``: number of partitions to create for the topic (default 1).
+* ``--metadata-num-fields``: number of fields in the metadata of each event.
+* ``--metadata-key-sizes``: size of the keys in the metadata of each event (default 8, note that this field can accept values in the form "x1;x2,y2;x3,y3", *mofkactl* will pick one of the options separated by a semicolon at random. Two comma-separated values will be used as a range by the benchmark).
+* ``--metadata-val-sizes``: size of the values in the metadata of each event (default 16, same note as for --metadata-key-sizes).
+* ``--data-num-blocks``: number of blocks of memory used for the data part of each event (default 0).
+* ``--data-total-size``: total size of the data part of each event (default 0).
+* ``--validator``: name of the validator (default "default", can also accept "schema").
+* ``--partition-selector``: name of the partition selector (default "default").
+* ``--serialize``: name of the serializer (default "default", can also be "property_list_serializer").
+* ``--num-producers``: number of producer processes (default 1, cannot be randomized).
+* ``--producer-batch-size``: batch size used by producer processes (default -1, use adaptive batch size).
+* ``--producer-adaptive-batch-size``: whether to use adaptive batch size in producers (default "true", note that we can use ""true,false" to make *mofkactl* pick this parameter at random).
+* ``--producer-ordering``: event ordering, "loose" (default) or "strict" (or "loose,strict" to randomize).
+* ``--producer-thread-count``: number of threads used by the producer processes (default 0).
+* ``--producer-burst-size-min``: minimum number of events produced in each burst (default 1).
+* ``--producer-burst-size-max``: maximum number of events produced in each burst (default 1).
+* ``--producer-wait-between-events-ms-min``: minimum delay in ms between two events (default 0).
+* ``--producer-wait-between-events-ms-max``: maximum delay in ms between two events (default 0).
+* ``--producer-wait-between-bursts-ms-min``: minimum delay in ms between two bursts (default 0).
+* ``--producer-wait-between-bursts-ms-max``: maximum delay in ms between two bursts (default 0).
+* ``--producer-flush-between-bursts``: whether to flush between bursts (default "true", can be set to "true,false" to be randomized).
+* ``--producer-flush-every-min``: minimum number of events between flushes (default 1).
+* ``--producer-flush-every-max``: maximum number of events between flushes (default 1).
+* ``--num-consumers``: number of consumers (default 1, cannot be randomized).
+* ``--consumer-batch-size``: batch size in consumer processes (default -1, use adaptive batch size).
+* ``--consumer-adaptive-batch-size``: whether to use adaptive batch size in consumers (default "true", note that we can use "true,false" to make *mofkactl* pick this parameter at random).
+* ``--consumer-check-data``: whether to check data integrity in the consumer (default "true").
+* ``--consumer-thread-count``: number of threads used by the consumer processes (default 0).
+* ``--consumer-data-selector-selectivity``: data selectivity (default 1.0, must be between 0 and 1, represents the probability for an event to have its data pulled by the consumer. Can be specified as a range "x,y" to be randomized).
+* ``--consumer-data-selector-proportion-min``: minimum proportion of data to pull for events whose data is selected (default 1.0).
+* ``--consumer-data-selector-proportion-max``: maximum proportion of data to pull for events whose data is selected (default 1.0).
+* ``--consumer-data-broker-num-blocks-min``: minimum number of blocks of memory into which to receive the data for each event (default 1).
+* ``--consumer-data-broker-num-blocks-max``: maximum number of blocks of memory into which to receive the data for each event (default 1).
+* ``--simultaneous-producer-and-consumer``: whether to run the producer and consumer simultaneously (default False, cannot be randomized).
+
+
+
+
