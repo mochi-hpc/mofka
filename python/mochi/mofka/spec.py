@@ -230,14 +230,14 @@ class BenchmarkTopicSpec:
     @staticmethod
     def space(*,
               num_partitions: int|tuple[int,int] = 1,
-              metadata_num_fields: int|tuple[int,int]|list[int|tuple[int,int]] = 8,
+              metadata_num_fields: int|tuple[int,int] = 8,
               metadata_key_sizes: int|tuple[int,int]|list[int|tuple[int,int]] = 8,
               metadata_val_sizes: int|tuple[int,int]|list[int|tuple[int,int]] = 16,
               data_num_blocks: int|tuple[int,int]|list[int|tuple[int,int]] = 0,
               data_total_size: int|tuple[int,int]|list[int|tuple[int,int]] = 0,
               validator: list[str] = ['default', 'schema'],
               partition_selector: list[str] = ['default'],
-              serializer: list[str] = ['default', 'property_list_serialized'],
+              serializer: list[str] = ['default', 'property_list_serializer'],
               **kwargs):
         from mochi.bedrock.config_space import (
                 ConfigurationSpace,
@@ -247,11 +247,7 @@ class BenchmarkTopicSpec:
                 IntegerOrConst,
                 CategoricalOrConst)
         cs = ConfigurationSpace()
-        if isinstance(metadata_num_fields, list):
-            cs.add(Categorical('metadata.num_fields', metadata_num_fields,
-                               default=metadata_num_fields[0]))
-        else:
-            cs.add(Constant('metadata.num_fields', metadata_num_fields))
+        cs.add(IntegerOrConst('metadata.num_fields', metadata_num_fields))
         if isinstance(metadata_key_sizes, list):
             cs.add(Categorical('metadata.key_sizes', metadata_key_sizes,
                                default=metadata_key_sizes[0]))
@@ -301,7 +297,8 @@ class BenchmarkTopicSpec:
         for param in config:
             if not param.startswith(prefix) or 'partition' in param:
                 continue
-            topic[param[len(prefix):]] = config[param]
+            value = config[param]
+            topic[param[len(prefix):]] = value.item() if hasattr(value, 'item') else value
         topic['partitions'] = [
             BenchmarkTopicPartitionSpec.from_config(
                 config=config, prefix=f'{prefix}partition[{i}].',
@@ -339,7 +336,8 @@ class BenchmarkProducerSpec:
         cs.add(Constant('count', num_producers))
         cs.add(IntegerOrConst('batch_size', producer_batch_size))
         cs.add(CategoricalOrConst('adaptive_batch_size', producer_adaptive_batch_size))
-        cs.add(EqualsCondition(cs['batch_size'], cs['adaptive_batch_size'], False))
+        if isinstance(producer_adaptive_batch_size, list) and len(producer_adaptive_batch_size) > 1:
+            cs.add(EqualsCondition(cs['batch_size'], cs['adaptive_batch_size'], False))
         cs.add(CategoricalOrConst('ordering', producer_ordering))
         cs.add(IntegerOrConst('thread_count', producer_thread_count))
         cs.add(IntegerOrConst('burst_size_min', producer_burst_size_min))
@@ -367,13 +365,16 @@ class BenchmarkProducerSpec:
         topic = BenchmarkTopicSpec.from_config(config, prefix=f'{prefix}topic.', **kwargs)
         def get_from_config(key):
             return config[f'{prefix}{key}']
+        if bool(get_from_config('adaptive_batch_size')) or get_from_config('batch_size') <= 0:
+            batch_size = 'adaptive'
+        else:
+            batch_size = int(get_from_config('batch_size'))
         producer = {
             'topic': topic,
             'ranks': [rank_offset + r for r in range(int(get_from_config('count')))],
             'num_events': num_events,
             'group_file': kwargs.get('flock_group_file', 'mofka.flock.json'),
-            'batch_size': 'adaptive' if bool(get_from_config('adaptive_batch_size')) \
-                                     else int(get_from_config('batch_size')),
+            'batch_size': batch_size,
             'ordering': get_from_config('ordering'),
             'thread_count': int(get_from_config('thread_count')),
             'burst_size': [
@@ -423,7 +424,8 @@ class BenchmarkConsumerSpec:
         cs.add(IntegerOrConst('batch_size', consumer_batch_size))
         cs.add(CategoricalOrConst('adaptive_batch_size', consumer_adaptive_batch_size))
         cs.add(CategoricalOrConst('check_data', consumer_check_data))
-        cs.add(EqualsCondition(cs['batch_size'], cs['adaptive_batch_size'], False))
+        if isinstance(consumer_adaptive_batch_size, list) and len(consumer_adaptive_batch_size) > 1:
+            cs.add(EqualsCondition(cs['batch_size'], cs['adaptive_batch_size'], False))
         cs.add(IntegerOrConst('thread_count', consumer_thread_count))
         cs.add(FloatOrConst('data_selector.selectivity', consumer_data_selector_selectivity))
         cs.add(FloatOrConst('data_selector_proportion_min', consumer_data_selector_proportion_min))
@@ -443,14 +445,17 @@ class BenchmarkConsumerSpec:
             return config[f'{prefix}{key}']
         if int(get_from_config('count')) == 0:
             return {}
+        if bool(get_from_config('adaptive_batch_size')) or get_from_config('batch_size') <= 0:
+            batch_size = 'adaptive'
+        else:
+            batch_size = int(get_from_config('batch_size'))
         consumer = {
             'ranks': [rank_offset + r for r in range(int(get_from_config('count')))],
             'num_events': num_events,
             'group_file': kwargs.get('flock_group_file', 'mofka.flock.json'),
             'topic_name': kwargs.get('topic_name', 'benchmark'),
             'consumer_name': kwargs.get('consumer_name', 'consumer'),
-            'batch_size': 'adaptive' if bool(get_from_config('adaptive_batch_size')) \
-                                     else int(get_from_config('batch_size')),
+            'batch_size': batch_size,
             'check_data': bool(get_from_config('check_data')),
             'thread_count': int(get_from_config('thread_count')),
             'data_selector.selectivity': float(get_from_config('data_selector.selectivity')),
