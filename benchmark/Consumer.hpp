@@ -168,6 +168,7 @@ class BenchmarkConsumer {
         std::uniform_int_distribution<size_t> numBlocksDistribution(
             m_data_num_blocks_min, m_data_num_blocks_max);
         auto num_blocks = std::min(descriptor.size(), numBlocksDistribution(m_rng));
+        if(num_blocks == 0) return mofka::Data{nullptr, 0};
         auto remaining_size = descriptor.size();
         auto block_size = remaining_size/num_blocks;
         std::vector<std::vector<char>>* blocks = new std::vector<std::vector<char>>();
@@ -200,7 +201,13 @@ class BenchmarkConsumer {
             for(ssize_t i = 0; i < num_events || num_events == -1; ++i) {
                 spdlog::trace("[consumer] Pulling event {}", i);
                 t1 = MPI_Wtime();
-                auto event = m_mofka_consumer.pull().wait();
+                mofka::Event event;
+                try {
+                    event = m_mofka_consumer.pull().wait();
+                } catch(const mofka::Exception& ex) {
+                    spdlog::error("[consumer] Caught exception: {}", ex.what());
+                    throw;
+                }
                 t2 = MPI_Wtime();
                 m_pull_stats << (t2 - t1);
                 spdlog::trace("[consumer] Done pulling event {}: received event {} from partition {}",
