@@ -311,17 +311,6 @@ int main(int argc, char** argv) {
         server_config = R"({
             "margo": {
                 "use_progress_thread": true,
-                "monitoring": {
-                    "config": {
-                        "filename_prefix": "client.mofka",
-                        "statistics": {
-                            "disable":false
-                        },
-                        "time_series": {
-                            "disable":true
-                        }
-                    }
-                }
             }
         })";
     }
