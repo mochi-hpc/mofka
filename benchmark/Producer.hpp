@@ -191,7 +191,7 @@ class BenchmarkProducer {
                 if(wait_between_bursts_ms) {
                     spdlog::trace("[producer] Waiting {} msec after burst", wait_between_bursts_ms);
                     usleep(1000*wait_between_bursts_ms);
-                    spdlog::trace("[producer] Done waiting after burst", wait_between_bursts_ms);
+                    spdlog::trace("[producer] Done waiting after burst");
                 }
                 next_burst = burst_size_dist(rng);
             } else {
