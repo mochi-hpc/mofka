@@ -310,7 +310,7 @@ int main(int argc, char** argv) {
     } else {
         server_config = R"({
             "margo": {
-                "use_progress_thread": true,
+                "use_progress_thread": true
             }
         })";
     }
