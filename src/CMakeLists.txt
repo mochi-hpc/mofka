@@ -44,11 +44,11 @@ target_link_libraries (mofka-client
     PkgConfig::uuid
     bedrock::client
     nlohmann_json::nlohmann_json
+    nlohmann_json_schema_validator::validator
     PRIVATE
     yokan::client
     spdlog::spdlog
     fmt::fmt
-    nlohmann_json_schema_validator::validator
     coverage_config
     warnings_config)
 target_include_directories (mofka-client PUBLIC $<INSTALL_INTERFACE:include>)
@@ -69,11 +69,11 @@ target_link_libraries (mofka-server
     PkgConfig::uuid
     fmt::fmt
     nlohmann_json::nlohmann_json
+    nlohmann_json_schema_validator::validator
     mofka-client
     PRIVATE
     warabi-client
     spdlog::spdlog
-    nlohmann_json_schema_validator::validator
     coverage_config
     warnings_config)
 target_include_directories (mofka-server PUBLIC $<INSTALL_INTERFACE:include>)

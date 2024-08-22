@@ -7,7 +7,7 @@ Name: mofka-server
 Description: Event streaming service for HPC based on Mochi
 Version: @MOFKA_VERSION@
 
-Requires: thallium uuid fmt RapidJSON
+Requires: thallium uuid fmt
 Requires.private: spdlog
 Libs: -L${libdir} @SERVER_PRIVATE_LIBS@ -lstdc++
 Cflags: -I${includedir}

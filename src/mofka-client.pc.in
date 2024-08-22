@@ -7,7 +7,7 @@ Name: mofka-client
 Description: Event streaming service for HPC based on Mochi
 Version: @MOFKA_VERSION@
 
-Requires: thallium uuid RapidJSON fmt bedrock-client
+Requires: thallium uuid fmt
 Requires.private: spdlog
 Libs: -L${libdir} @CLIENT_PRIVATE_LIBS@ -lstdc++
 Cflags: -I${includedir}
