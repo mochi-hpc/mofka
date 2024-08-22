@@ -9,7 +9,7 @@
 #include <mofka/ForwardDcl.hpp>
 
 #include <stdexcept>
-#include <uuid.h>
+#include <uuid/uuid.h>
 #include <cstdint>
 #include <string>
 #include <cstring>
