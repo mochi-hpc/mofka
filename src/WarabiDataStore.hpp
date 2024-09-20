@@ -28,6 +28,7 @@ class WarabiDataStore {
     };
 
     thallium::engine     m_engine;
+    warabi::Client       m_warabi_client;
     warabi::TargetHandle m_target;
 
     public:
@@ -138,12 +139,19 @@ class WarabiDataStore {
 
     WarabiDataStore(
             thallium::engine engine,
+            warabi::Client warabi_client,
             warabi::TargetHandle target)
     : m_engine(std::move(engine))
+    , m_warabi_client(std::move(warabi_client))
     , m_target(std::move(target)) {}
 
-    static std::unique_ptr<WarabiDataStore> create(thallium::engine engine, warabi::TargetHandle target) {
-        return std::make_unique<WarabiDataStore>(std::move(engine), std::move(target));
+    static std::unique_ptr<WarabiDataStore> create(
+            thallium::engine engine,
+            thallium::provider_handle warabi_ph) {
+        auto warabi_client = warabi::Client{engine};
+        auto target = warabi_client.makeTargetHandle(warabi_ph, warabi_ph.provider_id());
+        return std::make_unique<WarabiDataStore>(
+                std::move(engine), std::move(warabi_client), std::move(target));
     }
 
 };

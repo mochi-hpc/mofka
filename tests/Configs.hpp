@@ -9,12 +9,12 @@
 
 static inline const char* config = R"(
 {
-    "libraries" : {
-        "mofka" : "libmofka-bedrock-module.so",
-        "flock" : "libflock-bedrock-module.so",
-        "warabi" : "libwarabi-bedrock-module.so",
-        "yokan" : "libyokan-bedrock-module.so"
-    },
+    "libraries" : [
+        "libmofka-bedrock-module.so",
+        "libflock-bedrock-module.so",
+        "libwarabi-bedrock-module.so",
+        "libyokan-bedrock-module.so"
+    ],
     "providers" : [
         {
             "name" : "my_flock_provider",

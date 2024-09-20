@@ -11,12 +11,14 @@
 #include <numeric>
 #include <iostream>
 
+namespace tl = thallium;
+
 namespace mofka {
 
 MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(
     default, DefaultPartitionManager,
-    {"data", "warabi", BEDROCK_REQUIRED},
-    {"metadata", "yokan", BEDROCK_REQUIRED});
+    {"data", "warabi", true, false, false},
+    {"metadata", "yokan", true, false, false});
 
 Result<EventID> DefaultPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
@@ -126,28 +128,15 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
         throw Exception{"Error(s) while validating JSON config for DefaultPartitionManager"};
     }
 
-    /* Check that the dependencies are there */
-    auto it = dependencies.find("data");
-    warabi::TargetHandle* warabi_target = nullptr;;
-    if(it == dependencies.end()) {
-        throw Exception{"Warabi TargetHandle not provided as dependency"};
-    } else {
-        warabi_target = it->second.dependencies[0]->getHandle<warabi::TargetHandle*>();
-    }
-
-    yk_database_handle_t yokan_db = nullptr;
-    it = dependencies.find("metadata");
-    if(it == dependencies.end()) {
-        throw Exception{"Yokan Database not provided as dependency"};
-    } else {
-        yokan_db = it->second.dependencies[0]->getHandle<yk_database_handle_t>();
-    }
+    /* the data and metadata dependencies are required so we know they are in the map */
+    auto warabi_ph = dependencies.at("data")[0]->getHandle<tl::provider_handle>();
+    auto yokan_ph =  dependencies.at("metadata")[0]->getHandle<tl::provider_handle>();
 
     /* create data store */
-    auto data_store = WarabiDataStore::create(engine, std::move(*warabi_target));
+    auto data_store = WarabiDataStore::create(engine, std::move(warabi_ph));
 
     /* create event store */
-    auto event_store = YokanEventStore::create(engine, topic_name, partition_uuid, yokan_db);
+    auto event_store = YokanEventStore::create(engine, topic_name, partition_uuid, std::move(yokan_ph));
 
     /* create topic manager */
     return std::unique_ptr<mofka::PartitionManager>(
