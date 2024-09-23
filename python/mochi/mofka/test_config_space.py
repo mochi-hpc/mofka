@@ -10,7 +10,7 @@ class TestConfigSpace(unittest.TestCase):
 
     def test_mofka_config_space(self):
         space = MofkaServiceSpec.space(
-            num_procs=4, num_pools_in_servers=4, num_xstreams=4,
+            num_procs=4, num_pools_in_servers=4, num_xstreams_in_servers=4,
             num_metadata_db_per_proc=8,
             num_data_storage_per_proc=2).freeze()
 
