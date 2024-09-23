@@ -7,6 +7,7 @@
 #define MOFKA_YOKAN_EVENT_STORE_HPP
 
 #include "JsonUtil.hpp"
+#include <yokan/cxx/client.hpp>
 #include <yokan/cxx/collection.hpp>
 #include <mofka/ConsumerHandle.hpp>
 #include <mofka/BatchSize.hpp>
@@ -29,6 +30,7 @@ class YokanEventStore {
 
     thallium::engine             m_engine;
     std::string                  m_topic_name;
+    yokan::Client                m_yokan_client;
     yokan::Database              m_database;
     yokan::Collection            m_metadata_coll;
     yokan::Collection            m_descriptors_coll;
@@ -252,6 +254,7 @@ class YokanEventStore {
     YokanEventStore(
         thallium::engine engine,
         std::string topic_name,
+        yokan::Client yokan_client,
         yokan::Database db,
         yokan::Collection metadata_coll,
         yokan::Collection descriptors_coll,
@@ -259,6 +262,7 @@ class YokanEventStore {
         bool marked_as_complete)
     : m_engine(std::move(engine))
     , m_topic_name(std::move(topic_name))
+    , m_yokan_client(std::move(yokan_client))
     , m_database(std::move(db))
     , m_metadata_coll(std::move(metadata_coll))
     , m_descriptors_coll(std::move(descriptors_coll))
@@ -269,8 +273,11 @@ class YokanEventStore {
             thallium::engine engine,
             const std::string& topic_name,
             const UUID& partition_uuid,
-            yk_database_handle_t db) {
-        auto database = yokan::Database{db};
+            thallium::provider_handle yokan_ph) {
+
+        auto yokan_client = yokan::Client{engine};
+        auto database = yokan_client.makeDatabaseHandle(yokan_ph.get_addr(), yokan_ph.provider_id());
+
         std::string marked_as_complete_key = "#";
         marked_as_complete_key += topic_name + "#completed";
 
@@ -292,6 +299,7 @@ class YokanEventStore {
         return std::make_unique<YokanEventStore>(
             std::move(engine),
             std::move(topic_name),
+            std::move(yokan_client),
             std::move(database),
             std::move(metadata_coll),
             std::move(descriptors_coll),

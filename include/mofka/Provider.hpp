@@ -10,7 +10,7 @@
 #include <mofka/Metadata.hpp>
 #include <mofka/Json.hpp>
 
-#include <bedrock/AbstractServiceFactory.hpp>
+#include <bedrock/AbstractComponent.hpp>
 #include <thallium.hpp>
 #include <memory>
 #include <string_view>
@@ -33,13 +33,11 @@ class Provider {
      * @param engine Thallium engine to use to receive RPCs.
      * @param provider_id Provider id.
      * @param config JSON configuration.
-     * @param pool Argobots pool to use to handle RPCs.
      * @param dependencies Dependencies resolved by Bedrock or manually.
      */
     Provider(const thallium::engine& engine,
              uint16_t provider_id = 0,
              const Metadata& config = Metadata{"{}"},
-             const thallium::pool& pool = thallium::pool{},
              const bedrock::ResolvedDependencyMap& dependencies = {});
 
     /**

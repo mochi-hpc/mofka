@@ -15,7 +15,8 @@
 #include <mofka/ConsumerHandle.hpp>
 #include <mofka/Factory.hpp>
 
-#include <bedrock/AbstractServiceFactory.hpp>
+#include <bedrock/AbstractComponent.hpp>
+
 #include <thallium.hpp>
 #include <unordered_map>
 #include <string_view>

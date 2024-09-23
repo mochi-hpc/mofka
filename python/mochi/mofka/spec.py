@@ -14,8 +14,8 @@
 
 
 from mochi.bedrock.spec import ProviderSpec, ProcSpec, ServiceSpec
-from mochi.yokan.spec import YokanProviderSpec
-from mochi.warabi.spec import WarabiProviderSpec
+from mochi.yokan.config_space import YokanSpaceBuilder
+from mochi.warabi.config_space import WarabiSpaceBuilder
 
 
 class MofkaServiceSpec(ServiceSpec):
@@ -37,39 +37,36 @@ class MofkaServiceSpec(ServiceSpec):
         max_num_pools = num_pools_in_servers if isinstance(num_pools_in_servers, int) \
                                              else num_pools_in_servers[1]
         # Master database provider
-        master_db_cs = YokanProviderSpec.space(
+        master_db_space_builder = YokanSpaceBuilder(
             paths=[f'{p}/master' for p in master_db_path_prefixes],
             need_sorted_db=True, need_values=True,
             need_persistence=master_db_needs_persistence,
-            tags=['mofka:master'],
-            max_num_pools=max_num_pools)
+            tags=['mofka:master'])
         # Metadata database provider
-        metadata_db_cs = YokanProviderSpec.space(
+        metadata_db_space_builder = YokanSpaceBuilder(
             paths=[f'{p}/metadata' for p in metadata_db_path_prefixes],
             need_sorted_db=True, need_values=True,
             need_persistence=metadata_db_needs_persistence,
-            tags=['mofka:metadata'],
-            max_num_pools=max_num_pools)
+            tags=['mofka:metadata'])
         # Data storage provider
-        data_storage_cs = WarabiProviderSpec.space(
+        data_storage_space_builder = WarabiSpaceBuilder(
             paths=[f'{p}/data' for p in data_storage_path_prefixes],
             need_persistence=data_storage_needs_persistence,
-            tags=['mofka:data'],
-            max_num_pools=max_num_pools)
+            tags=['mofka:data'])
         provider_space_factories = [
             {
                 'family': 'master',
-                'space' : master_db_cs,
+                'builder' : master_db_space_builder,
                 'count' : 1
             },
             {
                 'family': 'metadata',
-                'space' : metadata_db_cs,
+                'builder' : metadata_db_space_builder,
                 'count' : num_metadata_db_per_proc
             },
             {
                 'family': 'data',
-                'space' : data_storage_cs,
+                'builder' : data_storage_space_builder,
                 'count' : num_data_storage_per_proc
             }
         ]
@@ -110,13 +107,13 @@ class MofkaServiceSpec(ServiceSpec):
         # Also because processes may share the same node, we will add
         # a prefix to all the paths
         for proc in spec.processes:
-            proc.libraries['yokan']  = 'libyokan-bedrock-module.so'
-            proc.libraries['warabi'] = 'libwarabi-bedrock-module.so'
-            proc.libraries['flock']  = 'libflock-bedrock-module.so'
-            proc.libraries['mofka']  = 'libmofka-bedrock-module.so'
+            proc.libraries.extend(['libyokan-bedrock-module.so',
+                                   'libwarabi-bedrock-module.so',
+                                   'libflock-bedrock-module.so',
+                                   'libmofka-bedrock-module.so'])
             proc.providers.add(
                     name='group', type='flock',
-                    pool=proc.margo.argobots.pools[0],
+                    dependencies={'pool': proc.margo.argobots.pools[0].name},
                     provider_id=len(proc.providers)+1,
                     config={
                         'bootstrap': 'mpi',

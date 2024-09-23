@@ -16,20 +16,26 @@ Provider::Provider(
         const tl::engine& engine,
         uint16_t provider_id,
         const Metadata& config,
-        const thallium::pool& pool,
-        const bedrock::ResolvedDependencyMap& dependencies)
-: self(std::make_shared<ProviderImpl>(engine, provider_id, config, pool, dependencies)) {
+        const bedrock::ResolvedDependencyMap& dependencies) {
+    /* the pool argument is optional */
+    auto it = dependencies.find("pool");
+    auto pool = it != dependencies.end() ?
+        it->second[0]->getHandle<tl::pool>()
+        : engine.get_handler_pool();
+    self = std::make_shared<ProviderImpl>(engine, provider_id, config, pool, dependencies);
     self->get_engine().push_finalize_callback(this, [p=this]() { p->self.reset(); });
 }
 
 std::vector<bedrock::Dependency> Provider::getDependencies(const Metadata& metadata) {
+    std::vector<bedrock::Dependency> dependencies;
     auto& json = metadata.json();
     if(json.is_object() && json.contains("type") && json["type"].is_string()) {
-        return PartitionManagerDependencyFactory::getDependencies(
+        dependencies = PartitionManagerDependencyFactory::getDependencies(
             json["type"].get_ref<const std::string&>()
         );
     }
-    return {};
+    dependencies.push_back({"pool", "pool", false, false, false});
+    return dependencies;
 }
 
 Provider::Provider(Provider&& other) {
