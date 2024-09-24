@@ -327,8 +327,8 @@ int main(int argc, char** argv) {
     server->getMargoManager().addXstream(
         R"({"name":"__mpi_xstream__", "scheduler":{"pools":["__mpi_pool__"],"type":"basic_wait"}}})");
 
-    auto mpi_pool = thallium::pool{
-        server->getMargoManager().getPool("__mpi_pool__")->getHandle<ABT_pool>()};
+    auto mpi_pool =
+        server->getMargoManager().getPool("__mpi_pool__")->getHandle<thallium::pool>();
 
     auto world = Communicator{mpi_pool, MPI_COMM_WORLD};
     world.barrier();
