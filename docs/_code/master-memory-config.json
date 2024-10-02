@@ -1,8 +1,8 @@
 {
-    "libraries": {
-        "flock": "libflock-bedrock-module.so",
-        "yokan": "libyokan-bedrock-module.so"
-    },
+    "libraries": [
+        "libflock-bedrock-module.so",
+        "libyokan-bedrock-module.so"
+    ],
     "providers": [
         {
             "name" : "my_group_manager",

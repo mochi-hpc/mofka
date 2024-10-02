@@ -1,8 +1,8 @@
 {
-    "libraries": {
-        "flock": "libflock-bedrock-module.so",
-        "mofka" : "libmofka-bedrock-module.so"
-    },
+    "libraries": [
+        "libflock-bedrock-module.so",
+        "libmofka-bedrock-module.so"
+    ],
     "providers": [
         {
             "name" : "my_group_manager",

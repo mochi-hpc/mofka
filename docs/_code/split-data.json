@@ -1,8 +1,8 @@
 {
-    "libraries": {
-        "flock": "libflock-bedrock-module.so",
-        "warabi": "libwarabi-bedrock-module.so"
-    },
+    "libraries": [
+        "libflock-bedrock-module.so",
+        "libwarabi-bedrock-module.so"
+    ],
     "providers": [
         {
             "name" : "my_group_manager",

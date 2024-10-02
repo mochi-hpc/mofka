@@ -2,12 +2,12 @@ $database_path = sprintf("/tmp/mofka/metadata_$id");
 $target_path = sprintf("/tmp/mofka/data_$id");
 
 return {
-    "libraries": {
-        "flock": "libflock-bedrock-module.so",
-        "yokan": "libyokan-bedrock-module.so",
-        "warabi": "libwarabi-bedrock-module.so",
-        "mofka" : "libmofka-bedrock-module.so"
-    },
+    "libraries": [
+        "libflock-bedrock-module.so",
+        "libyokan-bedrock-module.so",
+        "libwarabi-bedrock-module.so",
+        "libmofka-bedrock-module.so"
+    ],
     "providers": [
         {
             "name" : "my_group_manager",
