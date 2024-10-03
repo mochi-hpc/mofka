@@ -73,11 +73,6 @@ class TopicHandle {
     const std::string& name() const;
 
     /**
-     * @brief Returns the ServiceHandle this topic has been opened with.
-     */
-    ServiceHandle service() const;
-
-    /**
      * @brief Creates a Producer object with the specified options.
      * This function allows providing the options in any order,
      * and ommit non-mandatory options. See TopicHandle::makeProducer
@@ -91,7 +86,7 @@ class TopicHandle {
             GetArgOrDefault(std::string_view{""}, std::forward<Options>(opts)...),
             GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
-            GetArgOrDefault(defaultOrdering(), std::forward<Options>(opts)...));
+            GetArgOrDefault(Ordering::Strict, std::forward<Options>(opts)...));
     }
 
     /**
@@ -110,7 +105,7 @@ class TopicHandle {
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataBroker{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataSelector{}, std::forward<Options>(opts)...),
-            GetArgOrDefault(partitions(), std::forward<Options>(opts)...));
+            GetArgOrDefault(std::vector<size_t>(), std::forward<Options>(opts)...));
     }
 
     /**
@@ -167,6 +162,7 @@ class TopicHandle {
      * @param thread_pool Thread pool.
      * @param data_broker Data broker.
      * @param data_selector Data selector.
+     * @param targets Indices of the partitions to consumer from.
      *
      * @return Consumer instance.
      */
@@ -175,9 +171,7 @@ class TopicHandle {
                           ThreadPool thread_pool,
                           DataBroker data_broker,
                           DataSelector data_selector,
-                          const std::vector<PartitionInfo>& targets) const;
-
-    static Ordering defaultOrdering();
+                          const std::vector<size_t>& targets) const;
 
 };
 

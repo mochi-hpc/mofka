@@ -6,7 +6,7 @@
 #ifndef MOFKA_PRODUCER_BATCH_IMPL_H
 #define MOFKA_PRODUCER_BATCH_IMPL_H
 
-#include "PartitionInfoImpl.hpp"
+#include "MofkaPartitionInfo.hpp"
 #include "ThreadPoolImpl.hpp"
 #include "ProducerImpl.hpp"
 #include "Promise.hpp"
@@ -119,7 +119,7 @@ class ActiveProducerBatchQueue {
     ActiveProducerBatchQueue(
         std::string producer_name,
         SP<ClientImpl> client,
-        SP<PartitionInfoImpl> partition,
+        SP<MofkaPartitionInfo> partition,
         SP<ThreadPoolImpl> thread_pool,
         BatchSize batch_size)
     : m_producer_name(std::move(producer_name))
@@ -248,7 +248,7 @@ class ActiveProducerBatchQueue {
 
     std::string                         m_producer_name;
     SP<ClientImpl>                      m_client;
-    SP<PartitionInfoImpl>               m_partition;
+    SP<MofkaPartitionInfo>              m_partition;
     SP<ThreadPoolImpl>                  m_thread_pool;
     BatchSize                           m_batch_size;
     std::queue<SP<ProducerBatchImpl>>   m_batch_queue;

@@ -8,7 +8,7 @@
 
 #include "PimplUtil.hpp"
 #include "TopicHandleImpl.hpp"
-#include "PartitionInfoImpl.hpp"
+#include "MofkaPartitionInfo.hpp"
 #include "ProducerImpl.hpp"
 
 #include "mofka/Consumer.hpp"
@@ -28,15 +28,15 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
 
     public:
 
-    thallium::engine                       m_engine;
-    const std::string                      m_name;
-    const BatchSize                        m_batch_size;
-    const SP<ThreadPoolImpl>               m_thread_pool;
-    const DataBroker                       m_data_broker;
-    const DataSelector                     m_data_selector;
-    const EventProcessor                   m_event_processor;
-    const std::vector<PartitionInfo>       m_partitions;
-    const std::shared_ptr<TopicHandleImpl> m_topic;
+    thallium::engine                          m_engine;
+    const std::string                         m_name;
+    const BatchSize                           m_batch_size;
+    const SP<ThreadPoolImpl>                  m_thread_pool;
+    const DataBroker                          m_data_broker;
+    const DataSelector                        m_data_selector;
+    const EventProcessor                      m_event_processor;
+    const std::vector<SP<MofkaPartitionInfo>> m_partitions;
+    const std::shared_ptr<TopicHandleImpl>    m_topic;
 
     const std::string m_self_addr;
 
@@ -69,7 +69,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
                  SP<ThreadPoolImpl> thread_pool,
                  DataBroker broker,
                  DataSelector selector,
-                 std::vector<PartitionInfo> partitions,
+                 std::vector<SP<MofkaPartitionInfo>> partitions,
                  std::shared_ptr<TopicHandleImpl> topic)
     : m_engine(std::move(engine))
     , m_name(name)
@@ -99,7 +99,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
         const BulkRef &data_desc);
 
     SP<DataImpl> requestData(
-        SP<PartitionInfoImpl> target,
+        SP<MofkaPartitionInfo> target,
         SP<MetadataImpl> metadata,
         SP<DataDescriptorImpl> descriptor);
 };

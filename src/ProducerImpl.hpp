@@ -8,7 +8,7 @@
 
 #include "PimplUtil.hpp"
 #include "TopicHandleImpl.hpp"
-#include "PartitionInfoImpl.hpp"
+#include "MofkaPartitionInfo.hpp"
 #include "ProducerBatchImpl.hpp"
 
 #include "mofka/Producer.hpp"
@@ -32,7 +32,7 @@ class ProducerImpl {
     SP<TopicHandleImpl> m_topic;
 
     std::unordered_map<
-        PartitionInfo,
+        SP<MofkaPartitionInfo>,
         SP<ActiveProducerBatchQueue>> m_batch_queues;
     thallium::mutex                   m_batch_queues_mtx;
     thallium::condition_variable      m_batch_queues_cv;

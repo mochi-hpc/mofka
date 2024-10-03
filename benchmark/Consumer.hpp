@@ -210,10 +210,12 @@ class BenchmarkConsumer {
                 }
                 t2 = MPI_Wtime();
                 m_pull_stats << (t2 - t1);
+
+                auto uuid = mofka::UUID::from_string(
+                    event.partition().json()["uuid"].get_ref<const std::string&>().c_str());
                 spdlog::trace("[consumer] Done pulling event {}: received event {} from partition {}",
-                             i, event.id(), event.partition().uuid().to_string());
+                              i, event.id(), uuid.to_string());
                 if(event.id() == mofka::NoMoreEvents) break;
-                auto uuid = event.partition().uuid();
                 auto it = events_received.find(uuid);
                 if(it == events_received.end())
                     it = events_received.insert(std::make_pair(uuid, 0)).first;

@@ -22,13 +22,13 @@ class DefaultPartitionSelector : public PartitionSelectorInterface {
         m_targets = targets;
     }
 
-    PartitionInfo selectPartitionFor(const Metadata& metadata) override {
+    size_t selectPartitionFor(const Metadata& metadata) override {
         (void)metadata;
         if(m_targets.size() == 0)
             throw Exception("PartitionSelector has no target to select from");
         if(m_index >= m_targets.size()) m_index = m_index % m_targets.size();
         m_index += 1;
-        return m_targets.at(m_index-1);
+        return m_index-1;
     }
 
     Metadata metadata() const override {

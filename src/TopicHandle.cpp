@@ -24,10 +24,6 @@ const std::string& TopicHandle::name() const {
     return self->m_name;
 }
 
-ServiceHandle TopicHandle::service() const {
-    return ServiceHandle(self->m_service);
-}
-
 Producer TopicHandle::makeProducer(
         std::string_view name,
         BatchSize batch_size,
@@ -42,17 +38,28 @@ Consumer TopicHandle::makeConsumer(
         ThreadPool thread_pool,
         DataBroker data_broker,
         DataSelector data_selector,
-        const std::vector<PartitionInfo>& targets) const {
+        const std::vector<size_t>& targets) const {
+    std::vector<SP<MofkaPartitionInfo>> partitions;
+    if(targets.empty()) {
+        partitions = self->m_partitions;
+    } else {
+        partitions.reserve(targets.size());
+        for(auto& partition_index : targets) {
+            if(partition_index >= self->m_partitions.size())
+                throw Exception{"Invalid partition index passed to TopicHandle::consumer()"};
+            partitions.push_back(self->m_partitions[partition_index]);
+        }
+    }
     auto consumer = std::make_shared<ConsumerImpl>(
             self->m_service->m_client->m_engine,
             name, batch_size, thread_pool.self,
-            data_broker, data_selector, targets, self);
+            data_broker, data_selector, std::move(partitions), self);
     consumer->subscribe();
     return consumer;
 }
 
 const std::vector<PartitionInfo>& TopicHandle::partitions() const {
-    return self->m_partitions;
+    return self->m_partitions_info;
 }
 
 void TopicHandle::markAsComplete() const {
@@ -64,9 +71,7 @@ void TopicHandle::markAsComplete() const {
     results.reserve(self->m_partitions.size());
     try {
         for(auto& partition : self->m_partitions) {
-            auto ph = tl::provider_handle{
-                engine.lookup(partition.address()),
-                    partition.providerID()};
+            auto& ph = partition->m_ph;
             responses.push_back(rpc.on(ph).async());
         }
         for(auto& response : responses)
@@ -79,13 +84,6 @@ void TopicHandle::markAsComplete() const {
     for(auto& result : results) {
         if(!result.success()) throw Exception{result.error()};
     }
-}
-
-Ordering TopicHandle::defaultOrdering() {
-//    spdlog::warn("Ordering not specified when creating Producer. "
-//                 "Ordering will be strict by default. If this was intended, "
-//                 "explicitely specify the ordering as Ordering::Strict.");
-    return Ordering::Strict;
 }
 
 }

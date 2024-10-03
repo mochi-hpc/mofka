@@ -17,26 +17,6 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
-#if 0
-namespace mofka {
-class PythonBindingHelper {
-
-    public:
-
-    static void SetDataContext(mofka::Data& data, py::object obj) {
-        data.self->m_ctx = static_cast<void*>(new py::object(std::move(obj)));
-        data.self->m_ctx_free = [](void* uargs) -> void {
-            delete static_cast<py::object*>(uargs);
-        };
-    }
-
-    static py::object GetDataContext(const mofka::Data& data) {
-        return *static_cast<py::object*>(data.self->m_ctx);
-    }
-};
-}
-#endif
-
 typedef py::capsule py_margo_instance_id;
 typedef py::capsule py_hg_addr_t;
 
@@ -143,12 +123,6 @@ PYBIND11_MODULE(pymofka_client, m) {
             }, "metadata"_a=nlohmann::json::object())
     ;
 
-    py::class_<mofka::PartitionInfo>(m, "PartitionInfo")
-        .def_property_readonly("uuid", &mofka::PartitionInfo::uuid)
-        .def_property_readonly("address", &mofka::PartitionInfo::address)
-        .def_property_readonly("provider_id", &mofka::PartitionInfo::providerID)
-    ;
-
     py::class_<mofka::PartitionSelector>(m, "PartitionSelector")
         .def_static("from_metadata",
             [](const nlohmann::json& md){
@@ -227,7 +201,6 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::TopicHandle>(m, "TopicHandle")
         .def_property_readonly("name", &mofka::TopicHandle::name)
-        .def_property_readonly("service", &mofka::TopicHandle::service)
         .def_property_readonly("partitions", &mofka::TopicHandle::partitions)
         .def("producer",
             [](const mofka::TopicHandle& topic,
@@ -250,7 +223,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::optional<mofka::ThreadPool> thread_pool,
                PythonDataBroker broker,
                PythonDataSelector selector,
-               std::optional<std::vector<mofka::PartitionInfo>> targets) -> mofka::Consumer {
+               std::optional<std::vector<size_t>> targets) -> mofka::Consumer {
                 auto cpp_broker = broker ?
                     [broker=std::move(broker)]
                     (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::Data {
@@ -277,16 +250,17 @@ PYBIND11_MODULE(pymofka_client, m) {
                         else return mofka::DataDescriptor::Null();
                     }
                 : mofka::DataSelector{};
+                std::vector<size_t> default_targets;
                 return topic.consumer(
                     name, mofka::BatchSize(batch_size),
                     thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
                     mofka::DataBroker{cpp_broker},
                     mofka::DataSelector{cpp_selector},
-                    targets.value_or(topic.partitions()));
+                    targets.value_or(default_targets));
                },
             "name"_a, "batch_size"_a=mofka::BatchSize::Adaptive().value,
             "thread_pool"_a=std::nullopt, "data_broker"_a=PythonDataBroker{},
-            "data_selector"_a=PythonDataSelector{}, "targets"_a=std::optional<std::vector<mofka::PartitionInfo>>{})
+            "data_selector"_a=PythonDataSelector{}, "targets"_a=std::optional<std::vector<size_t>>{})
     ;
 
     py::class_<mofka::Producer>(m, "Producer")

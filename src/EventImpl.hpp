@@ -10,6 +10,7 @@
 #include "ConsumerImpl.hpp"
 #include "MetadataImpl.hpp"
 #include "DataImpl.hpp"
+#include "MofkaPartitionInfo.hpp"
 
 #include "mofka/Event.hpp"
 
@@ -22,7 +23,7 @@ class EventImpl {
     public:
 
     EventImpl(EventID id,
-              SP<PartitionInfoImpl> partition,
+              SP<MofkaPartitionInfo> partition,
               SP<ConsumerImpl> consumer)
     : m_id(std::move(id))
     , m_partition(std::move(partition))
@@ -30,11 +31,11 @@ class EventImpl {
     , m_metadata(std::make_shared<MetadataImpl>("{}", false))
     , m_data(std::make_shared<DataImpl>()) {}
 
-    EventID               m_id;
-    SP<PartitionInfoImpl> m_partition;
-    WP<ConsumerImpl>      m_consumer;
-    SP<MetadataImpl>      m_metadata;
-    SP<DataImpl>          m_data;
+    EventID                m_id;
+    SP<MofkaPartitionInfo> m_partition;
+    WP<ConsumerImpl>       m_consumer;
+    SP<MetadataImpl>       m_metadata;
+    SP<DataImpl>           m_data;
 };
 
 }

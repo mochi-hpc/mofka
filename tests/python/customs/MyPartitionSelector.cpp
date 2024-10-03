@@ -10,7 +10,7 @@ class MyPartitionSelector : public mofka::PartitionSelectorInterface {
         m_targets = targets;
     }
 
-    mofka::PartitionInfo selectPartitionFor(const mofka::Metadata& metadata) override {
+    size_t selectPartitionFor(const mofka::Metadata& metadata) override {
         (void)metadata;
         if(m_targets.size() == 0)
             throw mofka::Exception("PartitionSelector has no target to select from");

@@ -16,7 +16,6 @@ set (client-src-files
      Metadata.cpp
      Serializer.cpp
      PartitionSelector.cpp
-     PartitionInfo.cpp
      Validator.cpp
      EventbridgeValidator.cpp
      ThreadPool.cpp

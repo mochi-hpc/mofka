@@ -186,21 +186,21 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
     }
 
     // Deserialize the each partition information from its Metadata.
-    // They should have a __uuid__ field, an __address__ field, and
-    // a __provider_id__ field.
-    std::vector<PartitionInfo> partitionsList;
+    // They should have a uuid field, an address field, and
+    // a provider_id field.
+    std::vector<SP<MofkaPartitionInfo>> partitionsList;
     for(auto& partitionMetadata : partitionsMetadata) {
         const auto& partitionMetadataJson = partitionMetadata.json();
         auto uuid = UUID::from_string(
-                partitionMetadataJson["__uuid__"].get_ref<const std::string&>().c_str());
-        const auto& address = partitionMetadataJson["__address__"].get_ref<const std::string&>();
-        uint16_t provider_id = partitionMetadataJson["__provider_id__"].get<uint16_t>();
-        auto partitionInfo = std::make_shared<PartitionInfoImpl>(
+                partitionMetadataJson["uuid"].get_ref<const std::string&>().c_str());
+        const auto& address = partitionMetadataJson["address"].get_ref<const std::string&>();
+        uint16_t provider_id = partitionMetadataJson["provider_id"].get<uint16_t>();
+        auto partitionInfo = std::make_shared<MofkaPartitionInfo>(
             uuid, thallium::provider_handle{
                 self->m_client->m_engine.lookup(address),
                 provider_id}
         );
-        partitionsList.push_back(partitionInfo);
+        partitionsList.push_back(std::move(partitionInfo));
     }
 
     return std::make_shared<TopicHandleImpl>(
@@ -344,7 +344,7 @@ void ServiceHandle::addCustomPartition(
         self->m_yk_master_db};
     try {
         auto partition_info = fmt::format(
-            "{{\"__address__\":\"{}\", \"__provider_id__\":{}, \"__uuid__\":\"{}\" }}",
+            "{{\"address\":\"{}\",\"provider_id\":{},\"uuid\":\"{}\"}}",
             provider_address, provider_id, partition_uuid.to_string()
         );
         partitionCollection.store(partition_info.c_str(), partition_info.size());

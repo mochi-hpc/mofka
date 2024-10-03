@@ -7,7 +7,7 @@
 #include "mofka/Event.hpp"
 #include "mofka/Exception.hpp"
 
-#include "PartitionInfoImpl.hpp"
+#include "MofkaPartitionInfo.hpp"
 #include "EventImpl.hpp"
 #include "PimplUtil.hpp"
 
@@ -24,7 +24,7 @@ Data Event::data() const {
 }
 
 PartitionInfo Event::partition() const {
-    return self->m_partition;
+    return self->m_partition->toPartitionInfo();
 }
 
 EventID Event::id() const {

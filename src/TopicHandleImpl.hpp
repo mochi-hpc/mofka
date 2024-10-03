@@ -7,7 +7,7 @@
 #define MOFKA_TOPIC_HANDLE_IMPL_H
 
 #include "ServiceHandleImpl.hpp"
-#include "PartitionInfoImpl.hpp"
+#include "MofkaPartitionInfo.hpp"
 #include "mofka/Validator.hpp"
 #include "mofka/PartitionSelector.hpp"
 #include "mofka/Serializer.hpp"
@@ -19,12 +19,13 @@ class TopicHandleImpl {
 
     public:
 
-    std::string                m_name;
-    SP<ServiceHandleImpl>      m_service;
-    Validator                  m_validator;
-    PartitionSelector          m_selector;
-    Serializer                 m_serializer;
-    std::vector<PartitionInfo> m_partitions;
+    std::string                         m_name;
+    SP<ServiceHandleImpl>               m_service;
+    Validator                           m_validator;
+    PartitionSelector                   m_selector;
+    Serializer                          m_serializer;
+    std::vector<SP<MofkaPartitionInfo>> m_partitions;
+    std::vector<PartitionInfo>          m_partitions_info;
 
     TopicHandleImpl() = default;
 
@@ -33,14 +34,18 @@ class TopicHandleImpl {
                     Validator validator,
                     PartitionSelector selector,
                     Serializer serializer,
-                    std::vector<PartitionInfo> partitions)
+                    std::vector<SP<MofkaPartitionInfo>> partitions)
     : m_name(name)
     , m_service(std::move(service))
     , m_validator(std::move(validator))
     , m_selector(std::move(selector))
     , m_serializer(std::move(serializer))
     , m_partitions(std::move(partitions)) {
-        m_selector.setPartitions(m_partitions);
+        m_partitions_info.reserve(m_partitions.size());
+        for(auto& p : m_partitions) {
+            m_partitions_info.push_back(p->toPartitionInfo());
+        }
+        m_selector.setPartitions(m_partitions_info);
     }
 };
 

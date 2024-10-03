@@ -48,10 +48,11 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                     fmt::format("{{\"event_num\":{}}}", i)
                 };
                 std::string data = fmt::format("This is data for event {}", i);
-                auto future = producer.push(
+                mofka::Future<mofka::EventID> future;
+                REQUIRE_NOTHROW(future = producer.push(
                     metadata,
-                    mofka::Data{data.data(), data.size()});
-                future.wait();
+                    mofka::Data{data.data(), data.size()}));
+                REQUIRE_NOTHROW(future.wait());
             }
             topic.markAsComplete();
         }

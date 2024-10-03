@@ -7,7 +7,6 @@
 #define MOFKA_PARTITION_SELECTOR_HPP
 
 #include <mofka/ForwardDcl.hpp>
-#include <mofka/UUID.hpp>
 #include <mofka/Metadata.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/InvalidMetadata.hpp>
@@ -27,77 +26,11 @@ class ConsumerImpl;
 class Consumer;
 
 /**
- * @brief The PartitionInfo structure holds information about
- * a particular Mofka provider holding a partition of a topic. The
- * public interface allows accessing a server address, provider id,
- * and a UUID. Contrary to the address and provider id, the UUID
- * is meant not to change when the service is restarted or when
- * the partition migrates to another server.
+ * @brief The PartitionInfo structure holds information about a particular partition.
+ * The information contained in such a Metadata piece is implementation-defined.
  */
-class PartitionInfo {
+class PartitionInfo : public Metadata {
 
-    public:
-
-    /**
-     * @brief Identifier uniquely identifying the partition even if
-     * the service restarts or the partition is migrated to another server.
-     */
-    UUID uuid() const;
-
-    /**
-     * @brief Current address of the target.
-     */
-    const std::string& address() const;
-
-    /**
-     * @brief Current provider ID.
-     */
-    uint16_t providerID() const;
-
-    /**
-     * @brief Move constructor.
-     */
-    PartitionInfo(PartitionInfo&&);
-
-    /**
-     * @brief Copy constructor.
-     */
-    PartitionInfo(const PartitionInfo&);
-
-    /**
-     * @brief Move-assignment operator.
-     */
-    PartitionInfo& operator=(PartitionInfo&&);
-
-    /**
-     * @brief Copy-assignment operator.
-     */
-    PartitionInfo& operator=(const PartitionInfo&);
-
-    /**
-     * @brief Destructor.
-     */
-    ~PartitionInfo();
-
-    /**
-     * @brief Checks for the validity of the internal self pointer.
-     */
-    operator bool() const;
-
-    private:
-
-    std::shared_ptr<PartitionInfoImpl> self;
-
-    PartitionInfo(const std::shared_ptr<PartitionInfoImpl>& impl);
-
-    friend class std::hash<PartitionInfo>;
-    friend class TopicHandleImpl;
-    friend class ClientImpl;
-    friend class Producer;
-    friend class ServiceHandle;
-    friend class ConsumerImpl;
-    friend class Consumer;
-    friend class Event;
 };
 
 /**
@@ -127,10 +60,12 @@ class PartitionSelectorInterface {
 
     /**
      * @brief Selects a partition target to use to store the given event.
+     * The returned value should be an index between 0 and N-1 where N is the
+     * size of the array passed to setPartitions().
      *
      * @param metadata Metadata of the event.
      */
-    virtual PartitionInfo selectPartitionFor(const Metadata& metadata) = 0;
+    virtual size_t selectPartitionFor(const Metadata& metadata) = 0;
 
     /**
      * @brief Convert the underlying validator implementation into a Metadata
@@ -200,7 +135,7 @@ class PartitionSelector {
      *
      * @param metadata Metadata of the event.
      */
-    PartitionInfo selectPartitionFor(const Metadata& metadata);
+    size_t selectPartitionFor(const Metadata& metadata);
 
     /**
      * @brief Convert the underlying validator implementation into a Metadata

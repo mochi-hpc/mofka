@@ -66,7 +66,11 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
             /* Step 3.1: validate the metadata */
             topic->m_validator.validate(metadata, data);
             /* Step 3.2: select the partition for this metadata */
-            auto partition = topic->m_selector.selectPartitionFor(metadata);
+            auto partition_index = topic->m_selector.selectPartitionFor(metadata);
+            if(partition_index >= topic->m_partitions.size()) {
+                throw Exception{"Invalid index returned by partition selector"};
+            }
+            auto partition = topic->m_partitions[partition_index];
             {
                 /* Step 3.3: wait for our turn pushing the event into the batch */
                 std::unique_lock<thallium::mutex> guard{self->m_batch_queues_mtx};
@@ -81,7 +85,7 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
                     queue.reset(new ActiveProducerBatchQueue{
                         self->m_name,
                         self->m_topic->m_service->m_client,
-                        partition.self,
+                        partition,
                         self->m_thread_pool,
                         batchSize()});
                 }

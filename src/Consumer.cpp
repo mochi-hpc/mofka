@@ -71,7 +71,7 @@ Future<Event> Consumer::pull() const {
             // (arbitrarily from partition 0)
             // create new event instance
             auto event_impl = std::make_shared<EventImpl>(
-                    NoMoreEvents, std::make_shared<PartitionInfoImpl>(), self);
+                    NoMoreEvents, std::make_shared<MofkaPartitionInfo>(), self);
             promise.setValue(Event{event_impl});
         }
     } else {
@@ -116,7 +116,7 @@ void ConsumerImpl::subscribe() {
             [this, i, &ult_completed, &client](){
                 auto& partition = m_partitions[i];
                 auto& rpc = client->m_consumer_request_events;
-                auto& ph = partition.self->m_ph;
+                auto& ph = partition->m_ph;
                 auto consumer_ptr = reinterpret_cast<intptr_t>(this);
                 Result<void> result = rpc.on(ph)(consumer_ptr, (size_t)i, m_name, (size_t)0, (size_t)0);
                 ult_completed[i].set_value();
@@ -137,7 +137,7 @@ void ConsumerImpl::unsubscribe() {
         m_thread_pool->pushWork(
             [this, i, &ult_completed, &rpc](){
                 auto& partition = m_partitions[i];
-                auto& ph = partition.self->m_ph;
+                auto& ph = partition->m_ph;
                 auto consumer_ptr = reinterpret_cast<intptr_t>(this);
                 Result<void> result = rpc.on(ph)(consumer_ptr, i);
                 ult_completed[i].set_value();
@@ -178,7 +178,7 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
             m_futures.pop_front();
             m_futures_credit = true;
             auto event_impl = std::make_shared<EventImpl>(
-                    NoMoreEvents, std::make_shared<PartitionInfoImpl>(),
+                    NoMoreEvents, std::make_shared<MofkaPartitionInfo>(),
                     shared_from_this());
             promise.setValue(Event{event_impl});
         }
@@ -221,7 +221,7 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
         }
         // create new event instance
         auto event_impl = std::make_shared<EventImpl>(
-            eventID, partition.self, shared_from_this());
+            eventID, partition, shared_from_this());
         // create the ULT
         auto ult = [this, &batch, i, event_impl, promise,
                     metadata_offset, data_desc_offset,
@@ -263,7 +263,7 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
 }
 
 SP<DataImpl> ConsumerImpl::requestData(
-        SP<PartitionInfoImpl> partition,
+        SP<MofkaPartitionInfo> partition,
         SP<MetadataImpl> metadata,
         SP<DataDescriptorImpl> descriptor) {
 

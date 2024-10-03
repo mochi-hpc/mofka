@@ -16,10 +16,10 @@ class EnergyPartitionSelector final : public mofka::PartitionSelectorInterface {
         m_targets = targets;
     }
 
-    mofka::PartitionInfo selectPartitionFor(const mofka::Metadata& metadata) override {
+    size_t selectPartitionFor(const mofka::Metadata& metadata) override {
         auto energy = metadata.json()["energy"].get<size_t>();
         auto i = energy*m_targets.size()/energy_max;
-        return m_targets[i];
+        return i;
     }
 
     mofka::Metadata metadata() const override {
