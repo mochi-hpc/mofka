@@ -32,7 +32,7 @@ jobs:
 
     - name: Show spack-installed packages for debugging
       run: |
-        spack -e tests find -dlv
+        spack -e tests find -dclv
 
     - name: Build code and run unit tests
       run: |
