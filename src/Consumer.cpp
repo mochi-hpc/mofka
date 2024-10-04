@@ -11,7 +11,7 @@
 
 #include "JsonUtil.hpp"
 #include "CerealArchiveAdaptor.hpp"
-#include "EventImpl.hpp"
+#include "MofkaEvent.hpp"
 #include "Promise.hpp"
 #include "ClientImpl.hpp"
 #include "ConsumerImpl.hpp"
@@ -68,7 +68,7 @@ Future<Event> Consumer::pull() const {
             // all partitions are completed, create a NoMoreEvents event
             // (arbitrarily from partition 0)
             // create new event instance
-            promise.setValue(Event{std::make_shared<EventImpl>()});
+            promise.setValue(Event{std::make_shared<MofkaEvent>()});
         }
     } else {
         // the queue of futures has futures already
@@ -173,7 +173,7 @@ void ConsumerImpl::recvBatch(size_t partition_index,
             auto promise = std::move(m_futures.front().first);
             m_futures.pop_front();
             m_futures_credit = true;
-            promise.setValue(Event{std::make_shared<EventImpl>()});
+            promise.setValue(Event{std::make_shared<MofkaEvent>()});
         }
         return;
     }
@@ -239,7 +239,7 @@ void ConsumerImpl::recvBatch(size_t partition_index,
                     descriptor.self);
                 // create the event
                 auto event = Event{
-                    std::make_shared<EventImpl>(
+                    std::make_shared<MofkaEvent>(
                         eventID, std::move(partition),
                         std::move(metadata), std::move(data),
                         m_name, ack_rpc

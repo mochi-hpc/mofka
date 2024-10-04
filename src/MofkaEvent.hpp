@@ -16,17 +16,17 @@
 
 namespace mofka {
 
-class EventImpl {
+class MofkaEvent : public EventInterface {
 
     friend class Event;
 
     public:
 
-    EventImpl()
+    MofkaEvent()
     : m_id{NoMoreEvents}
     {}
 
-    EventImpl(EventID id,
+    MofkaEvent(EventID id,
               std::shared_ptr<MofkaPartitionInfo> partition,
               Metadata metadata,
               Data data,
@@ -40,7 +40,7 @@ class EventImpl {
     , m_acknowledge_rpc{std::move(ack_rpc)}
     {}
 
-    void acknowledge() {
+    void acknowledge() const override {
         using namespace std::string_literals;
         if(m_id == NoMoreEvents)
             throw Exception{"Cannot acknowledge \"NoMoreEvents\""};
@@ -52,22 +52,22 @@ class EventImpl {
         }
     }
 
-    auto partition() const {
+    PartitionInfo partition() const override {
         if(m_partition)
             return m_partition->toPartitionInfo();
         else
             return PartitionInfo{};
     }
 
-    auto metadata() const {
+    Metadata metadata() const override {
         return m_metadata;
     }
 
-    auto data() const {
+    Data data() const override {
         return m_data;
     }
 
-    auto id() const {
+    EventID id() const override {
         return m_id;
     }
 

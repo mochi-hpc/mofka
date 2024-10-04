@@ -18,9 +18,51 @@
 
 namespace mofka {
 
-class EventImpl;
 class ConsumerImpl;
 class Consumer;
+
+/**
+ * @brief The EventInterface is used by streaming drivers
+ * to implement their Event.
+ */
+class EventInterface {
+
+    public:
+
+    /**
+     * @brief Destructor.
+     */
+    virtual ~EventInterface() = default;
+
+    /**
+     * @brief Get an Event's Metadata.
+     */
+    virtual Metadata metadata() const = 0;
+
+    /**
+     * @brief Get an Event's Data.
+     */
+    virtual Data data() const = 0;
+
+    /**
+     * @brief Returns information about the partition
+     * this Event originates from.
+     */
+    virtual PartitionInfo partition() const = 0;
+
+    /**
+     * @brief Returns the EventID.
+     */
+    virtual EventID id() const = 0;
+
+    /**
+     * @brief Acknowledge the event.
+     * Consumers will always restart reading events from the latest
+     * acknowledged event in a partition.
+     */
+    virtual void acknowledge() const = 0;
+
+};
 
 /**
  * @brief An Event object encapsultes Metadata and Event, as well
@@ -35,79 +77,84 @@ class Event {
     public:
 
     /**
-     * @brief Constructor leading to an invalid Event.
+     * @brief Constructor.
      */
-    Event();
+    inline Event(std::shared_ptr<EventInterface> impl = nullptr)
+    : self{std::move(impl)} {}
 
     /**
      * @brief Move-constructor.
      */
-    Event(Event&&);
+    Event(Event&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    Event(const Event&);
+    Event(const Event&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    Event& operator=(const Event&);
+    Event& operator=(const Event&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    Event& operator=(Event&&);
+    Event& operator=(Event&&) = default;
 
     /**
      * @brief Destructor.
      */
-    ~Event();
+    ~Event() = default;
 
     /**
      * @brief Get event Event's Metadata.
      */
-    Metadata metadata() const;
+    inline Metadata metadata() const {
+        return self->metadata();
+    }
 
     /**
      * @brief Get event Event's Data.
      */
-    Data data() const;
+    inline Data data() const {
+        return self->data();
+    }
 
     /**
      * @brief Returns information about the partition
      * this Event originates from.
      */
-    PartitionInfo partition() const;
+    inline PartitionInfo partition() const {
+        return self->partition();
+    }
 
     /**
      * @brief Returns the EventID.
      */
-    EventID id() const;
+    inline EventID id() const {
+        return self->id();
+    }
 
     /**
      * @brief Send a message to the provider to acknowledge the event.
      * Consumers will always restart reading events from the latest
      * acknowledged event in a partition.
      */
-    void acknowledge() const;
+    inline void acknowledge() const {
+        return self->acknowledge();
+    }
 
     /**
      * @brief Checks if the Event instance is valid.
      */
-    operator bool() const;
+    inline operator bool() const {
+        return static_cast<bool>(self);
+    }
 
     private:
 
-    /**
-     * @brief Constructor is private. Use one of the static functions
-     * to create a valid Event object.
-     *
-     * @param impl Pointer to implementation.
-     */
-    Event(const std::shared_ptr<EventImpl>& impl);
-
-    std::shared_ptr<EventImpl> self;
+    std::shared_ptr<EventInterface> self;
 };
 
 }

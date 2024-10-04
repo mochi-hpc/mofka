@@ -19,7 +19,6 @@ set (client-src-files
      Validator.cpp
      EventbridgeValidator.cpp
      ThreadPool.cpp
-     Event.cpp
      PrioPool.cpp)
 
 set (module-src-files
