@@ -20,9 +20,7 @@
 #include "ConsumerBatchImpl.hpp"
 #include <limits>
 
-#include <thallium/serialization/stl/string.hpp>
-#include <thallium/serialization/stl/pair.hpp>
-#include <thallium/serialization/stl/vector.hpp>
+using namespace std::string_literals;
 
 namespace mofka {
 
@@ -70,9 +68,7 @@ Future<Event> Consumer::pull() const {
             // all partitions are completed, create a NoMoreEvents event
             // (arbitrarily from partition 0)
             // create new event instance
-            auto event_impl = std::make_shared<EventImpl>(
-                    NoMoreEvents, std::make_shared<MofkaPartitionInfo>(), self);
-            promise.setValue(Event{event_impl});
+            promise.setValue(Event{std::make_shared<EventImpl>()});
         }
     } else {
         // the queue of futures has futures already
@@ -156,7 +152,7 @@ void ConsumerImpl::unsubscribe() {
     }
 }
 
-void ConsumerImpl::recvBatch(size_t partition_info_index,
+void ConsumerImpl::recvBatch(size_t partition_index,
                              size_t count,
                              EventID startID,
                              const BulkRef &metadata_sizes,
@@ -177,15 +173,12 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
             auto promise = std::move(m_futures.front().first);
             m_futures.pop_front();
             m_futures_credit = true;
-            auto event_impl = std::make_shared<EventImpl>(
-                    NoMoreEvents, std::make_shared<MofkaPartitionInfo>(),
-                    shared_from_this());
-            promise.setValue(Event{event_impl});
+            promise.setValue(Event{std::make_shared<EventImpl>()});
         }
         return;
     }
 
-    auto& partition = m_partitions[partition_info_index];
+    auto partition = m_partitions[partition_index];
 
     auto batch = std::make_shared<ConsumerBatchImpl>(
         m_engine, count, metadata.size, data_desc.size);
@@ -195,6 +188,8 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
     thallium::future<void> ults_completed{(uint32_t)count};
     size_t metadata_offset  = 0;
     size_t data_desc_offset = 0;
+
+    auto ack_rpc = m_topic->m_service->m_client->m_consumer_ack_event;
 
     for(size_t i = 0; i < count; ++i) {
         auto eventID = startID + i;
@@ -219,16 +214,13 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
                 m_futures_credit = true;
             }
         }
-        // create new event instance
-        auto event_impl = std::make_shared<EventImpl>(
-            eventID, partition, shared_from_this());
         // create the ULT
-        auto ult = [this, &batch, i, event_impl, promise,
-                    metadata_offset, data_desc_offset,
+        auto ult = [this, &batch, i, eventID, ack_rpc, promise,
+                    partition, metadata_offset, data_desc_offset,
                     &serializer, &ults_completed]() mutable {
             try {
                 // deserialize its metadata
-                Metadata metadata{event_impl->m_metadata};
+                auto metadata = Metadata{};
                 BufferWrapperInputArchive metadata_archive{
                     std::string_view{
                         batch->m_meta_buffer.data() + metadata_offset,
@@ -242,12 +234,18 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
                 DataDescriptor descriptor;
                 descriptor.load(descriptors_archive);
                 // request Data associated with the event
-                event_impl->m_data = requestData(
-                        event_impl->m_partition,
-                        event_impl->m_metadata,
-                        descriptor.self);
+                auto data = requestData(
+                    partition, metadata,
+                    descriptor.self);
+                // create the event
+                auto event = Event{
+                    std::make_shared<EventImpl>(
+                        eventID, std::move(partition),
+                        std::move(metadata), std::move(data),
+                        m_name, ack_rpc
+                )};
                 // set the promise
-                promise.setValue(Event{event_impl});
+                promise.setValue(std::move(event));
             } catch(const Exception& ex) {
                 // something bad happened somewhere,
                 // pass the exception to the promise.
@@ -262,9 +260,9 @@ void ConsumerImpl::recvBatch(size_t partition_info_index,
     ults_completed.wait();
 }
 
-SP<DataImpl> ConsumerImpl::requestData(
+Data ConsumerImpl::requestData(
         SP<MofkaPartitionInfo> partition,
-        SP<MetadataImpl> metadata,
+        Metadata metadata,
         SP<DataDescriptorImpl> descriptor) {
 
     // run data selector

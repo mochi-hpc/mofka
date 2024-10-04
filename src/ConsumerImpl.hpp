@@ -98,9 +98,9 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
         const BulkRef &data_desc_sizes,
         const BulkRef &data_desc);
 
-    SP<DataImpl> requestData(
+    Data requestData(
         SP<MofkaPartitionInfo> target,
-        SP<MetadataImpl> metadata,
+        Metadata metadata,
         SP<DataDescriptorImpl> descriptor);
 };
 

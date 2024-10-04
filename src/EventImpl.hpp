@@ -6,36 +6,80 @@
 #ifndef MOFKA_EVENT_IMPL_H
 #define MOFKA_EVENT_IMPL_H
 
-#include "PimplUtil.hpp"
-#include "ConsumerImpl.hpp"
-#include "MetadataImpl.hpp"
-#include "DataImpl.hpp"
+#include "mofka/Event.hpp"
 #include "MofkaPartitionInfo.hpp"
 
-#include "mofka/Event.hpp"
-
 #include <thallium.hpp>
+#include <thallium/serialization/stl/string.hpp>
+#include <thallium/serialization/stl/pair.hpp>
+#include <thallium/serialization/stl/vector.hpp>
 
 namespace mofka {
 
 class EventImpl {
 
+    friend class Event;
+
     public:
 
+    EventImpl()
+    : m_id{NoMoreEvents}
+    {}
+
     EventImpl(EventID id,
-              SP<MofkaPartitionInfo> partition,
-              SP<ConsumerImpl> consumer)
+              std::shared_ptr<MofkaPartitionInfo> partition,
+              Metadata metadata,
+              Data data,
+              std::string consumer_name,
+              thallium::remote_procedure ack_rpc)
     : m_id(std::move(id))
     , m_partition(std::move(partition))
-    , m_consumer(std::move(consumer))
-    , m_metadata(std::make_shared<MetadataImpl>("{}", false))
-    , m_data(std::make_shared<DataImpl>()) {}
+    , m_metadata{std::move(metadata)}
+    , m_data{std::move(data)}
+    , m_consumer_name{std::move(consumer_name)}
+    , m_acknowledge_rpc{std::move(ack_rpc)}
+    {}
 
-    EventID                m_id;
-    SP<MofkaPartitionInfo> m_partition;
-    WP<ConsumerImpl>       m_consumer;
-    SP<MetadataImpl>       m_metadata;
-    SP<DataImpl>           m_data;
+    void acknowledge() {
+        using namespace std::string_literals;
+        if(m_id == NoMoreEvents)
+            throw Exception{"Cannot acknowledge \"NoMoreEvents\""};
+        try {
+            auto ph = m_partition->m_ph;
+            m_acknowledge_rpc.on(ph)(m_consumer_name, m_id);
+        } catch(const std::exception& ex) {
+            throw Exception{"Could not acknowledge event: "s + ex.what()};
+        }
+    }
+
+    auto partition() const {
+        if(m_partition)
+            return m_partition->toPartitionInfo();
+        else
+            return PartitionInfo{};
+    }
+
+    auto metadata() const {
+        return m_metadata;
+    }
+
+    auto data() const {
+        return m_data;
+    }
+
+    auto id() const {
+        return m_id;
+    }
+
+    private:
+
+    EventID                             m_id;
+    std::shared_ptr<MofkaPartitionInfo> m_partition;
+    Metadata                            m_metadata;
+    Data                                m_data;
+
+    std::string                m_consumer_name;
+    thallium::remote_procedure m_acknowledge_rpc;
 };
 
 }
