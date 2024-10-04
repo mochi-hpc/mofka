@@ -33,29 +33,31 @@ namespace mofka {
 
 class ProducerBatchImpl {
 
+    std::string                m_producer_name;
+    thallium::engine           m_engine;
+    thallium::provider_handle  m_partition_ph;
+    thallium::remote_procedure m_send_batch_rpc;
+
     std::vector<size_t>        m_meta_sizes;      /* size of each serialized metadata object */
     std::vector<char>          m_meta_buffer;     /* packed serialized metadata objects */
     std::vector<size_t>        m_data_sizes;      /* size of the data associated with each metadata */
     std::vector<Data::Segment> m_data_segments;   /* list of data segments */
-    size_t                     m_total_data_size; /* sum of sizes in the m_data_segments */
+    size_t                     m_total_data_size = 0; /* sum of sizes in the m_data_segments */
 
     std::vector<Promise<EventID>> m_promises; /* promise associated with each event */
 
     public:
 
-    void setPromises(EventID firstID) {
-        auto id = firstID;
-        for(auto& promise : m_promises) {
-            promise.setValue(id);
-            ++id;
-        }
-    }
-
-    void setPromises(Exception ex) {
-        for(auto& promise : m_promises) {
-            promise.setException(std::move(ex));
-        }
-    }
+    ProducerBatchImpl(
+        std::string producer_name,
+        thallium::engine engine,
+        thallium::provider_handle partition_ph,
+        thallium::remote_procedure send_batch)
+    : m_producer_name{std::move(producer_name)}
+    , m_engine{std::move(engine)}
+    , m_partition_ph{std::move(partition_ph)}
+    , m_send_batch_rpc{std::move(send_batch)}
+    {}
 
     void push(
             const Metadata& metadata,
@@ -77,16 +79,65 @@ class ProducerBatchImpl {
         m_promises.push_back(std::move(promise));
     }
 
-    thallium::bulk exposeMetadata(thallium::engine engine) {
+    void send() {
+        thallium::bulk metadata_content, data_content;
+        try {
+            metadata_content = exposeMetadata();
+            data_content = exposeData();
+        } catch(const std::exception& ex) {
+            setPromises(
+                Exception{fmt::format(
+                    "Unexpected error when registering batch for RDMA: {}", ex.what())});
+            return;
+        }
+        try {
+            auto self_addr = static_cast<std::string>(m_engine.self());
+            Result<EventID> result = m_send_batch_rpc.on(m_partition_ph)(
+                m_producer_name, count(),
+                BulkRef{metadata_content, 0, metadataBulkSize(), self_addr},
+                BulkRef{data_content, 0, dataBulkSize(), self_addr});
+            if(result.success()) {
+                setPromises(result.value());
+            } else {
+                setPromises(Exception{result.error()});
+            }
+        } catch(const std::exception& ex) {
+            setPromises(
+                Exception{fmt::format(
+                    "Unexpected error when sending batch: {}", ex.what())});
+        }
+    }
+
+    size_t count() const {
+        return m_meta_sizes.size();
+    }
+
+    private:
+
+    void setPromises(EventID firstID) {
+        auto id = firstID;
+        for(auto& promise : m_promises) {
+            promise.setValue(id);
+            ++id;
+        }
+    }
+
+    void setPromises(Exception ex) {
+        for(auto& promise : m_promises) {
+            promise.setException(std::move(ex));
+        }
+    }
+
+    thallium::bulk exposeMetadata() {
         if(count() == 0) return thallium::bulk{};
         std::vector<std::pair<void *, size_t>> segments;
         segments.reserve(2);
         segments.emplace_back(m_meta_sizes.data(), m_meta_sizes.size()*sizeof(m_meta_sizes[0]));
         segments.emplace_back(m_meta_buffer.data(), m_meta_buffer.size()*sizeof(m_meta_buffer[0]));
-        return engine.expose(segments, thallium::bulk_mode::read_only);
+        return m_engine.expose(segments, thallium::bulk_mode::read_only);
     }
 
-    thallium::bulk exposeData(thallium::engine engine) {
+    thallium::bulk exposeData() {
         if(count() == 0) return thallium::bulk{};
         std::vector<std::pair<void *, size_t>> segments;
         segments.reserve(1 + m_data_segments.size());
@@ -95,11 +146,7 @@ class ProducerBatchImpl {
             if(!seg.size) continue;
             segments.emplace_back(const_cast<void*>(seg.ptr), seg.size);
         }
-        return engine.expose(segments, thallium::bulk_mode::read_only);
-    }
-
-    size_t count() const {
-        return m_meta_sizes.size();
+        return m_engine.expose(segments, thallium::bulk_mode::read_only);
     }
 
     size_t metadataBulkSize() const {
@@ -109,6 +156,7 @@ class ProducerBatchImpl {
     size_t dataBulkSize() const {
         return count()*sizeof(size_t) + m_total_data_size;
     }
+
 };
 
 class ActiveProducerBatchQueue {
@@ -144,10 +192,22 @@ class ActiveProducerBatchQueue {
             need_notification = adaptive;
             std::unique_lock<thallium::mutex> guard{m_mutex};
             if(m_batch_queue.empty())
-                m_batch_queue.push(std::make_shared<ProducerBatchImpl>());
+                m_batch_queue.push(
+                    std::make_shared<ProducerBatchImpl>(
+                        m_producer_name,
+                        m_client->m_engine,
+                        m_partition->m_ph,
+                        m_client->m_producer_send_batch
+                    ));
             auto last_batch = m_batch_queue.back();
             if(!adaptive && last_batch->count() == m_batch_size.value) {
-                m_batch_queue.push(std::make_shared<ProducerBatchImpl>());
+                m_batch_queue.push(
+                    std::make_shared<ProducerBatchImpl>(
+                        m_producer_name,
+                        m_client->m_engine,
+                        m_partition->m_ph,
+                        m_client->m_producer_send_batch
+                    ));
                 last_batch = m_batch_queue.back();
                 need_notification = true;
             }
@@ -207,42 +267,11 @@ class ActiveProducerBatchQueue {
             auto batch = m_batch_queue.front();
             m_batch_queue.pop();
             guard.unlock();
-            sendBatch(batch);
+            batch->send();
             guard.lock();
         }
         m_running = false;
         m_terminated.set_value();
-    }
-
-    void sendBatch(const std::shared_ptr<ProducerBatchImpl>& batch) {
-        thallium::bulk metadata_content, data_content;
-        try {
-            metadata_content = batch->exposeMetadata(m_client->m_engine);
-            data_content = batch->exposeData(m_client->m_engine);
-        } catch(const std::exception& ex) {
-            batch->setPromises(
-                Exception{fmt::format(
-                    "Unexpected error when registering batch for RDMA: {}", ex.what())});
-            return;
-        }
-        try {
-            auto ph = m_partition->m_ph;
-            auto rpc = m_client->m_producer_send_batch;
-            auto self_addr = static_cast<std::string>(m_client->m_engine.self());
-            Result<EventID> result = rpc.on(ph)(
-                m_producer_name,
-                batch->count(),
-                BulkRef{metadata_content, 0, batch->metadataBulkSize(), self_addr},
-                BulkRef{data_content, 0, batch->dataBulkSize(), self_addr});
-            if(result.success()) {
-                batch->setPromises(result.value());
-            } else {
-                batch->setPromises(Exception{result.error()});
-            }
-        } catch(const std::exception& ex) {
-            batch->setPromises(
-                Exception{fmt::format("Unexpected error when sending batch: {}", ex.what())});
-        }
     }
 
     std::string                         m_producer_name;
