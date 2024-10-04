@@ -19,7 +19,6 @@
 #include "mofka/Future.hpp"
 #include "mofka/Consumer.hpp"
 #include "MofkaPartitionInfo.hpp"
-#include "ThreadPoolImpl.hpp"
 #include "ConsumerImpl.hpp"
 #include "Promise.hpp"
 #include "DataImpl.hpp"

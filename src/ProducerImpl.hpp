@@ -27,7 +27,7 @@ class ProducerImpl {
 
     std::string         m_name;
     BatchSize           m_batch_size;
-    SP<ThreadPoolImpl>  m_thread_pool;
+    ThreadPool          m_thread_pool;
     Ordering            m_ordering;
     SP<TopicHandleImpl> m_topic;
 
@@ -46,7 +46,7 @@ class ProducerImpl {
 
     ProducerImpl(std::string_view name,
                  BatchSize batch_size,
-                 SP<ThreadPoolImpl> thread_pool,
+                 ThreadPool thread_pool,
                  Ordering ordering,
                  SP<TopicHandleImpl> topic)
     : m_name(name)

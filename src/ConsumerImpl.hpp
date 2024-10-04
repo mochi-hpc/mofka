@@ -28,18 +28,17 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
 
     public:
 
-    thallium::engine                          m_engine;
-    const std::string                         m_name;
-    const BatchSize                           m_batch_size;
-    const SP<ThreadPoolImpl>                  m_thread_pool;
-    const DataBroker                          m_data_broker;
-    const DataSelector                        m_data_selector;
-    const EventProcessor                      m_event_processor;
-    const std::vector<SP<MofkaPartitionInfo>> m_partitions;
-    const std::shared_ptr<TopicHandleImpl>    m_topic;
+    thallium::engine                    m_engine;
+    std::string                         m_name;
+    BatchSize                           m_batch_size;
+    ThreadPool                          m_thread_pool;
+    DataBroker                          m_data_broker;
+    DataSelector                        m_data_selector;
+    EventProcessor                      m_event_processor;
+    std::vector<SP<MofkaPartitionInfo>> m_partitions;
+    std::shared_ptr<TopicHandleImpl>    m_topic;
 
-    const std::string m_self_addr;
-
+    std::string         m_self_addr;
     std::atomic<size_t> m_completed_partitions = 0;
 
     /* The futures/promises queue works as follows:
@@ -66,7 +65,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     ConsumerImpl(thallium::engine engine,
                  std::string_view name,
                  BatchSize batch_size,
-                 SP<ThreadPoolImpl> thread_pool,
+                 ThreadPool thread_pool,
                  DataBroker broker,
                  DataSelector selector,
                  std::vector<SP<MofkaPartitionInfo>> partitions,

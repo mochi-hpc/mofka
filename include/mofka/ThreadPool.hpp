@@ -75,6 +75,14 @@ class ThreadPool {
     ThreadCount threadCount() const;
 
     /**
+     * @brief Push work into the thread pool.
+     *
+     * @param func Function to push.
+     * @param priority Priority.
+     */
+    void pushWork(std::function<void()> func, uint64_t priority=0) const;
+
+    /**
      * @brief Checks if the ThreadPool instance is valid.
      */
     operator bool() const;

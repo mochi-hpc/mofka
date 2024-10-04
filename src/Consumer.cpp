@@ -16,7 +16,6 @@
 #include "ClientImpl.hpp"
 #include "ConsumerImpl.hpp"
 #include "PimplUtil.hpp"
-#include "ThreadPoolImpl.hpp"
 #include "ConsumerBatchImpl.hpp"
 #include <limits>
 
@@ -108,7 +107,7 @@ void ConsumerImpl::subscribe() {
     auto n = m_partitions.size();
     std::vector<thallium::eventual<void>> ult_completed(n);
     for(size_t i=0; i < n; ++i) {
-        m_thread_pool->pushWork(
+        m_thread_pool.pushWork(
             [this, i, &ult_completed, &client](){
                 auto& partition = m_partitions[i];
                 auto& rpc = client->m_consumer_request_events;
@@ -130,7 +129,7 @@ void ConsumerImpl::unsubscribe() {
     auto n = m_partitions.size();
     std::vector<thallium::eventual<void>> ult_completed(n);
     for(size_t i=0; i < n; ++i) {
-        m_thread_pool->pushWork(
+        m_thread_pool.pushWork(
             [this, i, &ult_completed, &rpc](){
                 auto& partition = m_partitions[i];
                 auto& ph = partition->m_ph;
@@ -253,7 +252,7 @@ void ConsumerImpl::recvBatch(size_t partition_index,
             }
             ults_completed.set(nullptr);
         };
-        m_thread_pool->pushWork(std::move(ult), eventID);
+        m_thread_pool.pushWork(std::move(ult), eventID);
         metadata_offset  += batch->m_meta_sizes[i];
         data_desc_offset += batch->m_data_desc_sizes[i];
     }

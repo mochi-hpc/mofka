@@ -13,7 +13,6 @@
 #include "ClientImpl.hpp"
 #include "ProducerImpl.hpp"
 #include "PimplUtil.hpp"
-#include "ThreadPoolImpl.hpp"
 #include <limits>
 
 #include <thallium/serialization/stl/string.hpp>
@@ -123,7 +122,7 @@ Future<EventID> Producer::push(Metadata metadata, Data data) const {
         self->m_num_posted_ults += 1;
     }
     /* Step 3: submit the ULT */
-    self->m_thread_pool->pushWork(std::move(ult), local_event_id);
+    self->m_thread_pool.pushWork(std::move(ult), local_event_id);
     /* Step 4: return the future */
     return future;
 }

@@ -7,7 +7,6 @@
 #define MOFKA_PRODUCER_BATCH_IMPL_H
 
 #include "MofkaPartitionInfo.hpp"
-#include "ThreadPoolImpl.hpp"
 #include "ProducerImpl.hpp"
 #include "Promise.hpp"
 #include "DataImpl.hpp"
@@ -120,7 +119,7 @@ class ActiveProducerBatchQueue {
         std::string producer_name,
         SP<ClientImpl> client,
         SP<MofkaPartitionInfo> partition,
-        SP<ThreadPoolImpl> thread_pool,
+        ThreadPool thread_pool,
         BatchSize batch_size)
     : m_producer_name(std::move(producer_name))
     , m_client(std::move(client))
@@ -172,7 +171,7 @@ class ActiveProducerBatchQueue {
 
     void start() {
         if(m_running) return;
-        m_thread_pool->pushWork([this]() { loop(); });
+        m_thread_pool.pushWork([this]() { loop(); });
     }
 
     void flush() {
@@ -249,7 +248,7 @@ class ActiveProducerBatchQueue {
     std::string                         m_producer_name;
     SP<ClientImpl>                      m_client;
     SP<MofkaPartitionInfo>              m_partition;
-    SP<ThreadPoolImpl>                  m_thread_pool;
+    ThreadPool                          m_thread_pool;
     BatchSize                           m_batch_size;
     std::queue<SP<ProducerBatchImpl>>   m_batch_queue;
     thallium::managed<thallium::thread> m_sender_ult;
