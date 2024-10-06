@@ -53,7 +53,10 @@ Consumer TopicHandle::makeConsumer(
     auto consumer = std::make_shared<ConsumerImpl>(
             self->m_service->m_client->m_engine,
             name, batch_size, std::move(thread_pool),
-            data_broker, data_selector, std::move(partitions), self);
+            data_broker, data_selector, self,
+            std::move(partitions),
+            self->m_service->m_client->m_consumer_request_data,
+            self->m_service->m_client->m_consumer_ack_event);
     consumer->subscribe();
     return consumer;
 }

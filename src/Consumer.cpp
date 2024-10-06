@@ -8,6 +8,7 @@
 #include "mofka/Exception.hpp"
 #include "mofka/TopicHandle.hpp"
 #include "mofka/Future.hpp"
+#include "mofka/BufferWrapperArchive.hpp"
 
 #include "JsonUtil.hpp"
 #include "CerealArchiveAdaptor.hpp"
@@ -188,8 +189,6 @@ void ConsumerImpl::recvBatch(size_t partition_index,
     size_t metadata_offset  = 0;
     size_t data_desc_offset = 0;
 
-    auto ack_rpc = m_topic->m_service->m_client->m_consumer_ack_event;
-
     for(size_t i = 0; i < count; ++i) {
         auto eventID = startID + i;
         // get a promise/future pair
@@ -214,7 +213,7 @@ void ConsumerImpl::recvBatch(size_t partition_index,
             }
         }
         // create the ULT
-        auto ult = [this, &batch, i, eventID, ack_rpc, promise,
+        auto ult = [this, &batch, i, eventID, promise,
                     partition, metadata_offset, data_desc_offset,
                     &serializer, &ults_completed]() mutable {
             try {
@@ -241,7 +240,7 @@ void ConsumerImpl::recvBatch(size_t partition_index,
                     std::make_shared<MofkaEvent>(
                         eventID, std::move(partition),
                         std::move(metadata), std::move(data),
-                        m_name, ack_rpc
+                        m_name, m_consumer_ack_event
                 )};
                 // set the promise
                 promise.setValue(std::move(event));
@@ -297,7 +296,7 @@ Data ConsumerImpl::requestData(
     };
 
     // request data
-    auto& rpc = m_topic->m_service->m_client->m_consumer_request_data;
+    auto& rpc = m_consumer_request_data;
     auto& ph  = partition->m_ph;
 
     Result<std::vector<Result<void>>> result = rpc.on(ph)(

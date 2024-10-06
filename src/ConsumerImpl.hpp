@@ -7,10 +7,10 @@
 #define MOFKA_CONSUMER_IMPL_H
 
 #include "PimplUtil.hpp"
-#include "TopicHandleImpl.hpp"
 #include "MofkaPartitionInfo.hpp"
-#include "ProducerImpl.hpp"
+#include "Promise.hpp"
 
+#include "TopicHandleImpl.hpp"
 #include "mofka/Consumer.hpp"
 #include "mofka/UUID.hpp"
 
@@ -35,11 +35,14 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     DataBroker                          m_data_broker;
     DataSelector                        m_data_selector;
     EventProcessor                      m_event_processor;
+    SP<TopicHandleImpl>                 m_topic;
     std::vector<SP<MofkaPartitionInfo>> m_partitions;
-    std::shared_ptr<TopicHandleImpl>    m_topic;
 
     std::string         m_self_addr;
     std::atomic<size_t> m_completed_partitions = 0;
+
+    thallium::remote_procedure m_consumer_request_data;
+    thallium::remote_procedure m_consumer_ack_event;
 
     /* The futures/promises queue works as follows:
      *
@@ -68,17 +71,22 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
                  ThreadPool thread_pool,
                  DataBroker broker,
                  DataSelector selector,
+                 SP<TopicHandleImpl> topic,
                  std::vector<SP<MofkaPartitionInfo>> partitions,
-                 std::shared_ptr<TopicHandleImpl> topic)
+                 thallium::remote_procedure request_data,
+                 thallium::remote_procedure ack_event)
     : m_engine(std::move(engine))
     , m_name(name)
     , m_batch_size(batch_size)
     , m_thread_pool(std::move(thread_pool))
     , m_data_broker(std::move(broker))
     , m_data_selector(std::move(selector))
-    , m_partitions(std::move(partitions))
     , m_topic(std::move(topic))
-    , m_self_addr(m_engine.self()) {}
+    , m_partitions(std::move(partitions))
+    , m_self_addr(m_engine.self())
+    , m_consumer_request_data{request_data}
+    , m_consumer_ack_event{ack_event}
+    {}
 
     ~ConsumerImpl() {
         unsubscribe();
