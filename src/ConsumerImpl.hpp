@@ -22,11 +22,7 @@ namespace mofka {
 
 namespace tl = thallium;
 
-class ClientImpl;
-
 class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
-
-    friend class ClientImpl;
 
     #define MOFKA_MAGIC_NUMBER (*((uint64_t*)"matthieu"))
 

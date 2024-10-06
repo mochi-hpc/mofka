@@ -95,7 +95,7 @@ ServiceHandle Client::connect(const std::string& groupfile) const {
         }
         auto bsgh = self->m_bedrock_client.makeServiceGroupHandle(addresses);
         auto master = discoverMofkaServiceMaster(bsgh);
-        return std::make_shared<ServiceHandleImpl>(self, std::move(bsgh), master);
+        return std::make_shared<ServiceHandleImpl>(*this, std::move(bsgh), master);
     } catch(const std::exception& ex) {
         throw Exception(ex.what());
     }

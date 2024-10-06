@@ -10,7 +10,6 @@
 
 #include "JsonUtil.hpp"
 #include "PimplUtil.hpp"
-#include "ClientImpl.hpp"
 #include "ServiceHandleImpl.hpp"
 #include "TopicHandleImpl.hpp"
 #include "MetadataImpl.hpp"
@@ -197,14 +196,14 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
         uint16_t provider_id = partitionMetadataJson["provider_id"].get<uint16_t>();
         auto partitionInfo = std::make_shared<MofkaPartitionInfo>(
             uuid, thallium::provider_handle{
-                self->m_client->m_engine.lookup(address),
+                self->m_client.engine().lookup(address),
                 provider_id}
         );
         partitionsList.push_back(std::move(partitionInfo));
     }
 
     return std::make_shared<TopicHandleImpl>(
-        self->m_client->m_engine, name, self,
+        self->m_client.engine(), name, self,
         std::move(validator),
         std::move(selector),
         std::move(serializer),

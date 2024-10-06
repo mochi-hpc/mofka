@@ -51,7 +51,7 @@ Consumer TopicHandle::makeConsumer(
         }
     }
     auto consumer = std::make_shared<ConsumerImpl>(
-            self->m_service->m_client->m_engine,
+            self->m_service->m_client.engine(),
             name, batch_size, std::move(thread_pool),
             data_broker, data_selector, self,
             std::move(partitions));
@@ -64,7 +64,7 @@ const std::vector<PartitionInfo>& TopicHandle::partitions() const {
 }
 
 void TopicHandle::markAsComplete() const {
-    auto engine = self->m_service->m_client->m_engine;
+    auto engine = self->m_service->m_client.engine();
     auto rpc = self->m_topic_mark_as_complete;
     std::vector<tl::async_response> responses;
     std::vector<Result<void>> results;

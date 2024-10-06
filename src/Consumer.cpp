@@ -313,7 +313,10 @@ void ConsumerImpl::forwardBatchToConsumer(
         result.error() = "Consumer seems to have be destroyed be client";
         result.success() = false;
     } else {
-        consumer_impl->recvBatch(
+        auto consumer_ptr = consumer_impl->shared_from_this();
+        // NOTE: we convert the pointer into a shared pointer to prevent
+        // the consumer from disappearing while the RPC executes.
+        consumer_ptr->recvBatch(
                 target_info_index, count, firstID,
                 metadata_sizes, metadata,
                 data_desc_sizes, data_desc);
