@@ -108,20 +108,4 @@ const Metadata& Client::getConfig() const {
     return config;
 }
 
-void ClientImpl::forwardBatchToConsumer(
-        const thallium::request& req,
-        intptr_t consumer_ctx,
-        size_t target_info_index,
-        size_t count,
-        EventID firstID,
-        const BulkRef &metadata_sizes,
-        const BulkRef &metadata,
-        const BulkRef &data_desc_sizes,
-        const BulkRef &data_desc) {
-    Result<void> result;
-    ConsumerImpl* consumer_impl = reinterpret_cast<ConsumerImpl*>(consumer_ctx);
-    consumer_impl->recvBatch(target_info_index, count, firstID, metadata_sizes, metadata, data_desc_sizes, data_desc);
-    req.respond(result);
-}
-
 }

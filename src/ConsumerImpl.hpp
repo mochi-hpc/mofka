@@ -20,14 +20,19 @@
 
 namespace mofka {
 
+namespace tl = thallium;
+
 class ClientImpl;
 
 class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
 
     friend class ClientImpl;
 
+    #define MOFKA_MAGIC_NUMBER (*((uint64_t*)"matthieu"))
+
     public:
 
+    uint64_t                            m_magic_number = MOFKA_MAGIC_NUMBER;
     thallium::engine                    m_engine;
     std::string                         m_name;
     BatchSize                           m_batch_size;
@@ -41,8 +46,11 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     std::string         m_self_addr;
     std::atomic<size_t> m_completed_partitions = 0;
 
-    thallium::remote_procedure m_consumer_request_data;
-    thallium::remote_procedure m_consumer_ack_event;
+    tl::remote_procedure m_consumer_request_events;
+    tl::remote_procedure m_consumer_ack_event;
+    tl::remote_procedure m_consumer_remove_consumer;
+    tl::remote_procedure m_consumer_request_data;
+    tl::remote_procedure m_consumer_recv_batch;
 
     /* The futures/promises queue works as follows:
      *
@@ -72,9 +80,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
                  DataBroker broker,
                  DataSelector selector,
                  SP<TopicHandleImpl> topic,
-                 std::vector<SP<MofkaPartitionInfo>> partitions,
-                 thallium::remote_procedure request_data,
-                 thallium::remote_procedure ack_event)
+                 std::vector<SP<MofkaPartitionInfo>> partitions)
     : m_engine(std::move(engine))
     , m_name(name)
     , m_batch_size(batch_size)
@@ -84,12 +90,16 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     , m_topic(std::move(topic))
     , m_partitions(std::move(partitions))
     , m_self_addr(m_engine.self())
-    , m_consumer_request_data{request_data}
-    , m_consumer_ack_event{ack_event}
+    , m_consumer_request_events(m_engine.define("mofka_consumer_request_events"))
+    , m_consumer_ack_event(m_engine.define("mofka_consumer_ack_event"))
+    , m_consumer_remove_consumer(m_engine.define("mofka_consumer_remove_consumer"))
+    , m_consumer_request_data(m_engine.define("mofka_consumer_request_data"))
+    , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch", forwardBatchToConsumer))
     {}
 
     ~ConsumerImpl() {
         unsubscribe();
+        m_magic_number = 0;
     }
 
     void subscribe();
@@ -109,6 +119,17 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
         SP<MofkaPartitionInfo> target,
         Metadata metadata,
         SP<DataDescriptorImpl> descriptor);
+
+    static void forwardBatchToConsumer(
+            const thallium::request& req,
+            intptr_t consumer_ctx,
+            size_t target_info_index,
+            size_t count,
+            EventID firstID,
+            const BulkRef &metadata_sizes,
+            const BulkRef &metadata,
+            const BulkRef &data_desc_sizes,
+            const BulkRef &data_desc);
 };
 
 }

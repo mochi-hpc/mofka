@@ -54,9 +54,7 @@ Consumer TopicHandle::makeConsumer(
             self->m_service->m_client->m_engine,
             name, batch_size, std::move(thread_pool),
             data_broker, data_selector, self,
-            std::move(partitions),
-            self->m_service->m_client->m_consumer_request_data,
-            self->m_service->m_client->m_consumer_ack_event);
+            std::move(partitions));
     consumer->subscribe();
     return consumer;
 }

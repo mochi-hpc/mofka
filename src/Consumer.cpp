@@ -96,22 +96,14 @@ NumEvents NumEvents::Infinity() {
 }
 
 void ConsumerImpl::subscribe() {
-    // add this ConsumerImpl to the Client's active consumers
-    auto& client               = m_topic->m_service->m_client;
-    auto& active_consumers     = client->m_consumers;
-    auto& active_consumers_mtx = client->m_consumers_mtx;
-    {
-        std::unique_lock g{active_consumers_mtx};
-        active_consumers[this] = shared_from_this();
-    }
     // for each partition, send a subscription RPC to that partition
     auto n = m_partitions.size();
     std::vector<thallium::eventual<void>> ult_completed(n);
     for(size_t i=0; i < n; ++i) {
         m_thread_pool.pushWork(
-            [this, i, &ult_completed, &client](){
+            [this, i, &ult_completed](){
                 auto& partition = m_partitions[i];
-                auto& rpc = client->m_consumer_request_events;
+                auto& rpc = m_consumer_request_events;
                 auto& ph = partition->m_ph;
                 auto consumer_ptr = reinterpret_cast<intptr_t>(this);
                 Result<void> result = rpc.on(ph)(consumer_ptr, (size_t)i, m_name, (size_t)0, (size_t)0);
@@ -126,7 +118,7 @@ void ConsumerImpl::subscribe() {
 
 void ConsumerImpl::unsubscribe() {
     // send a message to all the partitions requesting to disconnect
-    auto& rpc = m_topic->m_service->m_client->m_consumer_remove_consumer;
+    auto& rpc = m_consumer_remove_consumer;
     auto n = m_partitions.size();
     std::vector<thallium::eventual<void>> ult_completed(n);
     for(size_t i=0; i < n; ++i) {
@@ -143,13 +135,6 @@ void ConsumerImpl::unsubscribe() {
     // wait for the ULTs to complete
     for(auto& ev : ult_completed)
         ev.wait();
-    // remove from client's active consumers
-    auto& active_consumers     = m_topic->m_service->m_client->m_consumers;
-    auto& active_consumers_mtx = m_topic->m_service->m_client->m_consumers_mtx;
-    {
-        std::unique_lock g{active_consumers_mtx};
-        active_consumers.erase(this);
-    }
 }
 
 void ConsumerImpl::recvBatch(size_t partition_index,
@@ -311,6 +296,30 @@ Data ConsumerImpl::requestData(
     }
 
     return data.self;
+}
+
+void ConsumerImpl::forwardBatchToConsumer(
+        const thallium::request& req,
+        intptr_t consumer_ctx,
+        size_t target_info_index,
+        size_t count,
+        EventID firstID,
+        const BulkRef &metadata_sizes,
+        const BulkRef &metadata,
+        const BulkRef &data_desc_sizes,
+        const BulkRef &data_desc) {
+    Result<void> result;
+    ConsumerImpl* consumer_impl = reinterpret_cast<ConsumerImpl*>(consumer_ctx);
+    if(consumer_impl->m_magic_number != MOFKA_MAGIC_NUMBER) {
+        result.error() = "Consumer seems to have be destroyed be client";
+        result.success() = false;
+    } else {
+        consumer_impl->recvBatch(
+                target_info_index, count, firstID,
+                metadata_sizes, metadata,
+                data_desc_sizes, data_desc);
+    }
+    req.respond(result);
 }
 
 }
