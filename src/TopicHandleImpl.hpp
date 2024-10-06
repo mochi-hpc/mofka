@@ -30,6 +30,8 @@ class TopicHandleImpl {
     std::vector<SP<MofkaPartitionInfo>> m_partitions;
     std::vector<PartitionInfo>          m_partitions_info;
 
+    tl::remote_procedure m_topic_mark_as_complete;
+
     TopicHandleImpl() = default;
 
     TopicHandleImpl(tl::engine engine,
@@ -45,7 +47,8 @@ class TopicHandleImpl {
     , m_validator(std::move(validator))
     , m_selector(std::move(selector))
     , m_serializer(std::move(serializer))
-    , m_partitions(std::move(partitions)) {
+    , m_partitions(std::move(partitions))
+    , m_topic_mark_as_complete{m_engine.define("mofka_topic_mark_as_complete")} {
         m_partitions_info.reserve(m_partitions.size());
         for(auto& p : m_partitions) {
             m_partitions_info.push_back(p->toPartitionInfo());

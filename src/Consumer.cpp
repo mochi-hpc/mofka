@@ -14,7 +14,6 @@
 #include "CerealArchiveAdaptor.hpp"
 #include "MofkaEvent.hpp"
 #include "Promise.hpp"
-#include "ClientImpl.hpp"
 #include "ConsumerImpl.hpp"
 #include "PimplUtil.hpp"
 #include "ConsumerBatchImpl.hpp"

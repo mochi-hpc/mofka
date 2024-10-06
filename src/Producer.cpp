@@ -10,7 +10,6 @@
 #include "mofka/Future.hpp"
 
 #include "Promise.hpp"
-#include "ClientImpl.hpp"
 #include "ProducerImpl.hpp"
 #include "PimplUtil.hpp"
 #include <limits>

@@ -26,14 +26,11 @@ class ClientImpl {
 
     public:
 
-    tl::engine           m_engine;
-    tl::remote_procedure m_topic_mark_as_complete;
-
-    bedrock::Client      m_bedrock_client;
+    tl::engine      m_engine;
+    bedrock::Client m_bedrock_client;
 
     ClientImpl(const tl::engine& engine)
     : m_engine(engine)
-    , m_topic_mark_as_complete(m_engine.define("mofka_topic_mark_as_complete"))
     , m_bedrock_client(m_engine)
     {}
 };

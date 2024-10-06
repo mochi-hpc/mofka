@@ -8,7 +8,6 @@
 #include "mofka/Exception.hpp"
 
 #include "PimplUtil.hpp"
-#include "ClientImpl.hpp"
 #include "TopicHandleImpl.hpp"
 #include "ProducerImpl.hpp"
 #include "ConsumerImpl.hpp"
@@ -66,7 +65,7 @@ const std::vector<PartitionInfo>& TopicHandle::partitions() const {
 
 void TopicHandle::markAsComplete() const {
     auto engine = self->m_service->m_client->m_engine;
-    auto rpc = self->m_service->m_client->m_topic_mark_as_complete;
+    auto rpc = self->m_topic_mark_as_complete;
     std::vector<tl::async_response> responses;
     std::vector<Result<void>> results;
     responses.reserve(self->m_partitions.size());
