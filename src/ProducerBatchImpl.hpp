@@ -31,6 +31,8 @@
 
 namespace mofka {
 
+namespace tl = thallium;
+
 class ProducerBatchImpl {
 
     std::string                m_producer_name;
@@ -164,13 +166,15 @@ class ActiveProducerBatchQueue {
     public:
 
     ActiveProducerBatchQueue(
+        tl::engine engine,
+        tl::remote_procedure send_batch,
         std::string producer_name,
-        SP<ClientImpl> client,
         SP<MofkaPartitionInfo> partition,
         ThreadPool thread_pool,
         BatchSize batch_size)
-    : m_producer_name(std::move(producer_name))
-    , m_client(std::move(client))
+    : m_engine{std::move(engine)}
+    , m_producer_send_batch(send_batch)
+    , m_producer_name(std::move(producer_name))
     , m_partition(std::move(partition))
     , m_thread_pool{std::move(thread_pool)}
     , m_batch_size{batch_size} {
@@ -195,18 +199,18 @@ class ActiveProducerBatchQueue {
                 m_batch_queue.push(
                     std::make_shared<ProducerBatchImpl>(
                         m_producer_name,
-                        m_client->m_engine,
+                        m_engine,
                         m_partition->m_ph,
-                        m_client->m_producer_send_batch
+                        m_producer_send_batch
                     ));
             auto last_batch = m_batch_queue.back();
             if(!adaptive && last_batch->count() == m_batch_size.value) {
                 m_batch_queue.push(
                     std::make_shared<ProducerBatchImpl>(
                         m_producer_name,
-                        m_client->m_engine,
+                        m_engine,
                         m_partition->m_ph,
-                        m_client->m_producer_send_batch
+                        m_producer_send_batch
                     ));
                 last_batch = m_batch_queue.back();
                 need_notification = true;
@@ -274,8 +278,9 @@ class ActiveProducerBatchQueue {
         m_terminated.set_value();
     }
 
+    tl::engine                          m_engine;
+    tl::remote_procedure                m_producer_send_batch;
     std::string                         m_producer_name;
-    SP<ClientImpl>                      m_client;
     SP<MofkaPartitionInfo>              m_partition;
     ThreadPool                          m_thread_pool;
     BatchSize                           m_batch_size;

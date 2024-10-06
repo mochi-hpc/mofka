@@ -15,10 +15,13 @@
 
 namespace mofka {
 
+namespace tl = thallium;
+
 class TopicHandleImpl {
 
     public:
 
+    tl::engine                          m_engine;
     std::string                         m_name;
     SP<ServiceHandleImpl>               m_service;
     Validator                           m_validator;
@@ -29,13 +32,15 @@ class TopicHandleImpl {
 
     TopicHandleImpl() = default;
 
-    TopicHandleImpl(std::string_view name,
+    TopicHandleImpl(tl::engine engine,
+                    std::string_view name,
                     SP<ServiceHandleImpl> service,
                     Validator validator,
                     PartitionSelector selector,
                     Serializer serializer,
                     std::vector<SP<MofkaPartitionInfo>> partitions)
-    : m_name(name)
+    : m_engine{std::move(engine)}
+    , m_name(name)
     , m_service(std::move(service))
     , m_validator(std::move(validator))
     , m_selector(std::move(selector))

@@ -21,15 +21,20 @@
 
 namespace mofka {
 
+namespace tl = thallium;
+
 class ProducerImpl {
 
     public:
 
+    tl::engine          m_engine;
     std::string         m_name;
     BatchSize           m_batch_size;
     ThreadPool          m_thread_pool;
     Ordering            m_ordering;
     SP<TopicHandleImpl> m_topic;
+
+    tl::remote_procedure m_producer_send_batch;
 
     std::unordered_map<
         SP<MofkaPartitionInfo>,
@@ -44,16 +49,20 @@ class ProducerImpl {
     std::atomic<size_t> m_num_pushed_events = 0;
     std::atomic<size_t> m_num_ready_events = 0;
 
-    ProducerImpl(std::string_view name,
+    ProducerImpl(tl::engine engine,
+                 std::string_view name,
                  BatchSize batch_size,
                  ThreadPool thread_pool,
                  Ordering ordering,
                  SP<TopicHandleImpl> topic)
-    : m_name(name)
+    : m_engine{std::move(engine)}
+    , m_name(name)
     , m_batch_size(batch_size)
     , m_thread_pool(std::move(thread_pool))
     , m_ordering(ordering)
-    , m_topic(std::move(topic)) {}
+    , m_topic(std::move(topic))
+    , m_producer_send_batch(m_engine.define("mofka_producer_send_batch"))
+    {}
 
 };
 

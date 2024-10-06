@@ -27,15 +27,12 @@ class ClientImpl {
     public:
 
     tl::engine           m_engine;
-    tl::remote_procedure m_get_uuid;
-    tl::remote_procedure m_producer_send_batch;
     tl::remote_procedure m_topic_mark_as_complete;
 
     bedrock::Client      m_bedrock_client;
 
     ClientImpl(const tl::engine& engine)
     : m_engine(engine)
-    , m_producer_send_batch(m_engine.define("mofka_producer_send_batch"))
     , m_topic_mark_as_complete(m_engine.define("mofka_topic_mark_as_complete"))
     , m_bedrock_client(m_engine)
     {}

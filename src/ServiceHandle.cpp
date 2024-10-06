@@ -204,7 +204,7 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
     }
 
     return std::make_shared<TopicHandleImpl>(
-        name, self,
+        self->m_client->m_engine, name, self,
         std::move(validator),
         std::move(selector),
         std::move(serializer),

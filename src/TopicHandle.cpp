@@ -29,7 +29,8 @@ Producer TopicHandle::makeProducer(
         BatchSize batch_size,
         ThreadPool thread_pool,
         Ordering ordering) const {
-    return std::make_shared<ProducerImpl>(name, batch_size, std::move(thread_pool), ordering, self);
+    return std::make_shared<ProducerImpl>(
+        self->m_engine, name, batch_size, std::move(thread_pool), ordering, self);
 }
 
 Consumer TopicHandle::makeConsumer(
