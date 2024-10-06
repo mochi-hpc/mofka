@@ -258,7 +258,9 @@ void ServiceHandle::addDefaultPartition(std::string_view topic_name,
 
             if(metadata_provider.empty()) {
                 if(candidates.contains("metadata")) {
-                    dependencies["metadata"] = {candidates["metadata"].get<std::string>()};
+                    dependencies["metadata"] = {
+                        candidates["metadata"].get<std::string>() + "@"
+                        + candidates["address"].get<std::string>()};
                 } else {
                     throw Exception(
                         "No metadata provider provided or found in server. "
@@ -268,7 +270,9 @@ void ServiceHandle::addDefaultPartition(std::string_view topic_name,
             }
             if(data_provider.empty()) {
                 if(candidates.contains("data")) {
-                    dependencies["data"] = {candidates["data"].get<std::string>()};
+                    dependencies["data"] = {
+                        candidates["data"].get<std::string>() + "@"
+                        + candidates["address"].get<std::string>()};
                 } else {
                     throw Exception(
                         "No data provider provided or found in server. "

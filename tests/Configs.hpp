@@ -37,13 +37,14 @@ static inline const char* config = R"(
                     "type": "memory",
                     "config": {}
                 }
-            }
+            },
+            "tags": ["mofka:data"]
         },
         {
             "name" : "my_yokan_provider",
             "type" : "yokan",
             "provider_id" : 3,
-            "tags" : [ "mofka:master" ],
+            "tags" : [ "mofka:master", "mofka:metadata" ],
             "config" : {
                 "database" : {
                     "type": "map",
