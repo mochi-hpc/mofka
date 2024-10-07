@@ -23,7 +23,7 @@ using namespace std::string_literals;
 
 namespace mofka {
 
-PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DTOR(Consumer);
+PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DCTOR(Consumer);
 
 Consumer::~Consumer() {
     if(self.use_count() == 1)

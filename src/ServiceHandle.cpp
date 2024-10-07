@@ -11,7 +11,7 @@
 #include "JsonUtil.hpp"
 #include "PimplUtil.hpp"
 #include "ServiceHandleImpl.hpp"
-#include "TopicHandleImpl.hpp"
+#include "MofkaTopicHandle.hpp"
 #include "MetadataImpl.hpp"
 
 namespace mofka {
@@ -202,12 +202,12 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
         partitionsList.push_back(std::move(partitionInfo));
     }
 
-    return std::make_shared<TopicHandleImpl>(
+    return TopicHandle{std::make_shared<MofkaTopicHandle>(
         self->m_client.engine(), name, self,
         std::move(validator),
         std::move(selector),
         std::move(serializer),
-        std::move(partitionsList));
+        std::move(partitionsList))};
 }
 
 void ServiceHandle::addMemoryPartition(std::string_view topic_name,

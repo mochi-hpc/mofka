@@ -7,7 +7,7 @@
 #define MOFKA_PRODUCER_IMPL_H
 
 #include "PimplUtil.hpp"
-#include "TopicHandleImpl.hpp"
+#include "MofkaTopicHandle.hpp"
 #include "MofkaPartitionInfo.hpp"
 #include "ProducerBatchImpl.hpp"
 
@@ -24,16 +24,18 @@ namespace mofka {
 
 namespace tl = thallium;
 
+class MofkaTopicHandle;
+
 class MofkaProducer : public ProducerInterface {
 
     public:
 
-    tl::engine          m_engine;
-    std::string         m_name;
-    BatchSize           m_batch_size;
-    ThreadPool          m_thread_pool;
-    Ordering            m_ordering;
-    SP<TopicHandleImpl> m_topic;
+    tl::engine           m_engine;
+    std::string          m_name;
+    BatchSize            m_batch_size;
+    ThreadPool           m_thread_pool;
+    Ordering             m_ordering;
+    SP<MofkaTopicHandle> m_topic;
 
     tl::remote_procedure m_producer_send_batch;
 
@@ -55,7 +57,7 @@ class MofkaProducer : public ProducerInterface {
                  BatchSize batch_size,
                  ThreadPool thread_pool,
                  Ordering ordering,
-                 SP<TopicHandleImpl> topic)
+                 SP<MofkaTopicHandle> topic)
     : m_engine{std::move(engine)}
     , m_name(name)
     , m_batch_size(batch_size)
@@ -73,9 +75,7 @@ class MofkaProducer : public ProducerInterface {
         return m_name;
     }
 
-    TopicHandle topic() const override {
-        return TopicHandle{m_topic};
-    }
+    TopicHandle topic() const override;
 
     BatchSize batchSize() const override {
         return m_batch_size;

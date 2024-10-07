@@ -11,7 +11,6 @@
 #include "JsonUtil.hpp"
 #include "PimplUtil.hpp"
 #include "ClientImpl.hpp"
-#include "TopicHandleImpl.hpp"
 #include "ConsumerImpl.hpp"
 
 #include <nlohmann/json.hpp>

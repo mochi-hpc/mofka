@@ -19,7 +19,6 @@
 namespace mofka {
 
 class PartitionInfoImpl;
-class TopicHandleImpl;
 class ClientImpl;
 class ServiceHandle;
 class ConsumerImpl;

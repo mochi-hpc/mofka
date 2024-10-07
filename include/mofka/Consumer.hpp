@@ -39,7 +39,7 @@ class Consumer {
     /**
      * @brief Constructor. The resulting Consumer handle will be invalid.
      */
-    Consumer();
+    Consumer(const std::shared_ptr<ConsumerImpl>& impl = nullptr);
 
     /**
      * @brief Copy-constructor.
@@ -142,14 +142,6 @@ class Consumer {
     operator bool() const;
 
     private:
-
-    /**
-     * @brief Constructor is private. Use a Client object
-     * to create a Consumer instance.
-     *
-     * @param impl Pointer to implementation.
-     */
-    Consumer(const std::shared_ptr<ConsumerImpl>& impl);
 
     std::shared_ptr<ConsumerImpl> self;
 };

@@ -19,6 +19,10 @@
 
 namespace mofka {
 
+TopicHandle MofkaProducer::topic() const {
+    return TopicHandle{m_topic};
+}
+
 Future<EventID> MofkaProducer::push(Metadata metadata, Data data) {
     /* Step 1: create a future/promise pair for this operation */
     Future<EventID> future;

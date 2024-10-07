@@ -10,7 +10,7 @@
 #include "MofkaPartitionInfo.hpp"
 #include "Promise.hpp"
 
-#include "TopicHandleImpl.hpp"
+#include "MofkaTopicHandle.hpp"
 #include "mofka/Consumer.hpp"
 #include "mofka/UUID.hpp"
 
@@ -36,7 +36,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     DataBroker                          m_data_broker;
     DataSelector                        m_data_selector;
     EventProcessor                      m_event_processor;
-    SP<TopicHandleImpl>                 m_topic;
+    SP<MofkaTopicHandle>                m_topic;
     std::vector<SP<MofkaPartitionInfo>> m_partitions;
 
     std::string         m_self_addr;
@@ -75,7 +75,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
                  ThreadPool thread_pool,
                  DataBroker broker,
                  DataSelector selector,
-                 SP<TopicHandleImpl> topic,
+                 SP<MofkaTopicHandle> topic,
                  std::vector<SP<MofkaPartitionInfo>> partitions)
     : m_engine(std::move(engine))
     , m_name(name)

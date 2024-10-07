@@ -8,7 +8,7 @@
 #include "mofka/Exception.hpp"
 
 #include "PimplUtil.hpp"
-#include "TopicHandleImpl.hpp"
+#include "MofkaTopicHandle.hpp"
 #include "MofkaProducer.hpp"
 #include "ConsumerImpl.hpp"
 
@@ -17,22 +17,17 @@
 
 namespace mofka {
 
-PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(TopicHandle);
-
-const std::string& TopicHandle::name() const {
-    return self->m_name;
-}
-
-Producer TopicHandle::makeProducer(
+Producer MofkaTopicHandle::makeProducer(
         std::string_view name,
         BatchSize batch_size,
         ThreadPool thread_pool,
         Ordering ordering) const {
     return Producer{std::make_shared<MofkaProducer>(
-        self->m_engine, name, batch_size, std::move(thread_pool), ordering, self)};
+        m_engine, name, batch_size, std::move(thread_pool), ordering,
+        const_cast<MofkaTopicHandle*>(this)->shared_from_this())};
 }
 
-Consumer TopicHandle::makeConsumer(
+Consumer MofkaTopicHandle::makeConsumer(
         std::string_view name,
         BatchSize batch_size,
         ThreadPool thread_pool,
@@ -41,49 +36,34 @@ Consumer TopicHandle::makeConsumer(
         const std::vector<size_t>& targets) const {
     std::vector<SP<MofkaPartitionInfo>> partitions;
     if(targets.empty()) {
-        partitions = self->m_partitions;
+        partitions = m_partitions;
     } else {
         partitions.reserve(targets.size());
         for(auto& partition_index : targets) {
-            if(partition_index >= self->m_partitions.size())
+            if(partition_index >= m_partitions.size())
                 throw Exception{"Invalid partition index passed to TopicHandle::consumer()"};
-            partitions.push_back(self->m_partitions[partition_index]);
+            partitions.push_back(m_partitions[partition_index]);
         }
     }
     auto consumer = std::make_shared<ConsumerImpl>(
-            self->m_service->m_client.engine(),
+            m_service->m_client.engine(),
             name, batch_size, std::move(thread_pool),
-            data_broker, data_selector, self,
+            data_broker, data_selector,
+            const_cast<MofkaTopicHandle*>(this)->shared_from_this(),
             std::move(partitions));
     consumer->subscribe();
     return consumer;
 }
 
-const std::vector<PartitionInfo>& TopicHandle::partitions() const {
-    return self->m_partitions_info;
-}
-
-Validator TopicHandle::validator() const {
-    return self->m_validator;
-}
-
-PartitionSelector TopicHandle::selector() const {
-    return self->m_selector;
-}
-
-Serializer TopicHandle::serializer() const {
-    return self->m_serializer;
-}
-
-void TopicHandle::markAsComplete() const {
-    auto engine = self->m_service->m_client.engine();
-    auto rpc = self->m_topic_mark_as_complete;
+void MofkaTopicHandle::markAsComplete() const {
+    auto engine = m_service->m_client.engine();
+    auto rpc = m_topic_mark_as_complete;
     std::vector<tl::async_response> responses;
     std::vector<Result<void>> results;
-    responses.reserve(self->m_partitions.size());
-    results.reserve(self->m_partitions.size());
+    responses.reserve(m_partitions.size());
+    results.reserve(m_partitions.size());
     try {
-        for(auto& partition : self->m_partitions) {
+        for(auto& partition : m_partitions) {
             auto& ph = partition->m_ph;
             responses.push_back(rpc.on(ph).async());
         }
