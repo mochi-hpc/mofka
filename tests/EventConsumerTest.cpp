@@ -123,6 +123,8 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
                     REQUIRE(event.data().segments().size() == 0);
                 }
             }
+            auto event = consumer.pull().wait();
+            REQUIRE(event.id() == mofka::NoMoreEvents);
         }
     }
 }

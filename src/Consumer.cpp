@@ -23,7 +23,12 @@ using namespace std::string_literals;
 
 namespace mofka {
 
-PIMPL_DEFINE_COMMON_FUNCTIONS(Consumer);
+PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DTOR(Consumer);
+
+Consumer::~Consumer() {
+    if(self.use_count() == 1)
+        self->unsubscribe();
+}
 
 const std::string& Consumer::name() const {
     return self->m_name;
@@ -313,10 +318,18 @@ void ConsumerImpl::forwardBatchToConsumer(
         result.error() = "Consumer seems to have be destroyed be client";
         result.success() = false;
     } else {
-        auto consumer_ptr = consumer_impl->shared_from_this();
+        std::shared_ptr<ConsumerImpl> consumer_ptr;
+        try {
+            consumer_ptr = consumer_impl->shared_from_this();
+        } catch(const std::exception& ex) {
+            result.error() = "Consumer seems to have be destroyed be client";
+            result.success() = false;
+            req.respond(result);
+            return;
+        }
         // NOTE: we convert the pointer into a shared pointer to prevent
         // the consumer from disappearing while the RPC executes.
-        consumer_ptr->recvBatch(
+        consumer_impl->recvBatch(
                 target_info_index, count, firstID,
                 metadata_sizes, metadata,
                 data_desc_sizes, data_desc);

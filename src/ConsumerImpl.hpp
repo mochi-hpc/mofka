@@ -94,7 +94,6 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     {}
 
     ~ConsumerImpl() {
-        unsubscribe();
         m_magic_number = 0;
     }
 
