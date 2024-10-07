@@ -114,6 +114,21 @@ class TopicHandle {
     const std::vector<PartitionInfo>& partitions() const;
 
     /**
+     * @brief Return the Validator of the topic.
+     */
+    Validator validator() const;
+
+    /**
+     * @brief Return the PartitionSelector of the topic.
+     */
+    PartitionSelector selector() const;
+
+    /**
+     * @brief Return the Serializer of the topic.
+     */
+    Serializer serializer() const;
+
+    /**
      * @brief Indicate to the partition servers that no more events will be produced
      * in this topic. This will make any attempt to consume events return events with
      * no metadata, no data, and an ID of NoMoreEvents.

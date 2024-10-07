@@ -63,6 +63,18 @@ const std::vector<PartitionInfo>& TopicHandle::partitions() const {
     return self->m_partitions_info;
 }
 
+Validator TopicHandle::validator() const {
+    return self->m_validator;
+}
+
+PartitionSelector TopicHandle::selector() const {
+    return self->m_selector;
+}
+
+Serializer TopicHandle::serializer() const {
+    return self->m_serializer;
+}
+
 void TopicHandle::markAsComplete() const {
     auto engine = self->m_service->m_client.engine();
     auto rpc = self->m_topic_mark_as_complete;
