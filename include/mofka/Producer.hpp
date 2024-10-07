@@ -22,7 +22,57 @@
 namespace mofka {
 
 class ActiveProducerBatchQueue;
-class ProducerImpl;
+
+/**
+ * @brief Interface for Producer.
+ */
+class ProducerInterface {
+
+    public:
+
+    /**
+     * @brief Destructor.
+     */
+    virtual ~ProducerInterface() = default;
+
+    /**
+     * @brief Returns the name of the producer.
+     */
+    virtual const std::string& name() const = 0;
+
+    /**
+     * @brief Returns a copy of the options provided when
+     * the Producer was created.
+     */
+    virtual BatchSize batchSize() const = 0;
+
+    /**
+     * @brief Returns the ThreadPool associated with the Producer.
+     */
+    virtual ThreadPool threadPool() const = 0;
+
+    /**
+     * @brief Returns the TopicHandle this producer has been created from.
+     */
+    virtual TopicHandle topic() const = 0;
+
+    /**
+     * @brief Pushes an event into the producer's underlying topic,
+     * returning a Future that can be awaited.
+     *
+     * @param metadata Metadata of the event.
+     * @param data Optional data to attach to the event.
+     *
+     * @return a Future<EventID> tracking the asynchronous operation.
+     */
+    virtual Future<EventID> push(Metadata metadata, Data data = Data{}) = 0;
+
+    /**
+     * @brief Block until all the pending events have been sent.
+     */
+    virtual void flush() = 0;
+
+};
 
 /**
  * @brief A Producer is an object that can emmit events into a its topic.
@@ -35,50 +85,57 @@ class Producer {
     public:
 
     /**
-     * @brief Constructor. The resulting Producer handle will be invalid.
+     * @brief Constructor.
      */
-    Producer();
+    Producer(const std::shared_ptr<ProducerInterface>& impl = nullptr)
+    : self{impl} {}
 
     /**
      * @brief Copy-constructor.
      */
-    Producer(const Producer&);
+    Producer(const Producer&) = default;
 
     /**
      * @brief Move-constructor.
      */
-    Producer(Producer&&);
+    Producer(Producer&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    Producer& operator=(const Producer&);
+    Producer& operator=(const Producer&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    Producer& operator=(Producer&&);
+    Producer& operator=(Producer&&) = default;
 
     /**
      * @brief Destructor.
      */
-    ~Producer();
+    ~Producer() = default;
 
     /**
      * @brief Returns the name of the producer.
      */
-    const std::string& name() const;
+    const std::string& name() const {
+        return self->name();
+    }
 
     /**
      * @brief Returns a copy of the options provided when
      * the Producer was created.
      */
-    BatchSize batchSize() const;
+    BatchSize batchSize() const {
+        return self->batchSize();
+    }
 
     /**
      * @brief Returns the ThreadPool associated with the Producer.
      */
-    ThreadPool threadPool() const;
+    ThreadPool threadPool() const {
+        return self->threadPool();
+    }
 
     /**
      * @brief Returns the TopicHandle this producer has been created from.
@@ -88,7 +145,9 @@ class Producer {
     /**
      * @brief Checks if the Producer instance is valid.
      */
-    operator bool() const;
+    operator bool() const {
+        return static_cast<bool>(self);
+    }
 
     /**
      * @brief Pushes an event into the producer's underlying topic,
@@ -99,24 +158,20 @@ class Producer {
      *
      * @return a Future<EventID> tracking the asynchronous operation.
      */
-    Future<EventID> push(Metadata metadata, Data data = Data{}) const;
+    Future<EventID> push(Metadata metadata, Data data = Data{}) const {
+        return self->push(metadata, data);
+    }
 
     /**
      * @brief Block until all the pending events have been sent.
      */
-    void flush();
+    void flush() {
+        return self->flush();
+    }
 
     private:
 
-    /**
-     * @brief Constructor is private. Use a Client object
-     * to create a Producer instance.
-     *
-     * @param impl Pointer to implementation.
-     */
-    Producer(const std::shared_ptr<ProducerImpl>& impl);
-
-    std::shared_ptr<ProducerImpl> self;
+    std::shared_ptr<ProducerInterface> self;
 };
 
 }

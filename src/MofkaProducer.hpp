@@ -11,6 +11,7 @@
 #include "MofkaPartitionInfo.hpp"
 #include "ProducerBatchImpl.hpp"
 
+#include "mofka/TopicHandle.hpp"
 #include "mofka/Producer.hpp"
 #include "mofka/UUID.hpp"
 #include "mofka/Ordering.hpp"
@@ -23,7 +24,7 @@ namespace mofka {
 
 namespace tl = thallium;
 
-class ProducerImpl {
+class MofkaProducer : public ProducerInterface {
 
     public:
 
@@ -49,7 +50,7 @@ class ProducerImpl {
     std::atomic<size_t> m_num_pushed_events = 0;
     std::atomic<size_t> m_num_ready_events = 0;
 
-    ProducerImpl(tl::engine engine,
+    MofkaProducer(tl::engine engine,
                  std::string_view name,
                  BatchSize batch_size,
                  ThreadPool thread_pool,
@@ -64,6 +65,29 @@ class ProducerImpl {
     , m_producer_send_batch(m_engine.define("mofka_producer_send_batch"))
     {}
 
+    ~MofkaProducer() {
+        flush();
+    }
+
+    const std::string& name() const override {
+        return m_name;
+    }
+
+    TopicHandle topic() const override {
+        return TopicHandle{m_topic};
+    }
+
+    BatchSize batchSize() const override {
+        return m_batch_size;
+    }
+
+    ThreadPool threadPool() const override {
+        return m_thread_pool;
+    }
+
+    Future<EventID> push(Metadata metadata, Data data) override;
+
+    void flush() override;
 };
 
 }

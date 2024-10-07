@@ -7,7 +7,7 @@
 #define MOFKA_PRODUCER_BATCH_IMPL_H
 
 #include "MofkaPartitionInfo.hpp"
-#include "ProducerImpl.hpp"
+#include "MofkaProducer.hpp"
 #include "Promise.hpp"
 #include "DataImpl.hpp"
 #include "PimplUtil.hpp"

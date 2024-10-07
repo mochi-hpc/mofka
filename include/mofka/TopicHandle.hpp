@@ -38,9 +38,9 @@ class TopicHandle {
     public:
 
     /**
-     * @brief Constructor. The resulting TopicHandle handle will be invalid.
+     * @brief Constructor.
      */
-    TopicHandle();
+    TopicHandle(const std::shared_ptr<TopicHandleImpl>& impl = nullptr);
 
     /**
      * @brief Copy-constructor.
@@ -141,14 +141,6 @@ class TopicHandle {
     operator bool() const;
 
     private:
-
-    /**
-     * @brief Constructor is private. Use a Client object
-     * to create a TopicHandle instance.
-     *
-     * @param impl Pointer to implementation.
-     */
-    TopicHandle(const std::shared_ptr<TopicHandleImpl>& impl);
 
     std::shared_ptr<TopicHandleImpl> self;
 

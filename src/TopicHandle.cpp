@@ -9,7 +9,7 @@
 
 #include "PimplUtil.hpp"
 #include "TopicHandleImpl.hpp"
-#include "ProducerImpl.hpp"
+#include "MofkaProducer.hpp"
 #include "ConsumerImpl.hpp"
 
 #include <thallium/serialization/stl/string.hpp>
@@ -17,7 +17,7 @@
 
 namespace mofka {
 
-PIMPL_DEFINE_COMMON_FUNCTIONS(TopicHandle);
+PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(TopicHandle);
 
 const std::string& TopicHandle::name() const {
     return self->m_name;
@@ -28,8 +28,8 @@ Producer TopicHandle::makeProducer(
         BatchSize batch_size,
         ThreadPool thread_pool,
         Ordering ordering) const {
-    return std::make_shared<ProducerImpl>(
-        self->m_engine, name, batch_size, std::move(thread_pool), ordering, self);
+    return Producer{std::make_shared<MofkaProducer>(
+        self->m_engine, name, batch_size, std::move(thread_pool), ordering, self)};
 }
 
 Consumer TopicHandle::makeConsumer(
