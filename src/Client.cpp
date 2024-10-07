@@ -12,6 +12,9 @@
 #include "PimplUtil.hpp"
 #include "ClientImpl.hpp"
 #include "ConsumerImpl.hpp"
+#include "ServiceHandleImpl.hpp"
+
+#include <bedrock/ServiceGroupHandle.hpp>
 
 #include <nlohmann/json.hpp>
 #include <thallium/serialization/stl/string.hpp>

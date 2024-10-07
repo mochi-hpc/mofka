@@ -6,7 +6,6 @@
 #ifndef MOFKA_TOPIC_HANDLE_IMPL_H
 #define MOFKA_TOPIC_HANDLE_IMPL_H
 
-#include "ServiceHandleImpl.hpp"
 #include "MofkaPartitionInfo.hpp"
 #include "MofkaProducer.hpp"
 
@@ -16,6 +15,7 @@
 #include "mofka/PartitionSelector.hpp"
 #include "mofka/Serializer.hpp"
 #include "mofka/TopicHandle.hpp"
+
 #include <string_view>
 
 namespace mofka {
@@ -29,7 +29,6 @@ class MofkaTopicHandle : public std::enable_shared_from_this<MofkaTopicHandle>,
 
     tl::engine                          m_engine;
     std::string                         m_name;
-    SP<ServiceHandleImpl>               m_service;
     Validator                           m_validator;
     PartitionSelector                   m_selector;
     Serializer                          m_serializer;
@@ -41,15 +40,13 @@ class MofkaTopicHandle : public std::enable_shared_from_this<MofkaTopicHandle>,
     MofkaTopicHandle() = default;
 
     MofkaTopicHandle(tl::engine engine,
-                    std::string_view name,
-                    SP<ServiceHandleImpl> service,
-                    Validator validator,
-                    PartitionSelector selector,
-                    Serializer serializer,
-                    std::vector<SP<MofkaPartitionInfo>> partitions)
+                     std::string_view name,
+                     Validator validator,
+                     PartitionSelector selector,
+                     Serializer serializer,
+                     std::vector<SP<MofkaPartitionInfo>> partitions)
     : m_engine{std::move(engine)}
     , m_name(name)
-    , m_service(std::move(service))
     , m_validator(std::move(validator))
     , m_selector(std::move(selector))
     , m_serializer(std::move(serializer))

@@ -203,7 +203,7 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
     }
 
     return TopicHandle{std::make_shared<MofkaTopicHandle>(
-        self->m_client.engine(), name, self,
+        self->m_client.engine(), name,
         std::move(validator),
         std::move(selector),
         std::move(serializer),

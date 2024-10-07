@@ -46,8 +46,7 @@ Consumer MofkaTopicHandle::makeConsumer(
         }
     }
     auto consumer = std::make_shared<ConsumerImpl>(
-            m_service->m_client.engine(),
-            name, batch_size, std::move(thread_pool),
+            m_engine, name, batch_size, std::move(thread_pool),
             data_broker, data_selector,
             const_cast<MofkaTopicHandle*>(this)->shared_from_this(),
             std::move(partitions));
@@ -56,7 +55,6 @@ Consumer MofkaTopicHandle::makeConsumer(
 }
 
 void MofkaTopicHandle::markAsComplete() const {
-    auto engine = m_service->m_client.engine();
     auto rpc = m_topic_mark_as_complete;
     std::vector<tl::async_response> responses;
     std::vector<Result<void>> results;
