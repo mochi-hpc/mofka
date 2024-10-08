@@ -71,20 +71,6 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     m.attr("AdaptiveBatchSize") = py::int_(mofka::BatchSize::Adaptive().value);
 
-    py::class_<mofka::Client>(m, "Client")
-        .def_property_readonly("config",
-            [](const mofka::Client& client) -> nlohmann::json {
-                return client.getConfig().json();
-            })
-        .def_property_readonly("engine", &mofka::Client::engine)
-        .def(py::init<py_margo_instance_id>(), "mid"_a)
-        .def("connect",
-             [](const mofka::Client& client, std::string_view filename) -> mofka::ServiceHandle {
-                return client.connect(std::string{filename});
-             },
-            "group_file"_a)
-    ;
-
     py::class_<mofka::Validator>(m, "Validator")
         .def_static("from_metadata",
             [](const char* type, const nlohmann::json& md){
@@ -135,7 +121,8 @@ PYBIND11_MODULE(pymofka_client, m) {
     ;
 
     py::class_<mofka::ServiceHandle>(m, "ServiceHandle")
-        .def_property_readonly("client", &mofka::ServiceHandle::client)
+        .def(py::init<const std::string&>(), "group_file"_a)
+        .def(py::init<const std::string&, py_margo_instance_id>(), "group_file"_a, "mid"_a)
         .def_property_readonly("num_servers", &mofka::ServiceHandle::numServers)
         .def("create_topic",
              [](mofka::ServiceHandle& service,

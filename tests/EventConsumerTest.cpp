@@ -23,9 +23,9 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
     auto engine = server.getMargoManager().getThalliumEngine();
 
     SECTION("Producer/consumer") {
-        auto client = mofka::Client{engine};
-        REQUIRE(static_cast<bool>(client));
-        auto sh = client.connect("mofka.json");
+        mofka::ServiceHandle sh;
+        REQUIRE(!static_cast<bool>(sh));
+        REQUIRE_NOTHROW(sh = mofka::ServiceHandle{"mofka.json", engine});
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));

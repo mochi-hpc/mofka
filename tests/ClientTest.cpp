@@ -23,36 +23,29 @@ TEST_CASE("Client test", "[client]") {
     ENSURE(server.finalize());
     auto engine = server.getMargoManager().getThalliumEngine();
 
-    SECTION("Initialize a client") {
-        mofka::Client client;
-        REQUIRE(!static_cast<bool>(client));
-        REQUIRE_NOTHROW(client = mofka::Client{engine});
-        REQUIRE(static_cast<bool>(client));
+    SECTION("Initialize a service handle") {
+        mofka::ServiceHandle sh;
+        REQUIRE(!static_cast<bool>(sh));
+        REQUIRE_NOTHROW(sh = mofka::ServiceHandle{"mofka.json", engine});
+        REQUIRE(static_cast<bool>(sh));
 
-        SECTION("Initialize a service handle") {
-            mofka::ServiceHandle sh;
-            REQUIRE(!static_cast<bool>(sh));
-            REQUIRE_NOTHROW(sh = client.connect("mofka.json"));
-            REQUIRE(static_cast<bool>(sh));
+        SECTION("Create a topic") {
+            mofka::TopicHandle topic;
+            REQUIRE(!static_cast<bool>(topic));
+            REQUIRE_NOTHROW(sh.createTopic("mytopic"));
+            REQUIRE_THROWS_AS(sh.createTopic("mytopic"), mofka::Exception);
 
-            SECTION("Create a topic") {
-                mofka::TopicHandle topic;
-                REQUIRE(!static_cast<bool>(topic));
-                REQUIRE_NOTHROW(sh.createTopic("mytopic"));
-                REQUIRE_THROWS_AS(sh.createTopic("mytopic"), mofka::Exception);
+            mofka::Metadata partition_config;
+            mofka::ServiceHandle::PartitionDependencies partition_dependencies;
+            getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
-                mofka::Metadata partition_config;
-                mofka::ServiceHandle::PartitionDependencies partition_dependencies;
-                getPartitionArguments(partition_type, partition_dependencies, partition_config);
-
-                REQUIRE_NOTHROW(sh.addCustomPartition(
+            REQUIRE_NOTHROW(sh.addCustomPartition(
                         "mytopic", 0, partition_type,
                         partition_config, partition_dependencies));
 
-                REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
-                REQUIRE(static_cast<bool>(topic));
-                REQUIRE_THROWS_AS(sh.openTopic("mytopic2"), mofka::Exception);
-            }
+            REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
+            REQUIRE(static_cast<bool>(topic));
+            REQUIRE_THROWS_AS(sh.openTopic("mytopic2"), mofka::Exception);
         }
     }
 }

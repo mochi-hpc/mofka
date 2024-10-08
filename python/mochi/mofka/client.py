@@ -23,25 +23,27 @@ Ordering = pymofka_client.Ordering
 class Client:
 
     def __init__(self, arg):
+        import warnings
+        warnings.warn("The Client class is deprecated, please instantiate a ServiceHandle directly",
+                      DeprecationWarning, stacklevel=2)
         self._engine = None
+        self._mid = None
         if isinstance(arg, pymargo.core.Engine):
-            mid = arg.mid
+            self._mid = arg.mid
         elif isinstance(arg, str):
             self._engine = pymargo.core.Engine(arg, pymargo.server)
-            mid = self._engine.mid
+            self._mid = self._engine.mid
         else:
-            mid = arg
-        self._internal = pymofka_client.Client(mid)
+            self._mid = arg
 
     def connect(self, group_file: str):
-        return self._internal.connect(group_file)
+        return ServiceHandle(group_file, self._mid)
 
     @property
     def config(self):
-        return self._internal.config
+        return "{}"
 
     def __del__(self):
-        del self._internal
         if self._engine is not None:
             self._engine.finalize()
         del self._engine

@@ -23,10 +23,11 @@ TEST_CASE("Eventbridge validation", "[eventbridge]") {
 
     SECTION("Initialize client/topic/producer") {
 
-        auto client = mofka::Client{engine};
-        REQUIRE(static_cast<bool>(client));
-        auto sh = client.connect("mofka.json");
+        mofka::ServiceHandle sh;
+        REQUIRE(!static_cast<bool>(sh));
+        REQUIRE_NOTHROW(sh = mofka::ServiceHandle{"mofka.json", engine});
         REQUIRE(static_cast<bool>(sh));
+
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
         mofka::Validator validator = mofka::Validator::FromMetadata(

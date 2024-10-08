@@ -14,12 +14,103 @@
 #include "MofkaTopicHandle.hpp"
 #include "MetadataImpl.hpp"
 
+#include <bedrock/Client.hpp>
+
+#include <fstream>
+
 namespace mofka {
 
-PIMPL_DEFINE_COMMON_FUNCTIONS(ServiceHandle);
+PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(ServiceHandle);
 
-Client ServiceHandle::client() const {
-    return Client(self->m_client);
+static inline std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
+        const bedrock::ServiceGroupHandle& bsgh) {
+    std::string configs;
+    constexpr const char* script = R"(
+          $result = [];
+          foreach($__config__.providers as $p) {
+              if($p.type != "yokan") continue;
+              foreach($p.tags as $tag) {
+                  if($tag != "mofka:master") continue;
+                  array_push($result, $p.provider_id);
+              }
+          }
+          return $result;
+      )";
+    bsgh.queryConfig(script, &configs);
+    auto doc = Metadata{configs};
+    std::vector<std::pair<std::string, uint16_t>> masters;
+    for(const auto& p : doc.json().items()) {
+        const auto& address = p.key();
+        for(const auto& provider_id : p.value()) {
+            masters.push_back({address, provider_id.get<uint16_t>()});
+        }
+    }
+    if(masters.empty())
+        throw Exception{"Could not find a Yokan provider with the \"mofka:master\" tag"};
+    // note: if multiple yokan databases have the mofka:master tag,
+    // it is assume that they are linked together via RAFT to replicate the same content
+    return masters[0];
+}
+
+ServiceHandle::ServiceHandle(const std::string& groupfile) {
+    // try to infer the address from one of the members
+    std::ifstream inputFile(groupfile);
+    if(!inputFile.is_open()) {
+        throw Exception{"Could not open group file"};
+    }
+    try {
+        nlohmann::json content;
+        inputFile >> content;
+        if(!content.is_object()
+        || !content.contains("members")
+        || !content["members"].is_array()
+        || !content["members"][0].is_object()
+        || !content["members"][0].contains("address")
+        || !content["members"][0]["address"].is_string())
+            throw Exception{"Group file doesn't appear to be a correctly formatted Flock group file"};
+        auto& address = content["members"][0]["address"].get_ref<const std::string&>();
+        auto protocol = address.substr(0, address.find(':'));
+        auto engine = thallium::engine{protocol, THALLIUM_SERVER_MODE};
+        auto sh = ServiceHandle{groupfile, engine};
+        self = std::move(sh.self);
+    } catch(const std::exception& ex) {
+        throw Exception(ex.what());
+    }
+}
+
+ServiceHandle::ServiceHandle(const std::string& groupfile, thallium::engine engine) {
+    std::unordered_set<std::string> addrSet;
+    std::vector<std::string> addresses;
+
+    std::ifstream inputFile(groupfile);
+    if(!inputFile.is_open()) {
+        throw Exception{"Could not open group file"};
+    }
+
+    try {
+        nlohmann::json content;
+        inputFile >> content;
+        if(!content.is_object() || !content.contains("members") || !content["members"].is_array())
+            throw Exception{"Group file doesn't appear to be a correctly formatted Flock group file"};
+        auto& members = content["members"];
+        if(members.empty())
+            throw Exception{"No member found in provided Flock group file"};
+        for(auto& member : members) {
+            if(!member.is_object() || !member.contains("address"))
+                throw Exception{"Group file doesn't appear to be a correctly formatted Flock group file"};
+            auto c =  addrSet.size();
+            auto& addr = member["address"].get_ref<const std::string&>();
+            addrSet.insert(addr);
+            if(c < addrSet.size())
+                addresses.push_back(addr);
+        }
+        auto bedrock_client = bedrock::Client{engine};
+        auto bsgh = bedrock_client.makeServiceGroupHandle(addresses);
+        auto master = discoverMofkaServiceMaster(bsgh);
+        self = std::make_shared<ServiceHandleImpl>(engine, std::move(bsgh), master);
+    } catch(const std::exception& ex) {
+        throw Exception(ex.what());
+    }
 }
 
 size_t ServiceHandle::numServers() const {
@@ -196,14 +287,14 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
         uint16_t provider_id = partitionMetadataJson["provider_id"].get<uint16_t>();
         auto partitionInfo = std::make_shared<MofkaPartitionInfo>(
             uuid, thallium::provider_handle{
-                self->m_client.engine().lookup(address),
+                self->m_engine.lookup(address),
                 provider_id}
         );
         partitionsList.push_back(std::move(partitionInfo));
     }
 
     return TopicHandle{std::make_shared<MofkaTopicHandle>(
-        self->m_client.engine(), name,
+        self->m_engine, name,
         std::move(validator),
         std::move(selector),
         std::move(serializer),

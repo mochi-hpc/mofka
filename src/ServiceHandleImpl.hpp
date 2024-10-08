@@ -22,22 +22,22 @@ class ServiceHandleImpl {
 
     public:
 
-    Client                      m_client;
+    thallium::engine            m_engine;
     bedrock::ServiceGroupHandle m_bsgh;
 
     yokan::Client   m_yk_client;
     yokan::Database m_yk_master_db;
 
     ServiceHandleImpl(
-        Client client,
+        thallium::engine engine,
         bedrock::ServiceGroupHandle bsgh,
         const std::pair<std::string, uint16_t>& masterDbInfo)
-    : m_client(std::move(client))
+    : m_engine(std::move(engine))
     , m_bsgh(std::move(bsgh))
-    , m_yk_client{m_client.engine().get_margo_instance()}
+    , m_yk_client{m_engine.get_margo_instance()}
     , m_yk_master_db{
         m_yk_client.makeDatabaseHandle(
-            m_client.engine().lookup(masterDbInfo.first).get_addr(),
+            m_engine.lookup(masterDbInfo.first).get_addr(),
             masterDbInfo.second)}
     {}
 };

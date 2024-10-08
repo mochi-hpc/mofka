@@ -18,8 +18,7 @@ int main(int argc, char** argv) {
 
     try {
 
-        mofka::Client client = mofka::Client{engine};
-        mofka::ServiceHandle sh = client.connect(group_file);
+        mofka::ServiceHandle sh{group_file, engine};
 
         mofka::TopicHandle topic = sh.openTopic(topic_name);
 

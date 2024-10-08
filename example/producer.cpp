@@ -24,11 +24,8 @@ int main(int argc, char** argv) {
 
     try {
 
-        // -- Initialize a Client
-        mofka::Client client(engine);
-
         // -- Create ServiceHandle
-        mofka::ServiceHandle service = client.connect(g_group_file);
+        mofka::ServiceHandle service{g_group_file, engine};
 
         // -- Create a topic
         // We provide a default validator, selector, and serializer as example for the API.

@@ -13,7 +13,7 @@ wd = os.getcwd()
 
 from pymargo.core import Engine
 from mochi.bedrock.server import Server as BedrockServer
-import pymofka_client as mofka
+import mochi.mofka.client as mofka
 
 
 def my_data_selector(metadata, descriptor):
@@ -33,8 +33,7 @@ class TestConsumer(unittest.TestCase):
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
-        self.client = mofka.Client(mid=self.mid)
-        self.service = self.client.connect("mofka.json")
+        self.service = mofka.ServiceHandle("mofka.json", self.mid)
 
         # create data and metadata
         self.metadata = dict()
@@ -70,7 +69,6 @@ class TestConsumer(unittest.TestCase):
     def tearDown(self):
         del self.mid
         del self.service
-        del self.client
         del self.topic
         del self.consumer
         del self.producer

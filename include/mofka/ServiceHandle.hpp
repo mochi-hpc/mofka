@@ -7,7 +7,6 @@
 #define MOFKA_SERVICE_HANDLE_HPP
 
 #include <mofka/ForwardDcl.hpp>
-#include <mofka/Client.hpp>
 #include <mofka/Exception.hpp>
 #include <mofka/Serializer.hpp>
 #include <mofka/Validator.hpp>
@@ -29,15 +28,27 @@ class ServiceHandleImpl;
  */
 class ServiceHandle {
 
-    friend class Client;
     friend class TopicHandle;
 
     public:
 
+    ServiceHandle() = default;
+
     /**
-     * @brief Constructor. The resulting ServiceHandle handle will be invalid.
+     * @brief Constructor.
      */
-    ServiceHandle();
+    ServiceHandle(const std::string& groupfile);
+
+    /**
+     * @brief Constructor.
+     */
+    ServiceHandle(const std::string& groupfile, thallium::engine engine);
+
+    /**
+     * @brief Constructor.
+     */
+    ServiceHandle(const std::string& groupfile, margo_instance_id mid)
+    : ServiceHandle(groupfile, thallium::engine{mid}) {}
 
     /**
      * @brief Copy-constructor.
@@ -63,11 +74,6 @@ class ServiceHandle {
      * @brief Destructor.
      */
     ~ServiceHandle();
-
-    /**
-     * @brief Returns the client this database has been opened with.
-     */
-    Client client() const;
 
     /**
      * @brief Checks if the ServiceHandle instance is valid.

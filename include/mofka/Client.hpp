@@ -85,6 +85,7 @@ class Client {
      *
      * @return a ServiceHandle instance.
      */
+    [[deprecated("Please instanciate a ServiceHandle directly")]]
     ServiceHandle connect(const std::string& groupfile) const;
 
     /**

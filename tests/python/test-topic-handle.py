@@ -17,8 +17,7 @@ class TestTopicHandle(unittest.TestCase):
             os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
-        self.client = mofka.Client(self.bedrock_server.margo.mid)
-        self.service = self.client.connect("mofka.json")
+        self.service = mofka.ServiceHandle("mofka.json", self.bedrock_server.margo.mid)
 
         name = "my_topic"
         validator = mofka.Validator.from_metadata(
@@ -32,7 +31,6 @@ class TestTopicHandle(unittest.TestCase):
 
     def tearDown(self):
         del self.service
-        del self.client
         del self.topic
         self.bedrock_server.finalize()
         del self.bedrock_server

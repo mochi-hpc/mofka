@@ -22,12 +22,8 @@ int main(int argc, char** argv) {
     tl::engine engine(g_protocol, THALLIUM_SERVER_MODE);
 
     try {
-
-        // -- Initialize a Client
-        mofka::Client client(engine);
-
         // -- Create ServiceHandle
-        mofka::ServiceHandle service = client.connect(g_group_file);
+        mofka::ServiceHandle service{g_group_file, engine};
 
         // -- Open a topic
         mofka::TopicHandle topic = service.openTopic("mytopic");

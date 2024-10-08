@@ -17,11 +17,9 @@ class TestServiceHandle(unittest.TestCase):
             os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
-        self.client = mofka.Client(self.bedrock_server.margo.mid)
-        self.service = self.client.connect("mofka.json")
+        self.service = mofka.ServiceHandle("mofka.json", self.bedrock_server.margo.mid)
 
     def tearDown(self):
-        del self.client
         del self.service
         self.bedrock_server.finalize()
         del self.bedrock_server
@@ -29,10 +27,6 @@ class TestServiceHandle(unittest.TestCase):
     def test_get_servers(self):
         """Test get num servers"""
         n = self.service.num_servers
-
-    def test_get_client(self):
-        """Test get client"""
-        self.service.client
 
     def test_create_open_topic(self):
         """Test create and open a topic"""

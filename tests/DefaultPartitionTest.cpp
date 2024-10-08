@@ -22,14 +22,9 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
     auto engine = server.getMargoManager().getThalliumEngine();
 
     SECTION("Initialize a client and service handle, and create topic") {
-        mofka::Client client;
-        REQUIRE(!static_cast<bool>(client));
-        REQUIRE_NOTHROW(client = mofka::Client{engine});
-        REQUIRE(static_cast<bool>(client));
-
         mofka::ServiceHandle sh;
         REQUIRE(!static_cast<bool>(sh));
-        REQUIRE_NOTHROW(sh = client.connect("mofka.json"));
+        REQUIRE_NOTHROW(sh = mofka::ServiceHandle{"mofka.json", engine});
         REQUIRE(static_cast<bool>(sh));
 
         mofka::TopicHandle topic;

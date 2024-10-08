@@ -23,10 +23,12 @@ TEST_CASE("Producer test", "[producer]") {
     auto engine = server.getMargoManager().getThalliumEngine();
 
     SECTION("Initialize a Client and a ServiceHandle and create/open a topic") {
-        auto client = mofka::Client{engine};
-        REQUIRE(static_cast<bool>(client));
-        auto sh = client.connect("mofka.json");
+
+        mofka::ServiceHandle sh;
+        REQUIRE(!static_cast<bool>(sh));
+        REQUIRE_NOTHROW(sh = mofka::ServiceHandle{"mofka.json", engine});
         REQUIRE(static_cast<bool>(sh));
+
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
         REQUIRE_NOTHROW(sh.createTopic("mytopic"));
