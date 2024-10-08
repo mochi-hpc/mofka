@@ -18,12 +18,6 @@
 
 namespace mofka {
 
-class PartitionInfoImpl;
-class ClientImpl;
-class ServiceHandle;
-class ConsumerImpl;
-class Consumer;
-
 /**
  * @brief The PartitionInfo structure holds information about a particular partition.
  * The information contained in such a Metadata piece is implementation-defined.

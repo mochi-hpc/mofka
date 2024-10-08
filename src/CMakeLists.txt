@@ -11,6 +11,7 @@ set (client-src-files
      Producer.cpp
      MofkaProducer.cpp
      Consumer.cpp
+     MofkaConsumer.cpp
      ConsumerHandle.cpp
      Data.cpp
      DataDescriptor.cpp

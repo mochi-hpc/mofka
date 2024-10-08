@@ -22,7 +22,12 @@ namespace mofka {
 
 namespace tl = thallium;
 
-class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
+class MofkaTopicHandle;
+
+class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
+                      public ConsumerInterface {
+
+    friend class MofkaTopicHandle;
 
     #define MOFKA_MAGIC_NUMBER (*((uint64_t*)"matthieu"))
 
@@ -69,7 +74,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     bool                                                 m_futures_credit;
     thallium::mutex                                      m_futures_mtx;
 
-    ConsumerImpl(thallium::engine engine,
+    MofkaConsumer(thallium::engine engine,
                  std::string_view name,
                  BatchSize batch_size,
                  ThreadPool thread_pool,
@@ -93,13 +98,39 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch", forwardBatchToConsumer))
     {}
 
-    ~ConsumerImpl() {
+    ~MofkaConsumer() {
         m_magic_number = 0;
     }
 
-    void subscribe();
+    const std::string& name() const override {
+        return m_name;
+    }
 
-    void unsubscribe();
+    BatchSize batchSize() const override {
+        return m_batch_size;
+    }
+
+    ThreadPool threadPool() const override {
+        return m_thread_pool;
+    }
+
+    TopicHandle topic() const override;
+
+    DataBroker dataBroker() const override {
+        return m_data_broker;
+    }
+
+    DataSelector dataSelector() const override {
+        return m_data_selector;
+    }
+
+    Future<Event> pull() override;
+
+    void unsubscribe() override;
+
+    private:
+
+    void subscribe();
 
     void recvBatch(
         size_t target_info_index,
@@ -113,7 +144,7 @@ class ConsumerImpl : public std::enable_shared_from_this<ConsumerImpl> {
     Data requestData(
         SP<MofkaPartitionInfo> target,
         Metadata metadata,
-        SP<DataDescriptorImpl> descriptor);
+        const DataDescriptor& descriptor);
 
     static void forwardBatchToConsumer(
             const thallium::request& req,

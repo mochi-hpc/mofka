@@ -18,7 +18,6 @@ namespace mofka {
 class DataImpl;
 class PythonBindingHelper;
 class ProducerBatchImpl;
-class ConsumerImpl;
 
 /**
  * @brief A Data is an object that encapsulates the data of an event.
@@ -109,7 +108,6 @@ class Data {
 
     friend class ProducerBatchImpl;
     friend class Event;
-    friend class ConsumerImpl;
 
 };
 

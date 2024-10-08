@@ -17,7 +17,6 @@ namespace mofka {
 
 class ActiveProducerBatchQueue;
 class ThreadPoolImpl;
-class ConsumerImpl;
 
 /**
  * @brief Strongly typped size_t meant to represent the number of
@@ -99,11 +98,7 @@ class ThreadPool {
 
     std::shared_ptr<ThreadPoolImpl> self;
 
-    friend class Producer;
     friend class ActiveProducerBatchQueue;
-    friend class ConsumerImpl;
-    friend class Consumer;
-    friend class TopicHandle;
 };
 
 }

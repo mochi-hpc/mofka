@@ -18,9 +18,6 @@
 
 namespace mofka {
 
-class ConsumerImpl;
-class Consumer;
-
 /**
  * @brief The EventInterface is used by streaming drivers
  * to implement their Event.
@@ -70,9 +67,6 @@ class EventInterface {
  * enables consumers to acknowledge the event.
  */
 class Event {
-
-    friend class ConsumerImpl;
-    friend class Consumer;
 
     public:
 

@@ -25,41 +25,99 @@
 
 namespace mofka {
 
-class ConsumerImpl;
+/**
+ * @brief Interface for Consumer class.
+ */
+class ConsumerInterface {
+
+    public:
+
+    /**
+     * @brief Destructor.
+     */
+    virtual ~ConsumerInterface() = default;
+
+    /**
+     * @brief Returns the name of the producer.
+     */
+    virtual const std::string& name() const = 0;
+
+    /**
+     * @brief Returns a copy of the options provided when
+     * the Consumer was created.
+     */
+    virtual BatchSize batchSize() const = 0;
+
+    /**
+     * @brief Returns the ThreadPool associated with the Consumer.
+     */
+    virtual ThreadPool threadPool() const = 0;
+
+    /**
+     * @brief Returns the TopicHandle this producer has been created from.
+     */
+    virtual TopicHandle topic() const = 0;
+
+    /**
+     * @brief Returns the DataBroker used by the Consumer.
+     */
+    virtual DataBroker dataBroker() const = 0;
+
+    /**
+     * @brief Returns the DataSelector used by the Consumer.
+     */
+    virtual DataSelector dataSelector() const = 0;
+
+    /**
+     * @brief Unsubscribe from the topic.
+     *
+     * This function is not supposed to be called by users directly.
+     * It is used by the Consumer wrapping the ConsumerInterface in
+     * its destructor to stop events from coming in before destroying
+     * the object itself.
+     */
+    virtual void unsubscribe() = 0;
+
+    /**
+     * @brief Pull an Event. This function will immediately
+     * return a Future<Event>. Calling wait() on the event will
+     * block until an Event is actually available.
+     */
+    virtual Future<Event> pull() = 0;
+};
 
 /**
  * @brief A Consumer is an object that can emmit events into a its topic.
  */
 class Consumer {
 
-    friend class TopicHandle;
-
     public:
 
     /**
      * @brief Constructor. The resulting Consumer handle will be invalid.
      */
-    Consumer(const std::shared_ptr<ConsumerImpl>& impl = nullptr);
+    Consumer(const std::shared_ptr<ConsumerInterface>& impl = nullptr)
+    : self{impl} {}
 
     /**
      * @brief Copy-constructor.
      */
-    Consumer(const Consumer&);
+    Consumer(const Consumer&) = default;
 
     /**
      * @brief Move-constructor.
      */
-    Consumer(Consumer&&);
+    Consumer(Consumer&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    Consumer& operator=(const Consumer&);
+    Consumer& operator=(const Consumer&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    Consumer& operator=(Consumer&&);
+    Consumer& operator=(Consumer&&) = default;
 
     /**
      * @brief Destructor.
@@ -69,18 +127,24 @@ class Consumer {
     /**
      * @brief Returns the name of the producer.
      */
-    const std::string& name() const;
+    const std::string& name() const {
+        return self->name();
+    }
 
     /**
      * @brief Returns a copy of the options provided when
      * the Consumer was created.
      */
-    BatchSize batchSize() const;
+    BatchSize batchSize() const {
+        return self->batchSize();
+    }
 
     /**
      * @brief Returns the ThreadPool associated with the Consumer.
      */
-    ThreadPool threadPool() const;
+    ThreadPool threadPool() const {
+        return self->threadPool();
+    }
 
     /**
      * @brief Returns the TopicHandle this producer has been created from.
@@ -90,19 +154,25 @@ class Consumer {
     /**
      * @brief Returns the DataBroker used by the Consumer.
      */
-    DataBroker dataBroker() const;
+    DataBroker dataBroker() const {
+        return self->dataBroker();
+    }
 
     /**
      * @brief Returns the DataSelector used by the Consumer.
      */
-    DataSelector dataSelector() const;
+    DataSelector dataSelector() const {
+        return self->dataSelector();
+    }
 
     /**
      * @brief Pull an Event. This function will immediately
      * return a Future<Event>. Calling wait() on the event will
      * block until an Event is actually available.
      */
-    Future<Event> pull() const;
+    Future<Event> pull() const {
+        return self->pull();
+    }
 
     /**
      * @brief Feed the Events pulled by the Consumer into the provided
@@ -134,16 +204,20 @@ class Consumer {
      *
      * @param processor EventProcessor.
      */
-    void operator|(EventProcessor processor) const &&;
+    void operator|(EventProcessor processor) const && {
+        process(processor, threadPool(), NumEvents::Infinity());
+    }
 
     /**
      * @brief Checks if the Consumer instance is valid.
      */
-    operator bool() const;
+    operator bool() const {
+        return static_cast<bool>(self);
+    }
 
     private:
 
-    std::shared_ptr<ConsumerImpl> self;
+    std::shared_ptr<ConsumerInterface> self;
 };
 
 }

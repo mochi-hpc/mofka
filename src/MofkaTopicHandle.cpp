@@ -10,7 +10,7 @@
 #include "PimplUtil.hpp"
 #include "MofkaTopicHandle.hpp"
 #include "MofkaProducer.hpp"
-#include "ConsumerImpl.hpp"
+#include "MofkaConsumer.hpp"
 
 #include <thallium/serialization/stl/string.hpp>
 #include <thallium/serialization/stl/pair.hpp>
@@ -45,13 +45,13 @@ Consumer MofkaTopicHandle::makeConsumer(
             partitions.push_back(m_partitions[partition_index]);
         }
     }
-    auto consumer = std::make_shared<ConsumerImpl>(
+    auto consumer = std::make_shared<MofkaConsumer>(
             m_engine, name, batch_size, std::move(thread_pool),
             data_broker, data_selector,
             const_cast<MofkaTopicHandle*>(this)->shared_from_this(),
             std::move(partitions));
     consumer->subscribe();
-    return consumer;
+    return Consumer{std::move(consumer)};
 }
 
 void MofkaTopicHandle::markAsComplete() const {

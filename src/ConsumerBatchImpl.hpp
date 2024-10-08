@@ -19,7 +19,7 @@
 #include "mofka/Future.hpp"
 #include "mofka/Consumer.hpp"
 #include "MofkaPartitionInfo.hpp"
-#include "ConsumerImpl.hpp"
+#include "MofkaConsumer.hpp"
 #include "Promise.hpp"
 #include "DataImpl.hpp"
 #include <vector>
@@ -27,11 +27,11 @@
 
 namespace mofka {
 
-class ConsumerImpl;
+class MofkaConsumer;
 
 class ConsumerBatchImpl {
 
-    friend class ConsumerImpl;
+    friend class MofkaConsumer;
 
     thallium::engine    m_engine;
     std::vector<size_t> m_meta_sizes;       /* size of each serialized metadata object */

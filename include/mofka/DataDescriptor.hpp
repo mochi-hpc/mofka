@@ -17,8 +17,6 @@
 namespace mofka {
 
 class DataDescriptorImpl;
-class BatchImpl;
-class ConsumerImpl;
 
 /**
  * @brief A DataDescriptor is an opaque object describing
@@ -210,8 +208,6 @@ class DataDescriptor {
 
     std::shared_ptr<DataDescriptorImpl> self;
 
-    friend class ConsumerImpl;
-    friend class BatchImpl;
     friend struct Cerealized<DataDescriptor>;
 };
 

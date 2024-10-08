@@ -18,8 +18,6 @@
 
 namespace mofka {
 
-class ConsumerImpl;
-
 namespace tl = thallium;
 
 class ClientImpl {
