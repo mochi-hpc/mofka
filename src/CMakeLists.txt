@@ -9,6 +9,7 @@ set (client-src-files
      ServiceHandle.cpp
      MofkaTopicHandle.cpp
      Producer.cpp
+     BatchProducer.cpp
      MofkaProducer.cpp
      Consumer.cpp
      MofkaConsumer.cpp

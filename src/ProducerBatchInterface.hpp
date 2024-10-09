@@ -6,7 +6,6 @@
 #ifndef MOFKA_PRODUCER_BATCH_IFACE_H
 #define MOFKA_PRODUCER_BATCH_IFACE_H
 
-#include "mofka/Result.hpp"
 #include "mofka/EventID.hpp"
 #include "mofka/Metadata.hpp"
 #include "mofka/Archive.hpp"

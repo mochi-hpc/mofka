@@ -117,8 +117,8 @@ class TopicHandle {
     /**
      * @brief Constructor.
      */
-    TopicHandle(const std::shared_ptr<TopicHandleInterface>& impl = nullptr)
-    : self{impl} {}
+    TopicHandle(std::shared_ptr<TopicHandleInterface> impl = nullptr)
+    : self{std::move(impl)} {}
 
     /**
      * @brief Copy-constructor.
