@@ -16,10 +16,11 @@ set (MOFKA_VERSION
 add_library (coverage_config INTERFACE)
 add_library (warnings_config INTERFACE)
 
-option (ENABLE_TESTS    "Build tests" OFF)
-option (ENABLE_COVERAGE "Build with coverage" OFF)
-option (ENABLE_PYTHON   "Build the Python module" OFF)
+option (ENABLE_TESTS     "Build tests" OFF)
+option (ENABLE_COVERAGE  "Build with coverage" OFF)
+option (ENABLE_PYTHON    "Build the Python module" OFF)
 option (ENABLE_BENCHMARK "Build the benchmark" OFF)
+option (ENABLE_KAFKA     "Build with Kafka support" OFF)
 
 # add our cmake module directory to the path
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
@@ -84,6 +85,12 @@ if (ENABLE_PYTHON)
     find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
     find_package (pybind11 REQUIRED)
     add_subdirectory (python)
+endif ()
+
+if (ENABLE_KAFKA)
+    find_package (CURL REQUIRED)
+    pkg_check_modules (kafka REQUIRED IMPORTED_TARGET rdkafka++)
+    set (OPTIONAL_KAFKA CURL::libcurl PkgConfig::kafka)
 endif ()
 
 add_subdirectory (src)

@@ -23,6 +23,10 @@ set (client-src-files
      ThreadPool.cpp
      PrioPool.cpp)
 
+set (kafka-src-files
+     KafkaDriver.cpp
+     KafkaTopicHandle.cpp)
+
 set (module-src-files
      BedrockModule.cpp)
 
@@ -59,6 +63,28 @@ target_include_directories (mofka-client BEFORE PUBLIC
 set_target_properties (mofka-client
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
+
+# optional Kafka driver
+if (ENABLE_KAFKA)
+    add_library (mofka-kafka-driver ${kafka-src-files})
+    add_library (mofka::kafka-driver ALIAS mofka-kafka-driver)
+    target_link_libraries (mofka-kafka-driver
+         PUBLIC mofka::client
+         PRIVATE
+             nlohmann_json::nlohmann_json
+             CURL::libcurl
+             PkgConfig::kafka
+             coverage_config
+             warnings_config)
+    target_include_directories (mofka-kafka-driver PUBLIC $<INSTALL_INTERFACE:include>)
+    target_include_directories (mofka-kafka-driver BEFORE PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
+    target_include_directories (mofka-kafka-driver BEFORE PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+    set_target_properties (mofka-kafka-driver
+        PROPERTIES VERSION ${MOFKA_VERSION}
+        SOVERSION ${MOFKA_VERSION_MAJOR})
+endif ()
 
 # server library
 add_library (mofka-server ${server-src-files})
@@ -124,10 +150,17 @@ configure_file ("mofka-client.pc.in" "mofka-client.pc" @ONLY)
 configure_file ("Config.h.in" "Config.h" @ONLY)
 
 # "make install" rules
+if (ENABLE_KAFKA)
+install (TARGETS mofka-server mofka-client mofka-bedrock-module mofka-kafka-driver
+         EXPORT mofka-targets
+         ARCHIVE DESTINATION lib
+         LIBRARY DESTINATION lib)
+else ()
 install (TARGETS mofka-server mofka-client mofka-bedrock-module
          EXPORT mofka-targets
          ARCHIVE DESTINATION lib
          LIBRARY DESTINATION lib)
+endif ()
 install (EXPORT mofka-targets
          DESTINATION ${mofka-pkg}
          FILE "mofka-targets.cmake")
