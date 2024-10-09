@@ -11,6 +11,7 @@
 
 #include "Promise.hpp"
 #include "MofkaProducer.hpp"
+#include "ActiveProducerBatchQueue.hpp"
 #include "PimplUtil.hpp"
 #include <limits>
 
@@ -62,11 +63,16 @@ Future<EventID> MofkaProducer::push(Metadata metadata, Data data) {
                 /* Step 3.4: find/create the ActiveBatchQueue to send to */
                 auto& queue = m_batch_queues[partition];
                 if(!queue) {
+                    auto create_new_batch = [this, partition]() -> std::shared_ptr<ProducerBatchInterface> {
+                        return std::make_shared<MofkaProducerBatch>(
+                                m_name,
+                                m_engine,
+                                partition->m_ph,
+                                m_producer_send_batch
+                        );
+                    };
                     queue.reset(new ActiveProducerBatchQueue{
-                        m_engine,
-                        m_producer_send_batch,
-                        m_name,
-                        partition,
+                        create_new_batch,
                         m_thread_pool,
                         batchSize()});
                 }

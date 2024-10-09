@@ -11,6 +11,7 @@
 #include "Promise.hpp"
 #include "DataImpl.hpp"
 #include "PimplUtil.hpp"
+#include "ProducerBatchInterface.hpp"
 
 #include "mofka/BulkRef.hpp"
 #include "mofka/Result.hpp"
@@ -33,7 +34,7 @@ namespace mofka {
 
 namespace tl = thallium;
 
-class ProducerBatchImpl {
+class MofkaProducerBatch : public ProducerBatchInterface {
 
     std::string                m_producer_name;
     thallium::engine           m_engine;
@@ -50,7 +51,7 @@ class ProducerBatchImpl {
 
     public:
 
-    ProducerBatchImpl(
+    MofkaProducerBatch(
         std::string producer_name,
         thallium::engine engine,
         thallium::provider_handle partition_ph,
@@ -65,14 +66,14 @@ class ProducerBatchImpl {
             const Metadata& metadata,
             const Serializer& serializer,
             const Data& data,
-            Promise<EventID> promise) {
+            Promise<EventID> promise) override {
         size_t meta_buffer_size = m_meta_buffer.size();
         BufferWrapperOutputArchive archive(m_meta_buffer);
         serializer.serialize(archive, metadata);
         size_t meta_size = m_meta_buffer.size() - meta_buffer_size;
         m_meta_sizes.push_back(meta_size);
         size_t data_size = 0;
-        for(const auto& seg : data.self->m_segments) {
+        for(const auto& seg : data.segments()) {
             m_data_segments.push_back(seg);
             data_size += seg.size;
         }
@@ -81,7 +82,7 @@ class ProducerBatchImpl {
         m_promises.push_back(std::move(promise));
     }
 
-    void send() {
+    void send() override {
         thallium::bulk metadata_content, data_content;
         try {
             metadata_content = exposeMetadata();
@@ -110,7 +111,7 @@ class ProducerBatchImpl {
         }
     }
 
-    size_t count() const {
+    size_t count() const override {
         return m_meta_sizes.size();
     }
 
@@ -158,140 +159,6 @@ class ProducerBatchImpl {
     size_t dataBulkSize() const {
         return count()*sizeof(size_t) + m_total_data_size;
     }
-
-};
-
-class ActiveProducerBatchQueue {
-
-    public:
-
-    ActiveProducerBatchQueue(
-        tl::engine engine,
-        tl::remote_procedure send_batch,
-        std::string producer_name,
-        SP<MofkaPartitionInfo> partition,
-        ThreadPool thread_pool,
-        BatchSize batch_size)
-    : m_engine{std::move(engine)}
-    , m_producer_send_batch(send_batch)
-    , m_producer_name(std::move(producer_name))
-    , m_partition(std::move(partition))
-    , m_thread_pool{std::move(thread_pool)}
-    , m_batch_size{batch_size} {
-        start();
-    }
-
-    ~ActiveProducerBatchQueue() {
-        stop();
-    }
-
-    void push(
-            const Metadata& metadata,
-            const Serializer& serializer,
-            const Data& data,
-            Promise<EventID> promise) {
-        bool need_notification;
-        {
-            auto adaptive = m_batch_size == BatchSize::Adaptive();
-            need_notification = adaptive;
-            std::unique_lock<thallium::mutex> guard{m_mutex};
-            if(m_batch_queue.empty())
-                m_batch_queue.push(
-                    std::make_shared<ProducerBatchImpl>(
-                        m_producer_name,
-                        m_engine,
-                        m_partition->m_ph,
-                        m_producer_send_batch
-                    ));
-            auto last_batch = m_batch_queue.back();
-            if(!adaptive && last_batch->count() == m_batch_size.value) {
-                m_batch_queue.push(
-                    std::make_shared<ProducerBatchImpl>(
-                        m_producer_name,
-                        m_engine,
-                        m_partition->m_ph,
-                        m_producer_send_batch
-                    ));
-                last_batch = m_batch_queue.back();
-                need_notification = true;
-            }
-            last_batch->push(metadata, serializer, data, std::move(promise));
-        }
-        if(need_notification) {
-            m_cv.notify_one();
-        }
-    }
-
-    void stop() {
-        if(!m_running) return;
-        {
-            std::unique_lock<thallium::mutex> guard{m_mutex};
-            m_need_stop = true;
-        }
-        m_cv.notify_one();
-        m_terminated.wait();
-        m_terminated.reset();
-    }
-
-    void start() {
-        if(m_running) return;
-        m_thread_pool.pushWork([this]() { loop(); });
-    }
-
-    void flush() {
-        if(!m_running) return;
-        {
-            std::unique_lock<thallium::mutex> guard{m_mutex};
-            m_request_flush = true;
-            m_cv.wait(guard, [this]() { return m_batch_queue.empty(); });
-        }
-    }
-
-    private:
-
-    void loop() {
-        m_running = true;
-        std::unique_lock<thallium::mutex> guard{m_mutex};
-        while(!m_need_stop || !m_batch_queue.empty()) {
-            m_cv.wait(guard, [this]() {
-                if(m_need_stop || m_request_flush)        return true;
-                if(m_batch_queue.empty())                 return false;
-                if(m_batch_size == BatchSize::Adaptive()) return true;
-                auto batch = m_batch_queue.front();
-                if(batch->count() == m_batch_size.value)  return true;
-                return false;
-            });
-            if(m_batch_queue.empty()) {
-                if(m_request_flush) {
-                    m_request_flush = false;
-                    m_cv.notify_one();
-                }
-                continue;
-            }
-            auto batch = m_batch_queue.front();
-            m_batch_queue.pop();
-            guard.unlock();
-            batch->send();
-            guard.lock();
-        }
-        m_running = false;
-        m_terminated.set_value();
-    }
-
-    tl::engine                          m_engine;
-    tl::remote_procedure                m_producer_send_batch;
-    std::string                         m_producer_name;
-    SP<MofkaPartitionInfo>              m_partition;
-    ThreadPool                          m_thread_pool;
-    BatchSize                           m_batch_size;
-    std::queue<SP<ProducerBatchImpl>>   m_batch_queue;
-    thallium::managed<thallium::thread> m_sender_ult;
-    bool                                m_need_stop = false;
-    bool                                m_request_flush = false;
-    std::atomic<bool>                   m_running = false;
-    thallium::mutex                     m_mutex;
-    thallium::condition_variable        m_cv;
-    thallium::eventual<void>            m_terminated;
 
 };
 

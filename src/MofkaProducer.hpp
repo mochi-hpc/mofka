@@ -9,7 +9,7 @@
 #include "PimplUtil.hpp"
 #include "MofkaTopicHandle.hpp"
 #include "MofkaPartitionInfo.hpp"
-#include "ProducerBatchImpl.hpp"
+#include "MofkaProducerBatch.hpp"
 
 #include "mofka/TopicHandle.hpp"
 #include "mofka/Producer.hpp"
