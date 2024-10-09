@@ -23,9 +23,7 @@ TEST_CASE("Event producer test", "[event-producer]") {
     auto engine = server.getMargoManager().getThalliumEngine();
 
     SECTION("Initialize client/topic/producer") {
-        auto client = mofka::Client{engine};
-        REQUIRE(static_cast<bool>(client));
-        auto sh = client.connect("mofka.json");
+        auto sh = mofka::ServiceHandle{"mofka.json", engine};
         REQUIRE(static_cast<bool>(sh));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));

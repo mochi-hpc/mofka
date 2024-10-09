@@ -26,7 +26,8 @@ set (client-src-files
 
 set (kafka-src-files
      KafkaDriver.cpp
-     KafkaTopicHandle.cpp)
+     KafkaTopicHandle.cpp
+     KafkaProducer.cpp)
 
 set (module-src-files
      BedrockModule.cpp)

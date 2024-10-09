@@ -89,7 +89,7 @@ endif ()
 
 if (ENABLE_KAFKA)
     find_package (CURL REQUIRED)
-    pkg_check_modules (kafka REQUIRED IMPORTED_TARGET rdkafka++)
+    pkg_check_modules (kafka REQUIRED IMPORTED_TARGET rdkafka)
     set (OPTIONAL_KAFKA CURL::libcurl PkgConfig::kafka)
 endif ()
 

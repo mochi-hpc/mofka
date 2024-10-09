@@ -37,32 +37,34 @@ class KafkaDriver {
     /**
      * @brief Copy-constructor.
      */
-    KafkaDriver(const KafkaDriver&);
+    KafkaDriver(const KafkaDriver&) = default;
 
     /**
      * @brief Move-constructor.
      */
-    KafkaDriver(KafkaDriver&&);
+    KafkaDriver(KafkaDriver&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    KafkaDriver& operator=(const KafkaDriver&);
+    KafkaDriver& operator=(const KafkaDriver&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    KafkaDriver& operator=(KafkaDriver&&);
+    KafkaDriver& operator=(KafkaDriver&&) = default;
 
     /**
      * @brief Destructor.
      */
-    ~KafkaDriver();
+    ~KafkaDriver() = default;
 
     /**
      * @brief Checks if the KafkaDriver instance is valid.
      */
-    operator bool() const;
+    operator bool() const {
+        return static_cast<bool>(self);
+    }
 
     /**
      * @brief Create a topic with a given name, if it does not exist yet.

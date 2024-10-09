@@ -71,16 +71,3 @@ static inline void getPartitionArguments(
         partition_config = mofka::Metadata{"{}"};
     }
 }
-
-struct EnsureFileRemoved {
-
-    std::string m_filename;
-
-    template<typename ... Args>
-    EnsureFileRemoved(Args&&... args)
-    : m_filename(std::forward<Args>(args)...) {}
-
-    ~EnsureFileRemoved() {
-        std::remove(m_filename.c_str());
-    }
-};
