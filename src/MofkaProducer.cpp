@@ -20,6 +20,19 @@
 
 namespace mofka {
 
+std::shared_ptr<ProducerBatchInterface> MofkaProducer::newBatchForPartition(size_t index) const {
+    if(index >= m_topic->m_partitions.size()) {
+        throw Exception{"Invalid index returned by partition selector"};
+    }
+    auto partition = m_topic->m_partitions[index];
+    return std::make_shared<MofkaProducerBatch>(
+            m_name,
+            m_engine,
+            partition->m_ph,
+            m_producer_send_batch
+    );
+}
+
 TopicHandle MofkaProducer::topic() const {
     return TopicHandle{m_topic};
 }
@@ -48,10 +61,6 @@ Future<EventID> MofkaProducer::push(Metadata metadata, Data data) {
             topic->m_validator.validate(metadata, data);
             /* Step 3.2: select the partition for this metadata */
             auto partition_index = topic->m_selector.selectPartitionFor(metadata);
-            if(partition_index >= topic->m_partitions.size()) {
-                throw Exception{"Invalid index returned by partition selector"};
-            }
-            auto partition = topic->m_partitions[partition_index];
             {
                 /* Step 3.3: wait for our turn pushing the event into the batch */
                 std::unique_lock<thallium::mutex> guard{m_batch_queues_mtx};
@@ -61,15 +70,10 @@ Future<EventID> MofkaProducer::push(Metadata metadata, Data data) {
                     }
                 }
                 /* Step 3.4: find/create the ActiveBatchQueue to send to */
-                auto& queue = m_batch_queues[partition];
+                auto& queue = m_batch_queues[partition_index];
                 if(!queue) {
-                    auto create_new_batch = [this, partition]() -> std::shared_ptr<ProducerBatchInterface> {
-                        return std::make_shared<MofkaProducerBatch>(
-                                m_name,
-                                m_engine,
-                                partition->m_ph,
-                                m_producer_send_batch
-                        );
+                    auto create_new_batch = [this, partition_index]() {
+                        return newBatchForPartition(partition_index);
                     };
                     queue.reset(new ActiveProducerBatchQueue{
                         create_new_batch,

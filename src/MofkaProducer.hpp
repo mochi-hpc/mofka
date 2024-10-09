@@ -40,7 +40,7 @@ class MofkaProducer : public ProducerInterface {
     tl::remote_procedure m_producer_send_batch;
 
     std::unordered_map<
-        SP<MofkaPartitionInfo>,
+        size_t,
         SP<ActiveProducerBatchQueue>> m_batch_queues;
     thallium::mutex                   m_batch_queues_mtx;
     thallium::condition_variable      m_batch_queues_cv;
@@ -88,6 +88,8 @@ class MofkaProducer : public ProducerInterface {
     Future<EventID> push(Metadata metadata, Data data) override;
 
     void flush() override;
+
+    std::shared_ptr<ProducerBatchInterface> newBatchForPartition(size_t index) const;
 };
 
 }
