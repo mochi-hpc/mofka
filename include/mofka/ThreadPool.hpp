@@ -82,6 +82,11 @@ class ThreadPool {
     void pushWork(std::function<void()> func, uint64_t priority=0) const;
 
     /**
+     * @brief Get the number of ULTs in the pool, including blocked and running ULTs.
+     */
+    size_t size() const;
+
+    /**
      * @brief Checks if the ThreadPool instance is valid.
      */
     operator bool() const;

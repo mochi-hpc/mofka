@@ -64,8 +64,12 @@ class ThreadPoolImpl {
         }
     }
 
-    std::size_t managed_xstreams_size(){
+    std::size_t managed_xstreams_size() const {
         return m_managed_xstreams.size();
+    }
+
+    std::size_t size() const {
+        return m_pool.total_size();
     }
 
     private:

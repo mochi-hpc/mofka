@@ -19,6 +19,10 @@ ThreadCount ThreadPool::threadCount() const{
     return mofka::ThreadCount{self->managed_xstreams_size()};
 }
 
+size_t ThreadPool::size() const {
+    return self->size();
+}
+
 void ThreadPool::pushWork(std::function<void()> func, uint64_t priority) const {
     self->pushWork(std::move(func), priority);
 }

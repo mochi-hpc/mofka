@@ -11,7 +11,7 @@
 #include "Ensure.hpp"
 #include <fstream>
 
-TEST_CASE("Kafka driver test", "[kafka-driver]") {
+TEST_CASE("KafkaProducer test", "[kafka-producer]") {
 
     spdlog::set_level(spdlog::level::from_str("error"));
 
@@ -26,20 +26,22 @@ TEST_CASE("Kafka driver test", "[kafka-driver]") {
     SECTION("Initialize a KafkaDriver") {
 
         mofka::KafkaDriver driver;
-        REQUIRE(!static_cast<bool>(driver));
-
         REQUIRE_NOTHROW(driver = mofka::KafkaDriver{"kafka.json"});
         REQUIRE(static_cast<bool>(driver));
 
-        SECTION("Create a topic") {
-            REQUIRE_NOTHROW(driver.createTopic("mytopic"));
+        REQUIRE_NOTHROW(driver.createTopic("mytopic"));
+        mofka::TopicHandle topic;
+        REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
+        REQUIRE(static_cast<bool>(topic));
 
-            REQUIRE_THROWS_AS(driver.createTopic("mytopic"), mofka::Exception);
-            mofka::TopicHandle topic;
-            REQUIRE(!static_cast<bool>(topic));
-            REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
-            REQUIRE(static_cast<bool>(topic));
-            REQUIRE_THROWS_AS(driver.openTopic("mytopic2"), mofka::Exception);
+        SECTION("Create a producer from the topic") {
+            mofka::Producer producer;
+            REQUIRE(!static_cast<bool>(producer));
+            producer = topic.producer("myproducer");
+            REQUIRE(static_cast<bool>(producer));
+            REQUIRE(producer.name() == "myproducer");
+            REQUIRE(static_cast<bool>(producer.topic()));
+            REQUIRE(producer.topic().name() == "mytopic");
         }
     }
 }

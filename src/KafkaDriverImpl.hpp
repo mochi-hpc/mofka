@@ -22,7 +22,7 @@ class KafkaDriverImpl {
     rd_kafka_conf_t* m_kafka_config = nullptr;
 
     KafkaDriverImpl(const std::string& bootstrap_servers) {
-        if(!ABT_initialized()) {
+        if(ABT_initialized() == ABT_ERR_UNINITIALIZED) {
             setenv("ABT_MEM_MAX_NUM_STACKS", "8", 0);
             setenv("ABT_THREAD_STACKSIZE", "2097152", 0);
             ABT_init(0, NULL);
@@ -38,8 +38,9 @@ class KafkaDriverImpl {
     }
 
     ~KafkaDriverImpl() {
-        if(m_initialized_abt)
+        if(m_initialized_abt) {
             ABT_finalize();
+        }
         rd_kafka_conf_destroy(m_kafka_config);
     }
 };
