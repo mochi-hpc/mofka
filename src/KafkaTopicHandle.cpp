@@ -24,9 +24,9 @@ Producer KafkaTopicHandle::makeProducer(
     char errstr[512];
     // Create callback for message delivery
     auto dr_msg_cb = [](rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) -> void {
-        if(!opaque) return;
+        if(!rkmessage->_private) return;
         std::function<void(rd_kafka_t*, const rd_kafka_message_t*)>* fn =
-            static_cast<decltype(fn)>(opaque);
+            static_cast<decltype(fn)>(rkmessage->_private);
         (*fn)(rk, rkmessage);
     };
 

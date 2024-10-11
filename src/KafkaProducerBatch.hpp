@@ -112,7 +112,6 @@ class KafkaProducerBatch : public ProducerBatchInterface {
                 if(++m_msg_sent == n)
                     m_batch_sent.set_value();
             };
-
             messages[i].payload = m_messages[i].m_payload.data();
             messages[i].len     = m_messages[i].m_payload.size();
             messages[i].key = NULL;
@@ -127,6 +126,7 @@ class KafkaProducerBatch : public ProducerBatchInterface {
             throw Exception{std::string{"Failed to produce all messages: "}
                            + rd_kafka_err2str(rd_kafka_last_error())};
         // Wait for delivery report
+        rd_kafka_flush(m_kafka_prod.get(), 0);
         m_batch_sent.wait();
         m_msg_sent = 0;
         m_batch_sent.reset();

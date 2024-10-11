@@ -50,10 +50,11 @@ void KafkaProducer::start() {
         while(!m_should_stop) {
             int timeout = m_thread_pool.size() > 1 ? 0 : 100;
             rd_kafka_poll(m_kafka_producer.get(), timeout);
+            tl::thread::yield();
         }
         m_poll_ult_stopped.set_value();
     };
-    m_thread_pool.pushWork(std::move(run));
+    m_thread_pool.pushWork(std::move(run), std::numeric_limits<uint64_t>::max());
 }
 
 KafkaProducer::~KafkaProducer() {

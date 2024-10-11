@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm -rf /tmp/kraft-combined-logs
+
 echo "[BASH] Generating cluster ID"
 KAFKA_CLUSTER_ID="$(kafka-storage.sh random-uuid)"
 
@@ -16,7 +18,7 @@ KAFKA_PID=$!
 sleep 5
 
 echo "[BASH] Running test command: $@"
-$@
+timeout 60s $@
 RET=$?
 
 echo "[BASH] Stopping kafka server"
