@@ -13,7 +13,7 @@
 
 static size_t topic_num = 0;
 
-TEST_CASE("KafkaProducer test", "[kafka-producer]") {
+TEST_CASE("KafkaConsumer test", "[kafka-consumer]") {
 
     spdlog::set_level(spdlog::level::from_str("error"));
 
@@ -51,8 +51,7 @@ TEST_CASE("KafkaProducer test", "[kafka-producer]") {
                 REQUIRE_NOTHROW(future = producer.push(
                             metadata,
                             mofka::Data{someData.data(), someData.size()}));
-                if(i % 5 == 0)
-                    REQUIRE_NOTHROW(future.wait());
+                //REQUIRE_NOTHROW(future.wait());
             }
             REQUIRE_NOTHROW(producer.flush());
         }

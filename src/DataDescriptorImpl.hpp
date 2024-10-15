@@ -9,6 +9,7 @@
 #include "mofka/UUID.hpp"
 #include "mofka/Archive.hpp"
 #include "mofka/Exception.hpp"
+#include "mofka/DataDescriptor.hpp"
 #include "VariantUtil.hpp"
 #include <iostream>
 #include <variant>
@@ -22,10 +23,7 @@ class DataDescriptorImpl {
 
     public:
 
-    struct Sub {
-        std::size_t offset;
-        std::size_t size;
-    };
+    using Sub = DataDescriptor::Segment;
 
     struct Strided {
         std::size_t offset;

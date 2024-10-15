@@ -26,6 +26,11 @@ class DataDescriptor {
 
     public:
 
+    struct Segment {
+        std::size_t offset;
+        std::size_t size;
+    };
+
     /**
      * @brief Creates a NULL DataDescriptor.
      */
@@ -87,6 +92,11 @@ class DataDescriptor {
      * PartitionManager that created this DataDescriptor).
      */
     std::vector<char>& location();
+
+    /**
+     * @brief Extract a flat representation of the data descriptor.
+     */
+    std::vector<Segment> flatten() const;
 
     /**
      * @brief Create a DataDescriptor representing a subset of
@@ -196,6 +206,8 @@ class DataDescriptor {
      * @brief Checks if the Data instance is valid.
      */
     operator bool() const;
+
+
 
     private:
 

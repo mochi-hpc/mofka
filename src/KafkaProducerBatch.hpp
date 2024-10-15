@@ -114,17 +114,23 @@ class KafkaProducerBatch : public ProducerBatchInterface {
             };
             messages[i].payload = m_messages[i].m_payload.data();
             messages[i].len     = m_messages[i].m_payload.size();
+            std::cerr << "CCC " << messages[i].len << " " << m_partition << std::endl;
             messages[i].key = NULL;
             messages[i].key_len = 0;
             messages[i].partition = m_partition;
             messages[i]._private = static_cast<void*>(&m_messages[i].m_on_delivered);
         }
+        std::cerr << "BBB " << n << std::endl;
         // Produce the messages
         auto msg_count = rd_kafka_produce_batch(
             m_kafka_topic.get(), m_partition, 0, messages.data(), n);
-        if ((unsigned long)msg_count != n)
-            throw Exception{std::string{"Failed to produce all messages: "}
-                           + rd_kafka_err2str(rd_kafka_last_error())};
+        if ((unsigned long)msg_count != n) {
+            std::cerr << "AAA " << msg_count << " " << n << std::endl;
+            for(size_t i = msg_count; i < n; ++i) {
+                throw Exception{std::string{"Failed to produce all messages: "}
+                                + rd_kafka_err2str(messages[i].err)};
+            }
+        }
         // Wait for delivery report
         rd_kafka_flush(m_kafka_prod.get(), 0);
         m_batch_sent.wait();

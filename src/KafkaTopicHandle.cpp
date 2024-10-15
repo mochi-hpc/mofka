@@ -11,7 +11,7 @@
 #include "KafkaTopicHandle.hpp"
 #include "KafkaProducer.hpp"
 #include "KafkaDriverImpl.hpp"
-//#include "KafkaConsumer.hpp"
+#include "KafkaConsumer.hpp"
 
 namespace mofka {
 
@@ -24,6 +24,7 @@ Producer KafkaTopicHandle::makeProducer(
     char errstr[512];
     // Create callback for message delivery
     auto dr_msg_cb = [](rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) -> void {
+        (void)opaque;
         if(!rkmessage->_private) return;
         std::function<void(rd_kafka_t*, const rd_kafka_message_t*)>* fn =
             static_cast<decltype(fn)>(rkmessage->_private);
@@ -38,6 +39,8 @@ Producer KafkaTopicHandle::makeProducer(
     auto kprod = rd_kafka_new(RD_KAFKA_PRODUCER, kconf, errstr, sizeof(errstr));
     if (!kprod) throw Exception{"Failed to create Kafka producer: " + std::string{errstr}};
     auto kprod_ptr = std::shared_ptr<rd_kafka_t>{kprod, rd_kafka_destroy};
+
+    rd_kafka_poll(kprod, 0);
 
     // Create topic object
     auto ktopic = rd_kafka_topic_new(kprod, name.data(), NULL);
@@ -59,7 +62,9 @@ Consumer KafkaTopicHandle::makeConsumer(
         DataBroker data_broker,
         DataSelector data_selector,
         const std::vector<size_t>& targets) const {
-#if 0
+
+    char errstr[512];
+
     std::vector<SP<KafkaPartitionInfo>> partitions;
     if(targets.empty()) {
         partitions = m_partitions;
@@ -71,39 +76,66 @@ Consumer KafkaTopicHandle::makeConsumer(
             partitions.push_back(m_partitions[partition_index]);
         }
     }
+
+    // Create configuration for consumer
+    auto kconf = rd_kafka_conf_dup(m_driver->m_kafka_config);
+    auto ret = rd_kafka_conf_set(kconf, "group.id", name.data(), errstr, sizeof(errstr));
+    if (ret != RD_KAFKA_CONF_OK)
+        throw Exception{"Could not set Kafka group.id configuration: " + std::string(errstr)};
+    ret = rd_kafka_conf_set(kconf, "enable.auto.commit", "false", errstr, sizeof(errstr));
+    if (ret != RD_KAFKA_CONF_OK)
+        throw Exception{"Could not set Kafka enable.auto.commit configuration: " + std::string(errstr)};
+
+    // Create Kafka consumer instance
+    auto kcons = rd_kafka_new(RD_KAFKA_CONSUMER, kconf, errstr, sizeof(errstr));
+    if (!kcons) throw Exception{"Failed to create Kafka consumer: " + std::string{errstr}};
+    auto kcons_ptr = std::shared_ptr<rd_kafka_t>{kcons, rd_kafka_destroy};
+
+    // Create topic object
+    auto ktopic = rd_kafka_topic_new(kcons, name.data(), NULL);
+    if (!ktopic) throw Exception{std::string{"Failed to create Kafka topic object: "}
+                                + rd_kafka_err2str(rd_kafka_last_error())};
+    auto ktopic_ptr = std::shared_ptr<rd_kafka_topic_t>{ktopic, rd_kafka_topic_destroy};
+
     auto consumer = std::make_shared<KafkaConsumer>(
-            m_engine, name, batch_size, std::move(thread_pool),
+            name, batch_size, std::move(thread_pool),
             data_broker, data_selector,
             const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
-            std::move(partitions));
+            std::move(partitions), kcons_ptr, ktopic_ptr);
     consumer->subscribe();
     return Consumer{std::move(consumer)};
-#endif
 }
 
 void KafkaTopicHandle::markAsComplete() const {
-#if 0
-    auto rpc = m_topic_mark_as_complete;
-    std::vector<tl::async_response> responses;
-    std::vector<Result<void>> results;
-    responses.reserve(m_partitions.size());
-    results.reserve(m_partitions.size());
-    try {
-        for(auto& partition : m_partitions) {
-            auto& ph = partition->m_ph;
-            responses.push_back(rpc.on(ph).async());
-        }
-        for(auto& response : responses)
-            results.push_back(static_cast<Result<void>>(response.wait()));
-    } catch(const std::exception& ex) {
-        throw Exception{
-            fmt::format("Could not mark topic as comleted: {}", ex.what())
-        };
+
+    char errstr[512];
+    // Create configuration for temporary producer
+    auto kconf = rd_kafka_conf_dup(m_driver->m_kafka_config);
+
+    // Create producer instance
+    auto kprod = rd_kafka_new(RD_KAFKA_PRODUCER, kconf, errstr, sizeof(errstr));
+    if (!kprod) throw Exception{"Failed to create Kafka producer: " + std::string{errstr}};
+    auto kprod_ptr = std::shared_ptr<rd_kafka_t>{kprod, rd_kafka_destroy};
+
+    // Produce one event per partition
+    for (size_t i = 0; i < m_partitions.size(); i++) {
+        // Create headers object
+        rd_kafka_headers_t *headers = rd_kafka_headers_new(1);
+        rd_kafka_header_add(headers, "NoMoreEvents", -1, "", 0);
+
+        auto err = rd_kafka_producev(kprod,
+                    RD_KAFKA_V_TOPIC(m_name.c_str()),
+                    RD_KAFKA_V_PARTITION(m_partitions[i]->m_id),
+                    RD_KAFKA_V_HEADERS(headers),
+                    RD_KAFKA_V_VALUE(nullptr, 0),
+                    RD_KAFKA_V_END);
+        // Destroy headers if message production failed
+        if(err != 0)
+            rd_kafka_headers_destroy(headers);
     }
-    for(auto& result : results) {
-        if(!result.success()) throw Exception{result.error()};
-    }
-#endif
+
+    // Wait for messages to be delivered
+    rd_kafka_flush(kprod, 10000);
 }
 
 }

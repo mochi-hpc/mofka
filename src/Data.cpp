@@ -9,6 +9,8 @@
 #include "DataImpl.hpp"
 #include "PimplUtil.hpp"
 
+#include <cstring>
+
 namespace mofka {
 
 PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(Data);
@@ -32,6 +34,23 @@ size_t Data::size() const {
 
 Data::Context Data::context() const {
     return self->m_context;
+}
+
+void Data::write(char* data, size_t size, size_t offset) const {
+    size_t off = 0;
+    for(auto& seg : segments()) {
+        if(offset >= seg.size) {
+            offset -= seg.size;
+            continue;
+        }
+        // current segment needs to be copied
+        auto size_to_copy = std::min(size, seg.size);
+        std::memcpy(seg.ptr, data + off, size_to_copy);
+        offset -= size_to_copy;
+        off += size_to_copy;
+        size -= size_to_copy;
+        if(size == 0) break;
+    }
 }
 
 }
