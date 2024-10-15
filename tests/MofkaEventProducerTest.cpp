@@ -46,21 +46,23 @@ TEST_CASE("Event producer test", "[event-producer]") {
             "myproducer", batch_size, thread_count, ordering);
         REQUIRE(static_cast<bool>(producer));
 
-        SECTION("Push events into the topic using the producer") {
-            auto future = producer.push(
+        {
+            mofka::Future<mofka::EventID> future;
+            REQUIRE_NOTHROW(future = producer.push(
                 mofka::Metadata("{\"name\":\"matthieu\"}"),
-                mofka::Data{nullptr, 0});
-            producer.flush();
-            future.wait();
+                mofka::Data{nullptr, 0}));
+            REQUIRE_NOTHROW(producer.flush());
+            REQUIRE_NOTHROW(future.wait());
         }
 
-        SECTION("Push events with data") {
+        {
             std::string someData = "This is some data";
-            auto future = producer.push(
+            mofka::Future<mofka::EventID> future;
+            REQUIRE_NOTHROW(future = producer.push(
                 mofka::Metadata("{\"name\":\"matthieu\"}"),
-                mofka::Data{someData.data(), someData.size()});
-            producer.flush();
-            future.wait();
+                mofka::Data{someData.data(), someData.size()}));
+            REQUIRE_NOTHROW(producer.flush());
+            REQUIRE_NOTHROW(future.wait());
         }
     }
 }

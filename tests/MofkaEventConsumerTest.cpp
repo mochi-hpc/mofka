@@ -41,19 +41,20 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         REQUIRE(static_cast<bool>(topic));
 
         {
+            std::vector<std::string> data(100);
             auto producer = topic.producer();
             REQUIRE(static_cast<bool>(producer));
             for(unsigned i=0; i < 100; ++i) {
                 mofka::Metadata metadata = mofka::Metadata{
                     fmt::format("{{\"event_num\":{}}}", i)
                 };
-                std::string data = fmt::format("This is data for event {}", i);
+                data[i] = fmt::format("This is data for event {}", i);
                 mofka::Future<mofka::EventID> future;
                 REQUIRE_NOTHROW(future = producer.push(
                     metadata,
-                    mofka::Data{data.data(), data.size()}));
-                REQUIRE_NOTHROW(future.wait());
+                    mofka::Data{data[i].data(), data[i].size()}));
             }
+            REQUIRE_NOTHROW(producer.flush());
         }
         topic.markAsComplete();
 

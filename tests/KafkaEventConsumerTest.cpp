@@ -51,9 +51,9 @@ TEST_CASE("KafkaConsumer test", "[kafka-consumer]") {
                 REQUIRE_NOTHROW(future = producer.push(
                             metadata,
                             mofka::Data{someData.data(), someData.size()}));
-                //REQUIRE_NOTHROW(future.wait());
+                REQUIRE_NOTHROW(future.wait());
             }
-            REQUIRE_NOTHROW(producer.flush());
         }
+        topic.markAsComplete();
     }
 }
