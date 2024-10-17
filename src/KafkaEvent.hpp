@@ -64,7 +64,7 @@ class KafkaEvent : public EventInterface {
     std::shared_ptr<KafkaPartitionInfo> m_partition;
     Metadata                            m_metadata;
     Data                                m_data;
-    std::shared_ptr<KafkaConsumer>      m_consumer;
+    std::weak_ptr<KafkaConsumer>        m_consumer;
 };
 
 }

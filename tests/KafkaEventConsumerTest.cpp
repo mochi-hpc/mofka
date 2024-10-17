@@ -38,22 +38,49 @@ TEST_CASE("KafkaConsumer test", "[kafka-consumer]") {
         REQUIRE_NOTHROW(topic = driver.openTopic(topic_name));
         REQUIRE(static_cast<bool>(topic));
 
-        mofka::Producer producer;
-        REQUIRE_NOTHROW(producer = topic.producer("myproducer"));
-        REQUIRE(static_cast<bool>(producer));
         {
-            for(size_t i = 0; i < 100; ++i) {
-                mofka::Future<mofka::EventID> future;
-                auto metadata = mofka::Metadata{
-                    fmt::format("{{\"event_num\":{}}}", i)
-                };
-                std::string someData = fmt::format("This is some data for event {}", i);
-                REQUIRE_NOTHROW(future = producer.push(
-                            metadata,
-                            mofka::Data{someData.data(), someData.size()}));
-                REQUIRE_NOTHROW(future.wait());
+            mofka::Producer producer;
+            REQUIRE_NOTHROW(producer = topic.producer("myproducer", mofka::ThreadCount{0}));
+            REQUIRE(static_cast<bool>(producer));
+            {
+                std::vector<std::string> data(10);
+                for(size_t i = 0; i < 10; ++i) {
+                    mofka::Future<mofka::EventID> future;
+                    auto metadata = mofka::Metadata{
+                        fmt::format("{{\"event_num\":{}}}", i)
+                    };
+                    data[i] = fmt::format("This is some data for event {}", i);
+                    REQUIRE_NOTHROW(future = producer.push(
+                                metadata,
+                                mofka::Data{data[i].data(), data[i].size()}));
+                }
+                REQUIRE_NOTHROW(producer.flush());
             }
         }
         topic.markAsComplete();
+
+        SECTION("Consumer without data")
+        {
+            mofka::Consumer consumer;
+            REQUIRE_NOTHROW(consumer = topic.consumer("myconsumer", mofka::ThreadCount{0}));
+            REQUIRE(static_cast<bool>(consumer));
+            for(unsigned i=0; i < 10; ++i) {
+                mofka::Event event;
+                REQUIRE_NOTHROW(event = consumer.pull().wait());
+                REQUIRE(event.id() == i);
+                auto& doc = event.metadata().json();
+                REQUIRE(doc["event_num"].get<int64_t>() == i);
+                if(i % 5 == 0)
+                    REQUIRE_NOTHROW(event.acknowledge());
+            }
+            // Consume extra events, we should get events with NoMoreEvents as event IDs
+
+            for(unsigned i=0; i < 1; ++i) {
+                mofka::Event event;
+                REQUIRE_NOTHROW(event = consumer.pull().wait());
+                REQUIRE(event.id() == mofka::NoMoreEvents);
+            }
+
+        }
     }
 }

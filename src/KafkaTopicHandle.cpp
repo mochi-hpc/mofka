@@ -43,7 +43,7 @@ Producer KafkaTopicHandle::makeProducer(
     rd_kafka_poll(kprod, 0);
 
     // Create topic object
-    auto ktopic = rd_kafka_topic_new(kprod, name.data(), NULL);
+    auto ktopic = rd_kafka_topic_new(kprod, m_name.data(), NULL);
     if (!ktopic) throw Exception{std::string{"Failed to create Kafka topic object: "}
                                 + rd_kafka_err2str(rd_kafka_last_error())};
     auto ktopic_ptr = std::shared_ptr<rd_kafka_topic_t>{ktopic, rd_kafka_topic_destroy};
@@ -85,23 +85,21 @@ Consumer KafkaTopicHandle::makeConsumer(
     ret = rd_kafka_conf_set(kconf, "enable.auto.commit", "false", errstr, sizeof(errstr));
     if (ret != RD_KAFKA_CONF_OK)
         throw Exception{"Could not set Kafka enable.auto.commit configuration: " + std::string(errstr)};
+    ret = rd_kafka_conf_set(kconf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
+    if (ret != RD_KAFKA_CONF_OK)
+          throw Exception{"Could not set Kafka auto.offset.reset configuration: " + std::string(errstr)};
 
     // Create Kafka consumer instance
     auto kcons = rd_kafka_new(RD_KAFKA_CONSUMER, kconf, errstr, sizeof(errstr));
     if (!kcons) throw Exception{"Failed to create Kafka consumer: " + std::string{errstr}};
     auto kcons_ptr = std::shared_ptr<rd_kafka_t>{kcons, rd_kafka_destroy};
-
-    // Create topic object
-    auto ktopic = rd_kafka_topic_new(kcons, name.data(), NULL);
-    if (!ktopic) throw Exception{std::string{"Failed to create Kafka topic object: "}
-                                + rd_kafka_err2str(rd_kafka_last_error())};
-    auto ktopic_ptr = std::shared_ptr<rd_kafka_topic_t>{ktopic, rd_kafka_topic_destroy};
+    //rd_kafka_poll_set_consumer(kcons);
 
     auto consumer = std::make_shared<KafkaConsumer>(
             name, batch_size, std::move(thread_pool),
             data_broker, data_selector,
             const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
-            std::move(partitions), kcons_ptr, ktopic_ptr);
+            std::move(partitions), kcons_ptr);//, ktopic_ptr);
     consumer->subscribe();
     return Consumer{std::move(consumer)};
 }
@@ -123,11 +121,12 @@ void KafkaTopicHandle::markAsComplete() const {
         rd_kafka_headers_t *headers = rd_kafka_headers_new(1);
         rd_kafka_header_add(headers, "NoMoreEvents", -1, "", 0);
 
+        size_t payload = 0;
         auto err = rd_kafka_producev(kprod,
                     RD_KAFKA_V_TOPIC(m_name.c_str()),
                     RD_KAFKA_V_PARTITION(m_partitions[i]->m_id),
                     RD_KAFKA_V_HEADERS(headers),
-                    RD_KAFKA_V_VALUE(nullptr, 0),
+                    RD_KAFKA_V_VALUE((void*)"x", 1),
                     RD_KAFKA_V_END);
         // Destroy headers if message production failed
         if(err != 0)

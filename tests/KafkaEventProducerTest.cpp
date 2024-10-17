@@ -41,20 +41,23 @@ TEST_CASE("KafkaProducer test", "[kafka-producer]") {
         mofka::Producer producer;
         REQUIRE_NOTHROW(producer = topic.producer("myproducer"));
         REQUIRE(static_cast<bool>(producer));
+        std::vector<std::string> data(100);
         {
             for(size_t i = 0; i < 100; ++i) {
                 mofka::Future<mofka::EventID> future;
                 auto metadata = mofka::Metadata{
                     fmt::format("{{\"event_num\":{}}}", i)
                 };
-                std::string someData = fmt::format("This is some data for event {}", i);
+                data[i] = fmt::format("This is some data for event {}", i);
                 REQUIRE_NOTHROW(future = producer.push(
                             metadata,
-                            mofka::Data{someData.data(), someData.size()}));
+                            mofka::Data{data[i].data(), data[i].size()}));
                 if(i % 5 == 0)
                     REQUIRE_NOTHROW(future.wait());
             }
             REQUIRE_NOTHROW(producer.flush());
         }
+
+        topic.markAsComplete();
     }
 }

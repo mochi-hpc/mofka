@@ -37,8 +37,12 @@ class ThreadPoolImpl {
         for(auto& x : m_managed_xstreams) {
             x->join();
         }
-        if(m_pool_def)
+        m_managed_xstreams.clear();
+        if(m_pool_def) {
             ABT_pool_user_def_free(&m_pool_def);
+            ABT_pool pool = m_pool.native_handle();
+            ABT_pool_free(&pool);
+        }
     }
 
     template<typename Function>

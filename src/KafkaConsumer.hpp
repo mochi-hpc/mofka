@@ -33,7 +33,6 @@ class KafkaConsumer : public std::enable_shared_from_this<KafkaConsumer>,
     public:
 
     std::shared_ptr<rd_kafka_t>         m_kafka_consumer;
-    std::shared_ptr<rd_kafka_topic_t>   m_kafka_topic;
     std::string                         m_name;
     BatchSize                           m_batch_size;
     ThreadPool                          m_thread_pool;
@@ -76,10 +75,8 @@ class KafkaConsumer : public std::enable_shared_from_this<KafkaConsumer>,
                   DataSelector selector,
                   SP<KafkaTopicHandle> topic,
                   std::vector<SP<KafkaPartitionInfo>> partitions,
-                  std::shared_ptr<rd_kafka_t> kcons,
-                  std::shared_ptr<rd_kafka_topic_t> ktopic)
+                  std::shared_ptr<rd_kafka_t> kcons)
     : m_kafka_consumer{std::move(kcons)}
-    , m_kafka_topic{std::move(ktopic)}
     , m_name(name)
     , m_batch_size(batch_size)
     , m_thread_pool(std::move(thread_pool))

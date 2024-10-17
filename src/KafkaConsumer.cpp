@@ -57,19 +57,16 @@ Future<Event> KafkaConsumer::pull() {
 }
 
 void KafkaConsumer::subscribe() {
-    // for each partition, call rd_kafka_consume_start
+    auto subscription = rd_kafka_topic_partition_list_new(m_partitions.size());
     auto n = m_partitions.size();
     for(size_t i=0; i < n; ++i) {
-        int ret = rd_kafka_consume_start(
-            m_kafka_topic.get(), m_partitions[i]->m_id, RD_KAFKA_OFFSET_STORED);
-        if (ret != 0) {
-            for(size_t j = 0; j < i; ++j) {
-                rd_kafka_consume_stop(m_kafka_topic.get(), m_partitions[i]->m_id);
-            }
-            throw Exception{"Could not subscribe to partition " + std::to_string(m_partitions[i]->m_id)
-                            + ": rd_kafka_consume_start returned " + std::to_string(ret)};
-       }
+        rd_kafka_topic_partition_list_add(subscription, m_topic->m_name.c_str(), m_partitions[i]->m_id);
     }
+    auto subscribton_ptr = std::shared_ptr<rd_kafka_topic_partition_list_t>{
+        subscription, rd_kafka_topic_partition_list_destroy};
+    auto err = rd_kafka_subscribe(m_kafka_consumer.get(), subscription);
+    if (err) throw Exception{"Failed to subscribe to topic: " + std::string{rd_kafka_err2str(err)}};
+
     // start the polling loop
     m_should_stop = false;
     auto run = [this](){
@@ -84,6 +81,7 @@ void KafkaConsumer::subscribe() {
             }
             if(msg && msg->err) {
                 // TODO error happened, handle it
+                rd_kafka_message_destroy(msg);
                 tl::thread::yield();
                 continue;
             }
@@ -92,7 +90,7 @@ void KafkaConsumer::subscribe() {
         }
         m_poll_ult_stopped.set_value();
     };
-    m_thread_pool.pushWork(std::move(run), std::numeric_limits<uint64_t>::max());
+    m_thread_pool.pushWork(std::move(run));
 }
 
 void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
@@ -119,25 +117,30 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
     }
 
     // Retrieve the headers from the message
-    rd_kafka_headers_t *headers;
-    rd_kafka_resp_err_t err;
-    err = rd_kafka_message_headers(msg, &headers);
+    rd_kafka_headers_t *headers = nullptr;
+    auto err = rd_kafka_message_headers(msg, &headers);
     if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
         if (err != RD_KAFKA_RESP_ERR__NOENT) {
             promise.setException(
                 Exception{std::string{"Failed to retrieve message header: "} + rd_kafka_err2str(err)});
+            return;
         }
-        return;
     }
 
     // Check for NoMoreEvents
     const void* value;
     size_t value_size;
-    if (rd_kafka_header_get(headers, 0, "NoMoreEvents", &value, &value_size) == RD_KAFKA_RESP_ERR_NO_ERROR) {
+    if (headers &&
+        rd_kafka_header_get(headers, 0, "NoMoreEvents", &value, &value_size) == RD_KAFKA_RESP_ERR_NO_ERROR) {
         auto ult = [promise=std::move(promise)]() mutable {
-            promise.setValue(Event{});
+            promise.setValue(Event{std::make_shared<KafkaEvent>()});
         };
-        m_thread_pool.pushWork(std::move(ult), NoMoreEvents);
+        auto completed = ++m_completed_partitions;
+        //if(completed == m_partitions.size()) {
+            //m_should_stop = true;
+        //}
+        m_thread_pool.pushWork(std::move(ult), std::numeric_limits<uint64_t>::max()-1);
+        rd_kafka_message_destroy(msg);
         return;
     }
 
@@ -192,162 +195,18 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
                  // pass the exception to the promise.
                  promise.setException(ex);
              }
+             // destroy the message
+             rd_kafka_message_destroy(msg);
          };
     m_thread_pool.pushWork(std::move(ult), msg->offset);
 }
 
 void KafkaConsumer::unsubscribe() {
-    auto n = m_partitions.size();
-    for(size_t i=0; i < n; ++i)
-        rd_kafka_consume_stop(m_kafka_topic.get(), m_partitions[i]->m_id);
     if(!m_should_stop) {
         m_should_stop = true;
         m_poll_ult_stopped.wait();
     }
+    rd_kafka_unsubscribe(m_kafka_consumer.get());
 }
-
-#if 0
-void KafkaConsumer::recvBatch(size_t partition_index,
-                             size_t count,
-                             EventID startID,
-                             const BulkRef &metadata_sizes,
-                             const BulkRef &metadata,
-                             const BulkRef &data_desc_sizes,
-                             const BulkRef &data_desc) {
-
-    if(count == 0) { // no more events from this partition
-        m_completed_partitions += 1;
-        // check if there will be no more events any more, if so, set
-        // the promise of all the pending Futures to NoMoreEvents.
-        std::unique_lock<thallium::mutex> guard{m_futures_mtx};
-        if(m_completed_partitions != m_partitions.size()) {
-            return;
-        }
-        if(!m_futures_credit) return;
-        while(!m_futures.empty()) {
-            auto promise = std::move(m_futures.front().first);
-            m_futures.pop_front();
-            m_futures_credit = true;
-            promise.setValue(Event{std::make_shared<KafkaEvent>()});
-        }
-        return;
-    }
-
-    auto partition = m_partitions[partition_index];
-
-    auto batch = std::make_shared<ConsumerBatchImpl>(
-        m_engine, count, metadata.size, data_desc.size);
-    batch->pullFrom(metadata_sizes, metadata, data_desc_sizes, data_desc);
-
-    auto serializer = m_topic->m_serializer;
-    thallium::future<void> ults_completed{(uint32_t)count};
-    size_t metadata_offset  = 0;
-    size_t data_desc_offset = 0;
-
-    for(size_t i = 0; i < count; ++i) {
-        auto eventID = startID + i;
-        // get a promise/future pair
-        Promise<Event> promise;
-        {
-            std::unique_lock<thallium::mutex> guard{m_futures_mtx};
-            if(!m_futures_credit || m_futures.empty()) {
-                // the queue of futures is empty or the futures
-                // already in the queue have been created by
-                // previous calls to recvBatch() that haven't had
-                // a corresponding pull() call from the user.
-                Future<Event> future;
-                std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
-                m_futures.emplace_back(promise, future);
-                m_futures_credit = false;
-            } else {
-                // the queue of futures has futures already
-                // created by pull() calls from the user
-                promise = std::move(m_futures.front().first);
-                m_futures.pop_front();
-                m_futures_credit = true;
-            }
-        }
-        // create the ULT
-        auto ult = [this, &batch, i, eventID, promise,
-                    partition, metadata_offset, data_desc_offset,
-                    &serializer, &ults_completed]() mutable {
-            try {
-                // deserialize its metadata
-                auto metadata = Metadata{};
-                BufferWrapperInputArchive metadata_archive{
-                    std::string_view{
-                        batch->m_meta_buffer.data() + metadata_offset,
-                        batch->m_meta_sizes[i]}};
-                serializer.deserialize(metadata_archive, metadata);
-                // deserialize the data descriptors
-                BufferWrapperInputArchive descriptors_archive{
-                    std::string_view{
-                        batch->m_data_desc_buffer.data() + data_desc_offset,
-                        batch->m_data_desc_sizes[i]}};
-                DataDescriptor descriptor;
-                descriptor.load(descriptors_archive);
-                // request Data associated with the event
-                auto data = requestData(
-                    partition, metadata,
-                    descriptor);
-                // create the event
-                auto event = Event{
-                    std::make_shared<KafkaEvent>(
-                        eventID, std::move(partition),
-                        std::move(metadata), std::move(data),
-                        m_name, m_consumer_ack_event
-                )};
-                // set the promise
-                promise.setValue(std::move(event));
-            } catch(const Exception& ex) {
-                // something bad happened somewhere,
-                // pass the exception to the promise.
-                promise.setException(ex);
-            }
-            ults_completed.set(nullptr);
-        };
-        m_thread_pool.pushWork(std::move(ult), eventID);
-        metadata_offset  += batch->m_meta_sizes[i];
-        data_desc_offset += batch->m_data_desc_sizes[i];
-    }
-    ults_completed.wait();
-}
-
-
-void KafkaConsumer::forwardBatchToConsumer(
-        const thallium::request& req,
-        intptr_t consumer_ctx,
-        size_t target_info_index,
-        size_t count,
-        EventID firstID,
-        const BulkRef &metadata_sizes,
-        const BulkRef &metadata,
-        const BulkRef &data_desc_sizes,
-        const BulkRef &data_desc) {
-    Result<void> result;
-    KafkaConsumer* consumer_impl = reinterpret_cast<KafkaConsumer*>(consumer_ctx);
-    if(consumer_impl->m_magic_number != MOFKA_MAGIC_NUMBER) {
-        result.error() = "Consumer seems to have be destroyed be client";
-        result.success() = false;
-    } else {
-        std::shared_ptr<KafkaConsumer> consumer_ptr;
-        try {
-            consumer_ptr = consumer_impl->shared_from_this();
-        } catch(const std::exception& ex) {
-            result.error() = "Consumer seems to have be destroyed be client";
-            result.success() = false;
-            req.respond(result);
-            return;
-        }
-        // NOTE: we convert the pointer into a shared pointer to prevent
-        // the consumer from disappearing while the RPC executes.
-        consumer_impl->recvBatch(
-                target_info_index, count, firstID,
-                metadata_sizes, metadata,
-                data_desc_sizes, data_desc);
-    }
-    req.respond(result);
-}
-#endif
 
 }

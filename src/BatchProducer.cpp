@@ -50,15 +50,19 @@ Future<EventID> BatchProducer::push(Metadata metadata, Data data) {
                     }
                 }
                 /* Step 3.4: find/create the ActiveBatchQueue to send to */
-                auto& queue = m_batch_queues[partition_index];
-                if(!queue) {
+                auto queue_it = m_batch_queues.find(partition_index);
+                decltype(queue_it->second) queue;
+                if(queue_it == m_batch_queues.end()) {
                     auto create_new_batch = [this, partition_index]() {
                         return newBatchForPartition(partition_index);
                     };
-                    queue.reset(new ActiveProducerBatchQueue{
-                        create_new_batch,
-                        m_thread_pool,
-                        batchSize()});
+                    queue = std::make_shared<ActiveProducerBatchQueue>(
+                            create_new_batch,
+                            m_thread_pool,
+                            batchSize());
+                    m_batch_queues[partition_index] = queue;
+                } else {
+                    queue = queue_it->second;
                 }
                 if(m_ordering != Ordering::Strict)
                     guard.unlock();

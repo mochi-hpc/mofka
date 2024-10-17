@@ -16,6 +16,9 @@ set (MOFKA_VERSION
 add_library (coverage_config INTERFACE)
 add_library (warnings_config INTERFACE)
 
+#set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+#set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+
 option (ENABLE_TESTS     "Build tests" OFF)
 option (ENABLE_COVERAGE  "Build with coverage" OFF)
 option (ENABLE_PYTHON    "Build the Python module" OFF)
