@@ -136,6 +136,7 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
             promise.setValue(Event{std::make_shared<KafkaEvent>()});
         };
         auto completed = ++m_completed_partitions;
+        // FIXME If partitions are completed there is no reason to continue running the polling thread
         //if(completed == m_partitions.size()) {
             //m_should_stop = true;
         //}
@@ -148,9 +149,9 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
     auto ult = [this, msg, promise=std::move(promise), topic=topic()]() mutable {
              try {
                  // deserialize its metadata
-                 size_t data_size = 0;
-                 std::memcpy(&data_size, msg->payload, sizeof(data_size));
-                 size_t metadata_size = msg->len - sizeof(data_size) - data_size;
+                 size_t metadata_size = 0;
+                 std::memcpy(&metadata_size, msg->payload, sizeof(metadata_size));
+                 size_t data_size = msg->len - sizeof(metadata_size) - metadata_size;
                  auto metadata = Metadata{};
                  BufferWrapperInputArchive metadata_archive{
                      std::string_view{

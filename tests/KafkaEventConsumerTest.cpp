@@ -43,8 +43,8 @@ TEST_CASE("KafkaConsumer test", "[kafka-consumer]") {
             REQUIRE_NOTHROW(producer = topic.producer("myproducer", mofka::ThreadCount{0}));
             REQUIRE(static_cast<bool>(producer));
             {
-                std::vector<std::string> data(10);
-                for(size_t i = 0; i < 10; ++i) {
+                std::vector<std::string> data(100);
+                for(size_t i = 0; i < 100; ++i) {
                     mofka::Future<mofka::EventID> future;
                     auto metadata = mofka::Metadata{
                         fmt::format("{{\"event_num\":{}}}", i)
@@ -64,7 +64,7 @@ TEST_CASE("KafkaConsumer test", "[kafka-consumer]") {
             mofka::Consumer consumer;
             REQUIRE_NOTHROW(consumer = topic.consumer("myconsumer", mofka::ThreadCount{0}));
             REQUIRE(static_cast<bool>(consumer));
-            for(unsigned i=0; i < 10; ++i) {
+            for(unsigned i=0; i < 100; ++i) {
                 mofka::Event event;
                 REQUIRE_NOTHROW(event = consumer.pull().wait());
                 REQUIRE(event.id() == i);
@@ -75,12 +75,64 @@ TEST_CASE("KafkaConsumer test", "[kafka-consumer]") {
             }
             // Consume extra events, we should get events with NoMoreEvents as event IDs
 
-            for(unsigned i=0; i < 1; ++i) {
+            for(unsigned i=0; i < 10; ++i) {
                 mofka::Event event;
                 REQUIRE_NOTHROW(event = consumer.pull().wait());
                 REQUIRE(event.id() == mofka::NoMoreEvents);
             }
 
+        }
+
+        SECTION("Consume with data")
+        {
+            mofka::DataSelector data_selector =
+                [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
+                    auto& doc = metadata.json();
+                    auto event_id = doc["event_num"].get<int64_t>();
+                    if(event_id % 2 == 0) {
+                        return descriptor;
+                    } else {
+                        return mofka::DataDescriptor::Null();
+                    }
+                };
+            mofka::DataBroker data_broker =
+                [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
+                    auto size = descriptor.size();
+                    auto& doc = metadata.json();
+                    auto event_id = doc["event_num"].get<int64_t>();
+                    if(event_id % 2 == 0) {
+                        auto data = new char[size];
+                        return mofka::Data{data, size};
+                    } else {
+                        return mofka::Data{};
+                    }
+                    return mofka::Data{};
+                };
+            auto consumer = topic.consumer(
+                    "myconsumer", data_selector, data_broker);
+            REQUIRE(static_cast<bool>(consumer));
+            for(unsigned i=0; i < 100; ++i) {
+                mofka::Event event;
+                REQUIRE_NOTHROW(event = consumer.pull().wait());
+                REQUIRE(event.id() == i);
+                auto& doc = event.metadata().json();
+                REQUIRE(doc["event_num"].get<int64_t>() == i);
+                if(i % 5 == 0)
+                    REQUIRE_NOTHROW(event.acknowledge());
+                if(i % 2 == 0) {
+                    REQUIRE(event.data().segments().size() == 1);
+                    auto data_str = std::string{
+                        (const char*)event.data().segments()[0].ptr,
+                            event.data().segments()[0].size};
+                    std::string expected = fmt::format("This is some data for event {}", i);
+                    REQUIRE(data_str == expected);
+                    delete[] static_cast<const char*>(event.data().segments()[0].ptr);
+                } else {
+                    REQUIRE(event.data().segments().size() == 0);
+                }
+            }
+            auto event = consumer.pull().wait();
+            REQUIRE(event.id() == mofka::NoMoreEvents);
         }
     }
 }
