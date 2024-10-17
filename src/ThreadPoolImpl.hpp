@@ -49,7 +49,6 @@ class ThreadPoolImpl {
         } else { // custom priority pool, first argument should be a priority
             struct Args {
                 uint64_t priority;
-                uint64_t cs_count;
                 Function func;
             };
             auto func_wrapper = [](void* args) {
@@ -57,7 +56,7 @@ class ThreadPoolImpl {
                 a->func();
                 delete a;
             };
-            auto args = new Args{priority, 0, std::forward<Function>(func)};
+            auto args = new Args{priority, std::forward<Function>(func)};
             ABT_thread_create(m_pool.native_handle(),
                               func_wrapper, args,
                               ABT_THREAD_ATTR_NULL, nullptr);

@@ -12,7 +12,6 @@
 
 struct ArgsWrapper {
     uint64_t priority;
-    uint64_t cs_count;
     void (*func)(void*);
     void* args;
 };
@@ -97,10 +96,9 @@ static void pool_push(ABT_pool pool, ABT_unit unit, ABT_pool_context context)
     {
         ArgsWrapper *wrapper;
         ABT_thread_get_arg((ABT_thread)unit, (void**)&wrapper);
-        wrapper->cs_count++;
 
         auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-        if(wrapper->cs_count < 32)
+        if(wrapper->priority < std::numeric_limits<uint64_t>::max())
             p_data->prio_queue.emplace((ABT_thread)unit);
         else
             p_data->fifo_queue.emplace((ABT_thread)unit);
@@ -119,8 +117,7 @@ static void pool_push_many(ABT_pool pool, const ABT_unit *units,
         for(size_t i = 0; i < num_units; ++i) {
             ArgsWrapper *wrapper;
             ABT_thread_get_arg((ABT_thread)units[i], (void**)&wrapper);
-            wrapper->cs_count++;
-            if(wrapper->cs_count < 32)
+            if(wrapper->priority < std::numeric_limits<uint64_t>::max())
                 p_data->prio_queue.emplace((ABT_thread)units[i]);
             else
                 p_data->fifo_queue.emplace((ABT_thread)units[i]);
@@ -293,7 +290,7 @@ int ABT_pool_prio_wait_def_free(ABT_pool_user_def* def)
 int ABT_thread_create_priority(ABT_pool pool, void (*thread_func)(void *), void *arg,
                                ABT_thread_attr attr, uint64_t priority, ABT_thread *newthread)
 {
-    auto wrapped_args = new ArgsWrapper{priority, 0, thread_func, arg};
+    auto wrapped_args = new ArgsWrapper{priority, thread_func, arg};
     static auto wrapper_fn = [](void* args) {
         auto wrapped_args = static_cast<ArgsWrapper*>(args);
         (wrapped_args->func)(wrapped_args->args);

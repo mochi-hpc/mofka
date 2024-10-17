@@ -33,6 +33,14 @@ struct ThreadCount {
 /**
  * @brief A ThreadPool is an object that manages a number of Argobots
  * execution streams and an Argobots pool and pushes works into them.
+ * The pool holds two data structures: a FIFO queue for the ULTs that
+ * have a priority set to std::numeric_limits<uint64_t>::max(), and
+ * a min-heap for the ULTs that have a different priority. The pool
+ * will pick alternatively from each queue.
+ *
+ * @warning For ULTs in the min-heap, a lower priority value means that
+ * the ULT will be picked first. This is so that an EventID can be used
+ * as a priority, allowing events with lower ID to be processed first.
  */
 class ThreadPool {
 
@@ -79,7 +87,8 @@ class ThreadPool {
      * @param func Function to push.
      * @param priority Priority.
      */
-    void pushWork(std::function<void()> func, uint64_t priority=0) const;
+    void pushWork(std::function<void()> func,
+                  uint64_t priority = std::numeric_limits<uint64_t>::max()) const;
 
     /**
      * @brief Get the number of ULTs in the pool, including blocked and running ULTs.
