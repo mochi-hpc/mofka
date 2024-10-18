@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_SERVICE_HANDLE_IMPL_H
-#define MOFKA_SERVICE_HANDLE_IMPL_H
+#ifndef MOFKA_DRIVER_IMPL_H
+#define MOFKA_DRIVER_IMPL_H
 
 #include "PimplUtil.hpp"
 #include "mofka/Client.hpp"
@@ -18,7 +18,7 @@
 
 namespace mofka {
 
-class ServiceHandleImpl {
+class MofkaDriverImpl {
 
     public:
 
@@ -28,7 +28,7 @@ class ServiceHandleImpl {
     yokan::Client   m_yk_client;
     yokan::Database m_yk_master_db;
 
-    ServiceHandleImpl(
+    MofkaDriverImpl(
         thallium::engine engine,
         bedrock::ServiceGroupHandle bsgh,
         const std::pair<std::string, uint16_t>& masterDbInfo)

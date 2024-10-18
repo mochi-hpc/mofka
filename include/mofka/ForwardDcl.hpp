@@ -25,6 +25,7 @@ struct StopEventProcessor;
 class Exception;
 template<typename ResultType, typename WaitFn, typename TestFn> class Future;
 class Metadata;
+class MofkaDriver;
 struct NumEvents;
 class Producer;
 class Provider;
@@ -32,7 +33,6 @@ template<typename T>
 class Result;
 class SerializerInterface;
 class Serializer;
-class ServiceHandle;
 class PartitionInfo;
 class PartitionSelectorInterface;
 class PartitionSelector;

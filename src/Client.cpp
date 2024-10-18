@@ -11,7 +11,7 @@
 #include "JsonUtil.hpp"
 #include "PimplUtil.hpp"
 #include "ClientImpl.hpp"
-#include "ServiceHandleImpl.hpp"
+#include "MofkaDriverImpl.hpp"
 
 #include <bedrock/ServiceGroupHandle.hpp>
 
@@ -32,17 +32,17 @@ Client::Client(margo_instance_id mid)
 : self(std::make_shared<ClientImpl>(thallium::engine{mid})) {}
 
 const thallium::engine& Client::engine() const {
-    if(!self) throw Exception("Uninitialized ServiceHandle instance");
+    if(!self) throw Exception("Uninitialized MofkaDriver instance");
     return self->m_engine;
 }
 
-ServiceHandle Client::connect(const std::string& groupfile) const {
+MofkaDriver Client::connect(const std::string& groupfile) const {
     if(!self) throw Exception("Uninitialized Client instance");
-    return ServiceHandle{groupfile, self->m_engine};
+    return MofkaDriver{groupfile, self->m_engine};
 }
 
 const Metadata& Client::getConfig() const {
-    if(!self) throw Exception("Uninitialized ServiceHandle instance");
+    if(!self) throw Exception("Uninitialized MofkaDriver instance");
     static Metadata config{"{}"};
     return config;
 }

@@ -1,4 +1,4 @@
-#include <mofka/Client.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <iostream>
 
@@ -18,9 +18,9 @@ int main(int argc, char** argv) {
 
     try {
 
-        mofka::ServiceHandle sh{group_file, engine};
+        mofka::MofkaDriver driver{group_file, engine};
 
-        mofka::TopicHandle topic = sh.openTopic(topic_name);
+        mofka::TopicHandle topic = driver.openTopic(topic_name);
 
         mofka::Consumer consumer = topic.consumer("consumer");
         for(size_t i = 0; i < 100; ++i) {

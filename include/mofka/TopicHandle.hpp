@@ -108,7 +108,7 @@ class TopicHandleInterface {
  */
 class TopicHandle {
 
-    friend class ServiceHandle;
+    friend class MofkaDriver;
     friend class Producer;
     friend class Consumer;
 

@@ -6,7 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_all.hpp>
 #include <bedrock/Server.hpp>
-#include <mofka/Client.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/TopicHandle.hpp>
 #include "Configs.hpp"
 #include "Ensure.hpp"
@@ -23,19 +23,19 @@ TEST_CASE("Event producer test", "[event-producer]") {
     auto engine = server.getMargoManager().getThalliumEngine();
 
     SECTION("Initialize client/topic/producer") {
-        auto sh = mofka::ServiceHandle{"mofka.json", engine};
-        REQUIRE(static_cast<bool>(sh));
+        auto driver = mofka::MofkaDriver{"mofka.json", engine};
+        REQUIRE(static_cast<bool>(driver));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        REQUIRE_NOTHROW(sh.createTopic("mytopic"));
+        REQUIRE_NOTHROW(driver.createTopic("mytopic"));
         mofka::Metadata partition_config;
-        mofka::ServiceHandle::PartitionDependencies partition_dependencies;
+        mofka::MofkaDriver::PartitionDependencies partition_dependencies;
         getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
-        REQUIRE_NOTHROW(sh.addCustomPartition(
+        REQUIRE_NOTHROW(driver.addCustomPartition(
                     "mytopic", 0, partition_type,
                     partition_config, partition_dependencies));
-        REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
+        REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
 
         auto thread_count = GENERATE(as<mofka::ThreadCount>{}, 0, 1, 2);

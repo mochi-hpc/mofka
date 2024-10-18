@@ -6,7 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_all.hpp>
 #include <bedrock/Server.hpp>
-#include <mofka/Client.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/TopicHandle.hpp>
 #include "Configs.hpp"
 #include "Ensure.hpp"
@@ -23,27 +23,27 @@ TEST_CASE("Consumer test", "[consumer]") {
     ENSURE(server.finalize());
     auto engine = server.getMargoManager().getThalliumEngine();
 
-    SECTION("Initialize a Client and a ServiceHandle and create/open a topic") {
-        mofka::ServiceHandle sh;
-        REQUIRE(!static_cast<bool>(sh));
-        REQUIRE_NOTHROW(sh = mofka::ServiceHandle{"mofka.json", engine});
-        REQUIRE(static_cast<bool>(sh));
+    SECTION("Initialize a MofkaDriver and create/open a topic") {
+        mofka::MofkaDriver driver;
+        REQUIRE(!static_cast<bool>(driver));
+        REQUIRE_NOTHROW(driver = mofka::MofkaDriver{"mofka.json", engine});
+        REQUIRE(static_cast<bool>(driver));
         mofka::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
-        REQUIRE_NOTHROW(sh.createTopic("mytopic"));
-        REQUIRE_THROWS_AS(sh.createTopic("mytopic"), mofka::Exception);
+        REQUIRE_NOTHROW(driver.createTopic("mytopic"));
+        REQUIRE_THROWS_AS(driver.createTopic("mytopic"), mofka::Exception);
 
         mofka::Metadata partition_config;
-        mofka::ServiceHandle::PartitionDependencies partition_dependencies;
+        mofka::MofkaDriver::PartitionDependencies partition_dependencies;
         getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
-        REQUIRE_NOTHROW(sh.addCustomPartition(
+        REQUIRE_NOTHROW(driver.addCustomPartition(
                     "mytopic", 0, partition_type,
                     partition_config, partition_dependencies));
 
-        REQUIRE_NOTHROW(topic = sh.openTopic("mytopic"));
+        REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
-        REQUIRE_THROWS_AS(sh.openTopic("mytopic2"), mofka::Exception);
+        REQUIRE_THROWS_AS(driver.openTopic("mytopic2"), mofka::Exception);
 
         SECTION("Create a consumer from the topic") {
             mofka::Consumer consumer;

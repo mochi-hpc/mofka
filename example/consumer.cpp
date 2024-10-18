@@ -1,4 +1,4 @@
-#include <mofka/Client.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <tclap/CmdLine.h>
 #include <spdlog/spdlog.h>
@@ -22,11 +22,11 @@ int main(int argc, char** argv) {
     tl::engine engine(g_protocol, THALLIUM_SERVER_MODE);
 
     try {
-        // -- Create ServiceHandle
-        mofka::ServiceHandle service{g_group_file, engine};
+        // -- Create MofkaDriver
+        mofka::MofkaDriver driver{g_group_file, engine};
 
         // -- Open a topic
-        mofka::TopicHandle topic = service.openTopic("mytopic");
+        mofka::TopicHandle topic = driver.openTopic("mytopic");
 
         // -- Create a DataSelector for the consumer
         // This example will only select events with an even id field and a value field lower than 70
@@ -95,7 +95,7 @@ static void parse_command_line(int argc, char** argv) {
     try {
         TCLAP::CmdLine cmd("Mofka client", ' ', "0.1");
         TCLAP::ValueArg<std::string> groupFileArg(
-                "f", "group-file", "Flock group file of the service", true, "", "string");
+                "f", "group-file", "Flock group file of the driver", true, "", "string");
         TCLAP::ValueArg<std::string> protocolArg(
                 "p", "protocol", "Protocol", true, "na+sm", "string");
         TCLAP::ValuesConstraint<std::string> allowedLogLevels({

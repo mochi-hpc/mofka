@@ -6,7 +6,7 @@ set (server-src-files
 
 set (client-src-files
      Client.cpp
-     ServiceHandle.cpp
+     MofkaDriver.cpp
      MofkaTopicHandle.cpp
      Producer.cpp
      BatchProducer.cpp

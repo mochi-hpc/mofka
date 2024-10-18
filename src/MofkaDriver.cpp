@@ -3,14 +3,14 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "mofka/ServiceHandle.hpp"
+#include "mofka/MofkaDriver.hpp"
 #include "mofka/Result.hpp"
 #include "mofka/Exception.hpp"
 #include "mofka/TopicHandle.hpp"
 
 #include "JsonUtil.hpp"
 #include "PimplUtil.hpp"
-#include "ServiceHandleImpl.hpp"
+#include "MofkaDriverImpl.hpp"
 #include "MofkaTopicHandle.hpp"
 #include "MetadataImpl.hpp"
 
@@ -20,7 +20,7 @@
 
 namespace mofka {
 
-PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(ServiceHandle);
+PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(MofkaDriver);
 
 static inline std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
         const bedrock::ServiceGroupHandle& bsgh) {
@@ -52,7 +52,7 @@ static inline std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
     return masters[0];
 }
 
-ServiceHandle::ServiceHandle(const std::string& groupfile) {
+MofkaDriver::MofkaDriver(const std::string& groupfile) {
     // try to infer the address from one of the members
     std::ifstream inputFile(groupfile);
     if(!inputFile.is_open()) {
@@ -71,14 +71,14 @@ ServiceHandle::ServiceHandle(const std::string& groupfile) {
         auto& address = content["members"][0]["address"].get_ref<const std::string&>();
         auto protocol = address.substr(0, address.find(':'));
         auto engine = thallium::engine{protocol, THALLIUM_SERVER_MODE};
-        auto sh = ServiceHandle{groupfile, engine};
+        auto sh = MofkaDriver{groupfile, engine};
         self = std::move(sh.self);
     } catch(const std::exception& ex) {
         throw Exception(ex.what());
     }
 }
 
-ServiceHandle::ServiceHandle(const std::string& groupfile, thallium::engine engine) {
+MofkaDriver::MofkaDriver(const std::string& groupfile, thallium::engine engine) {
     std::unordered_set<std::string> addrSet;
     std::vector<std::string> addresses;
 
@@ -107,17 +107,17 @@ ServiceHandle::ServiceHandle(const std::string& groupfile, thallium::engine engi
         auto bedrock_client = bedrock::Client{engine};
         auto bsgh = bedrock_client.makeServiceGroupHandle(addresses);
         auto master = discoverMofkaServiceMaster(bsgh);
-        self = std::make_shared<ServiceHandleImpl>(engine, std::move(bsgh), master);
+        self = std::make_shared<MofkaDriverImpl>(engine, std::move(bsgh), master);
     } catch(const std::exception& ex) {
         throw Exception(ex.what());
     }
 }
 
-size_t ServiceHandle::numServers() const {
+size_t MofkaDriver::numServers() const {
     return self->m_bsgh.size();
 }
 
-void ServiceHandle::createTopic(
+void MofkaDriver::createTopic(
         std::string_view name,
         Validator validator,
         PartitionSelector selector,
@@ -130,7 +130,7 @@ void ServiceHandle::createTopic(
     //
     // The partitions are managed in a collection named
     // "MOFKA:GLOBAL:{}:partitions. The topic is created without any partition.
-    // The partitions need to be added using ServiceHandle::add*Partition().
+    // The partitions need to be added using MofkaDriver::add*Partition().
     std::array<std::string, 3> keys = {
         fmt::format("MOFKA:GLOBAL:{}:validator",  name),
         fmt::format("MOFKA:GLOBAL:{}:selector",   name),
@@ -178,7 +178,7 @@ void ServiceHandle::createTopic(
     }
 }
 
-TopicHandle ServiceHandle::openTopic(std::string_view name) {
+TopicHandle MofkaDriver::openTopic(std::string_view name) {
     // craft the keys for the topic's validator, selector and serializer
     std::array<std::string, 3> keys = {
         fmt::format("MOFKA:GLOBAL:{}:validator",  name),
@@ -301,13 +301,13 @@ TopicHandle ServiceHandle::openTopic(std::string_view name) {
         std::move(partitionsList))};
 }
 
-void ServiceHandle::addMemoryPartition(std::string_view topic_name,
+void MofkaDriver::addMemoryPartition(std::string_view topic_name,
                                        size_t server_rank,
                                        std::string_view pool_name) {
     addCustomPartition(topic_name, server_rank, "memory", {}, {}, pool_name);
 }
 
-void ServiceHandle::addDefaultPartition(std::string_view topic_name,
+void MofkaDriver::addDefaultPartition(std::string_view topic_name,
                                         size_t server_rank,
                                         std::string_view metadata_provider,
                                         std::string_view data_provider,
@@ -381,7 +381,7 @@ void ServiceHandle::addDefaultPartition(std::string_view topic_name,
     addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name);
 }
 
-void ServiceHandle::addCustomPartition(
+void MofkaDriver::addCustomPartition(
     std::string_view topic_name,
     size_t server_rank,
     std::string_view partition_type,

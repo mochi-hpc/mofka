@@ -7,7 +7,7 @@
 #define MOFKA_CLIENT_HPP
 
 #include <mofka/ForwardDcl.hpp>
-#include <mofka/ServiceHandle.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/UUID.hpp>
 #include <mofka/Json.hpp>
 
@@ -25,7 +25,7 @@ class ClientImpl;
  */
 class Client {
 
-    friend class ServiceHandle;
+    friend class MofkaDriver;
 
     public:
 
@@ -79,14 +79,14 @@ class Client {
     const thallium::engine& engine() const;
 
     /**
-     * @brief Creates a ServiceHandle representing a Mofka service.
+     * @brief Creates a MofkaDriver representing a Mofka service.
      *
      * @param filename name of the group file of the service.
      *
-     * @return a ServiceHandle instance.
+     * @return a MofkaDriver instance.
      */
-    [[deprecated("Please instanciate a ServiceHandle directly")]]
-    ServiceHandle connect(const std::string& groupfile) const;
+    [[deprecated("Please instanciate a MofkaDriver directly")]]
+    MofkaDriver connect(const std::string& groupfile) const;
 
     /**
      * @brief Checks that the Client instance is valid.
