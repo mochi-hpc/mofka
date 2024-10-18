@@ -188,7 +188,13 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::TopicHandle>(m, "TopicHandle")
         .def_property_readonly("name", &mofka::TopicHandle::name)
-        .def_property_readonly("partitions", &mofka::TopicHandle::partitions)
+        .def_property_readonly("partitions", [](const mofka::TopicHandle& topic) {
+            std::vector<nlohmann::json> result;
+            for(auto& p : topic.partitions()) {
+                result.push_back(p.json());
+            }
+            return result;
+        })
         .def("producer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,

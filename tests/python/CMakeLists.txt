@@ -8,7 +8,7 @@ set (MOFKA_TEST_PYTHONPATH
 
 foreach (test-python-source ${test-mofka-python-sources})
     get_filename_component (test-target ${test-python-source} NAME_WE)
-    set (test-target "${test-target}-python")
+    set (test-target "${test-target}_py")
     if (${ENABLE_COVERAGE})
         add_test (NAME ${test-target} COMMAND coverage run -a ${test-python-source})
     else ()
@@ -18,18 +18,22 @@ foreach (test-python-source ${test-mofka-python-sources})
                   "LD_LIBRARY_PATH=${MOFKA_TEST_LD_LIBRARY_PATH};PYTHONPATH=${MOFKA_TEST_PYTHONPATH}")
 endforeach ()
 
+if (ENABLE_KAFKA)
+
 foreach (test-python-source ${test-kafka-python-sources})
     get_filename_component (test-target ${test-python-source} NAME_WE)
-    set (test-target "${test-target}-python")
+    set (test-target "${test-target}_py")
     if (${ENABLE_COVERAGE})
         add_test (NAME ${test-target} COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run-test-with-kafka.sh
                   coverage run -a ${test-python-source})
     else ()
-        add_test (NAME ${test-target} COMMAND ${Python3_EXECUTABLE}
-                  ${CMAKE_CURRENT_SOURCE_DIR}/../run-test-with-kafka.sh ${test-python-source})
+        add_test (NAME ${test-target} COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run-test-with-kafka.sh
+                  ${Python3_EXECUTABLE} ${test-python-source})
     endif ()
     set_property (TEST ${test-target} PROPERTY ENVIRONMENT
                   "LD_LIBRARY_PATH=${MOFKA_TEST_LD_LIBRARY_PATH};PYTHONPATH=${MOFKA_TEST_PYTHONPATH}")
 endforeach ()
+
+endif ()
 
 add_subdirectory (customs)

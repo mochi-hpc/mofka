@@ -15,6 +15,7 @@ using namespace pybind11::literals;
 
 PYBIND11_MODULE(pymofka_kafka, m) {
     m.doc() = "Python binding for the KafkaDriver of the Mofka library";
+    py::module_::import("pymofka_client");
 
     py::class_<mofka::KafkaDriver>(m, "KafkaDriver")
         .def(py::init<const std::string&>(), "config_file"_a)

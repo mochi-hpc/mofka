@@ -4,6 +4,7 @@ import unittest
 import json
 import string
 import random
+import uuid
 
 from mochi.bedrock.server import Server as BedrockServer
 import mochi.mofka.client as mofka
@@ -13,27 +14,17 @@ import mochi.mofka.client as mofka
 class TestTopicHandle(unittest.TestCase):
 
     def setUp(self):
-        bedrock_config_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json")
-        with open(bedrock_config_file) as f:
-            self.bedrock_server = BedrockServer("na+sm", config=f.read())
-        self.service = mofka.MofkaDriver("mofka.json", self.bedrock_server.margo.mid)
-
-        name = "my_topic"
-        validator = mofka.Validator.from_metadata(
-            {"__type__":"my_validator:libmy_validator.so"})
-        selector = mofka.PartitionSelector.from_metadata(
-            {"__type__":"my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer.from_metadata(
-            {"__type__":"my_serializer:libmy_serializer.so"})
-        self.service.create_topic(name, validator, selector, serializer)
+        with open("kafka.json", "w+") as f:
+            f.write(json.dumps({"bootstrap.servers": "localhost:9092"}))
+        self.service = mofka.KafkaDriver("kafka.json")
+        name = "my_topic_" + str(uuid.uuid4())
+        self.service.create_topic(name)
         self.topic = self.service.open_topic(name)
 
     def tearDown(self):
         del self.service
         del self.topic
-        self.bedrock_server.finalize()
-        del self.bedrock_server
+        os.remove("kafka.json")
 
     def test_create_producer(self):
         """Test create a producer associated with a topic"""
