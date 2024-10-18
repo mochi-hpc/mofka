@@ -5,7 +5,7 @@
 #include "pybind11_json/pybind11_json.hpp"
 #include <mofka/Client.hpp>
 #include <mofka/Data.hpp>
-#include <mofka/ServiceHandle.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <mofka/ThreadPool.hpp>
 #include "../src/DataImpl.hpp"
@@ -120,12 +120,12 @@ PYBIND11_MODULE(pymofka_client, m) {
             }, "type"_a, "metadata"_a=nlohmann::json::object())
     ;
 
-    py::class_<mofka::ServiceHandle>(m, "ServiceHandle")
+    py::class_<mofka::MofkaDriver>(m, "MofkaDriver")
         .def(py::init<const std::string&>(), "group_file"_a)
         .def(py::init<const std::string&, py_margo_instance_id>(), "group_file"_a, "mid"_a)
-        .def_property_readonly("num_servers", &mofka::ServiceHandle::numServers)
+        .def_property_readonly("num_servers", &mofka::MofkaDriver::numServers)
         .def("create_topic",
-             [](mofka::ServiceHandle& service,
+             [](mofka::MofkaDriver& service,
                 const std::string& name,
                 mofka::Validator validator,
                 mofka::PartitionSelector selector,
@@ -135,12 +135,12 @@ PYBIND11_MODULE(pymofka_client, m) {
              "topic_name"_a, "validator"_a=mofka::Validator{}, "selector"_a=mofka::PartitionSelector{},
              "serializer"_a=mofka::Serializer{})
         .def("open_topic",
-            [](mofka::ServiceHandle& service, const std::string& name) -> mofka::TopicHandle {
+            [](mofka::MofkaDriver& service, const std::string& name) -> mofka::TopicHandle {
                 return service.openTopic(name);
             },
             "topic_name"_a)
         .def("add_default_partition",
-            [](mofka::ServiceHandle& service,
+            [](mofka::MofkaDriver& service,
                std::string_view topic_name,
                size_t server_rank,
                std::string_view metadata_provider,
@@ -160,12 +160,12 @@ PYBIND11_MODULE(pymofka_client, m) {
             "partition_config"_a=nlohmann::json::object(),
             "pool_name"_a="")
         .def("add_custom_partition",
-            [](mofka::ServiceHandle& service,
+            [](mofka::MofkaDriver& service,
                std::string_view topic_name,
                size_t server_rank,
                const std::string& partition_type,
                const nlohmann::json& partition_config,
-               const mofka::ServiceHandle::PartitionDependencies& dependencies,
+               const mofka::MofkaDriver::PartitionDependencies& dependencies,
                const std::string& pool_name) {
                 service.addCustomPartition(
                     topic_name, server_rank, partition_type,
@@ -174,10 +174,10 @@ PYBIND11_MODULE(pymofka_client, m) {
             },
             "topic_name"_a, "server_rank"_a, "partition_type"_a="memory",
             "partition_config"_a=nlohmann::json::object(),
-            "dependencies"_a=mofka::ServiceHandle::PartitionDependencies{},
+            "dependencies"_a=mofka::MofkaDriver::PartitionDependencies{},
             "pool_name"_a="")
         .def("add_memory_partition",
-            [](mofka::ServiceHandle& service,
+            [](mofka::MofkaDriver& service,
                std::string_view topic_name,
                size_t server_rank,
                const std::string& pool_name) {

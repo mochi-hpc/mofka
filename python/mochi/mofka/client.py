@@ -10,7 +10,7 @@ PartitionSelector = pymofka_client.PartitionSelector
 Serializer = pymofka_client.Serializer
 ThreadPool = pymofka_client.ThreadPool
 AdaptiveBatchSize = pymofka_client.AdaptiveBatchSize
-ServiceHandle = pymofka_client.ServiceHandle
+MofkaDriver = pymofka_client.MofkaDriver
 Producer = pymofka_client.Producer
 Consumer = pymofka_client.Consumer
 DataDescriptor = pymofka_client.DataDescriptor
@@ -20,11 +20,20 @@ FutureEvent = pymofka_client.FutureEvent
 Ordering = pymofka_client.Ordering
 
 
+class ServiceHandle(MofkaDriver):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        import warnings
+        warnings.warn("The ServiceHandle class is deprecated, please use MofkaDriver",
+                      DeprecationWarning, stacklevel=2)
+
+
 class Client:
 
     def __init__(self, arg):
         import warnings
-        warnings.warn("The Client class is deprecated, please instantiate a ServiceHandle directly",
+        warnings.warn("The Client class is deprecated, please use MofkaDriver",
                       DeprecationWarning, stacklevel=2)
         self._engine = None
         self._mid = None

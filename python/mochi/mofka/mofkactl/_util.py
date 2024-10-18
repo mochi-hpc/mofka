@@ -31,9 +31,8 @@ class ServiceContext:
 
     def __enter__(self):
         self.engine = Engine(self.protocol)
-        from ..client import Client
-        client = Client(self.engine.mid)
-        self.service = client.connect(self.groupfile)
+        from ..client import MofkaDriver
+        self.service = MofkaDriver(self.groupfile, self.engine.mid)
         return self.service
 
     def __exit__(self, type, value, traceback):
