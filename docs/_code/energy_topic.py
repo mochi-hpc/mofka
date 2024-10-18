@@ -1,12 +1,11 @@
 import sys
 import pymargo.core
 from pymargo.core import Engine
-from mochi.mofka.client import Client
+from mochi.mofka.client import MofkaDriver
 
 
 def main(engine: Engine, group_file: str):
-    client = Client(engine)
-    service = client.connect(group_file)
+    driver = MofkaDriver(group_file, engine)
 
     # START CREATE TOPIC
     from mochi.mofka.client import Validator, PartitionSelector, Serializer
@@ -18,7 +17,7 @@ def main(engine: Engine, group_file: str):
     serializer = Serializer.from_metadata(
         "energy_serializer:libenergy_serializer.so", {"energy_max": 100})
 
-    service.create_topic(
+    driver.create_topic(
         topic_name="collisions",
         validator=validator,
         selector=selector,
@@ -27,11 +26,11 @@ def main(engine: Engine, group_file: str):
 
     # START ADD PARTITION
     # add an in-memory partition
-    service.add_memory_partition(
+    driver.add_memory_partition(
         topic_name="collisions",
         server_rank=0)
     # add a default partition (all arguments specified)
-    service.add_default_partition(
+    driver.add_default_partition(
         topic_name="collisions",
         server_rank=0,
         metadata_provider="my_metadata_provider@local",
@@ -39,7 +38,7 @@ def main(engine: Engine, group_file: str):
         partition_config={},
         pool_name="__primary__")
     # add a default partition (discover providers automatically)
-    service.add_default_partition(
+    driver.add_default_partition(
         topic_name="collisions",
         server_rank=0)
     # END ADD PARTITION
@@ -47,7 +46,7 @@ def main(engine: Engine, group_file: str):
     # START PRODUCER
     from mochi.mofka.client import ThreadPool, AdaptiveBatchSize, Ordering
 
-    topic = service.open_topic("collisions")
+    topic = driver.open_topic("collisions")
     thread_pool = ThreadPool(4)
     batch_size = AdaptiveBatchSize # or an integer > 0
     ordering = Ordering.Strict # or Ordering.Loose

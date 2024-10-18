@@ -1,13 +1,12 @@
 import sys
 import pymargo.core
 from pymargo.core import Engine
-from mochi.mofka.client import Client
+from mochi.mofka.client import MofkaDriver
 
 
 def produce(engine: Engine, group_file: str, topic_name: str):
-    client = Client(engine)
-    service = client.connect(group_file)
-    topic = service.open_topic(topic_name)
+    driver = MofkaDriver(group_file, engine)
+    topic = driver.open_topic(topic_name)
     producer = topic.producer()
 
     for i in range(0, 100):

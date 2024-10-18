@@ -7,6 +7,7 @@
 #define ABT_POOL_PRIO_H
 
 #include <abt.h>
+#include <functional>
 
 int ABT_pool_prio_wait_def_create(ABT_pool_user_def* def);
 

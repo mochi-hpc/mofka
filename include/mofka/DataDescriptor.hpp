@@ -17,8 +17,6 @@
 namespace mofka {
 
 class DataDescriptorImpl;
-class BatchImpl;
-class ConsumerImpl;
 
 /**
  * @brief A DataDescriptor is an opaque object describing
@@ -27,6 +25,11 @@ class ConsumerImpl;
 class DataDescriptor {
 
     public:
+
+    struct Segment {
+        std::size_t offset;
+        std::size_t size;
+    };
 
     /**
      * @brief Creates a NULL DataDescriptor.
@@ -89,6 +92,11 @@ class DataDescriptor {
      * PartitionManager that created this DataDescriptor).
      */
     std::vector<char>& location();
+
+    /**
+     * @brief Extract a flat representation of the data descriptor.
+     */
+    std::vector<Segment> flatten() const;
 
     /**
      * @brief Create a DataDescriptor representing a subset of
@@ -199,6 +207,8 @@ class DataDescriptor {
      */
     operator bool() const;
 
+
+
     private:
 
     /**
@@ -210,8 +220,6 @@ class DataDescriptor {
 
     std::shared_ptr<DataDescriptorImpl> self;
 
-    friend class ConsumerImpl;
-    friend class BatchImpl;
     friend struct Cerealized<DataDescriptor>;
 };
 

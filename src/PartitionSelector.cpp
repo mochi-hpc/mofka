@@ -25,7 +25,7 @@ void PartitionSelector::setPartitions(const std::vector<PartitionInfo>& targets)
     return self->setPartitions(targets);
 }
 
-PartitionInfo PartitionSelector::selectPartitionFor(const Metadata& metadata) {
+size_t PartitionSelector::selectPartitionFor(const Metadata& metadata) {
     return self->selectPartitionFor(metadata);
 }
 

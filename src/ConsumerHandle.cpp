@@ -42,7 +42,7 @@ void ConsumerHandle::feed(
             data_desc_sizes,
             data_desc);
     } catch(const std::exception& ex) {
-        spdlog::warn("Exception throw will sending batch to consumer: {}", ex.what());
+        spdlog::warn("Exception thrown while sending batch to consumer: {}", ex.what());
     }
 }
 

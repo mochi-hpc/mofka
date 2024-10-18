@@ -39,10 +39,18 @@ struct ULT {
 struct PrioPoolData {
     std::mutex               mutex;
     std::condition_variable  cond;
-    std::priority_queue<ULT> queue;
+    uint64_t                 cs_count = 0;
+    std::priority_queue<ULT> prio_queue;
+    std::queue<ULT>          fifo_queue;
 };
 
-struct QueueAdaptor : public std::priority_queue<ULT> {
+struct PriorityQueueAdaptor : public std::priority_queue<ULT> {
+    const auto& container() const {
+        return this->c;
+    }
+};
+
+struct FifoQueueAdaptor : public std::queue<ULT> {
     const auto& container() const {
         return this->c;
     }
@@ -69,7 +77,7 @@ static ABT_bool pool_is_empty(ABT_pool pool)
     PrioPoolData* p_data = nullptr;
     ABT_pool_get_data(pool, (void**)&p_data);
     auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-    return p_data->queue.empty();
+    return p_data->prio_queue.empty() && p_data->fifo_queue.empty();
 }
 
 static size_t pool_get_size(ABT_pool pool)
@@ -77,7 +85,7 @@ static size_t pool_get_size(ABT_pool pool)
     PrioPoolData* p_data = nullptr;
     ABT_pool_get_data(pool, (void**)&p_data);
     auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-    return p_data->queue.size();
+    return p_data->prio_queue.size() + p_data->fifo_queue.size();
 }
 
 static void pool_push(ABT_pool pool, ABT_unit unit, ABT_pool_context context)
@@ -86,8 +94,14 @@ static void pool_push(ABT_pool pool, ABT_unit unit, ABT_pool_context context)
     PrioPoolData* p_data = nullptr;
     ABT_pool_get_data(pool, (void**)&p_data);
     {
+        ArgsWrapper *wrapper;
+        ABT_thread_get_arg((ABT_thread)unit, (void**)&wrapper);
+
         auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-        p_data->queue.emplace((ABT_thread)unit);
+        if(wrapper->priority < std::numeric_limits<uint64_t>::max())
+            p_data->prio_queue.emplace((ABT_thread)unit);
+        else
+            p_data->fifo_queue.emplace((ABT_thread)unit);
     }
     p_data->cond.notify_one();
 }
@@ -100,8 +114,14 @@ static void pool_push_many(ABT_pool pool, const ABT_unit *units,
     ABT_pool_get_data(pool, (void**)&p_data);
     {
         auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-        for(size_t i = 0; i < num_units; ++i)
-            p_data->queue.emplace((ABT_thread)units[i]);
+        for(size_t i = 0; i < num_units; ++i) {
+            ArgsWrapper *wrapper;
+            ABT_thread_get_arg((ABT_thread)units[i], (void**)&wrapper);
+            if(wrapper->priority < std::numeric_limits<uint64_t>::max())
+                p_data->prio_queue.emplace((ABT_thread)units[i]);
+            else
+                p_data->fifo_queue.emplace((ABT_thread)units[i]);
+        }
     }
     if(num_units == 1)
         p_data->cond.notify_one();
@@ -118,11 +138,25 @@ static ABT_thread pool_pop_wait(ABT_pool pool, double time_secs,
     ABT_pool_get_data(pool, (void**)&p_data);
     {
         auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-        if(p_data->queue.empty())
+        if(p_data->prio_queue.empty() && p_data->fifo_queue.empty())
             p_data->cond.wait_for(guard, std::chrono::duration<double, std::milli>(time_secs*1000));
-        if(!p_data->queue.empty()) {
-            result = p_data->queue.top().m_thread;
-            p_data->queue.pop();
+        p_data->cs_count++;
+        if(p_data->cs_count % 2 == 0) {
+            if(!p_data->prio_queue.empty()) {
+                result = p_data->prio_queue.top().m_thread;
+                p_data->prio_queue.pop();
+            } else if(!p_data->fifo_queue.empty()) {
+                result = p_data->fifo_queue.front().m_thread;
+                p_data->fifo_queue.pop();
+            }
+        } else {
+            if(!p_data->fifo_queue.empty()) {
+                result = p_data->fifo_queue.front().m_thread;
+                p_data->fifo_queue.pop();
+            } else if(!p_data->prio_queue.empty()) {
+                result = p_data->prio_queue.top().m_thread;
+                p_data->prio_queue.pop();
+            }
         }
     }
     return result;
@@ -136,9 +170,23 @@ static ABT_thread pool_pop(ABT_pool pool, ABT_pool_context context)
     ABT_pool_get_data(pool, (void**)&p_data);
     {
         auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-        if(!p_data->queue.empty()) {
-            result = p_data->queue.top().m_thread;
-            p_data->queue.pop();
+        p_data->cs_count++;
+        if(p_data->cs_count % 2 == 0) {
+            if(!p_data->prio_queue.empty()) {
+                result = p_data->prio_queue.top().m_thread;
+                p_data->prio_queue.pop();
+            } else if(!p_data->fifo_queue.empty()) {
+                result = p_data->fifo_queue.front().m_thread;
+                p_data->fifo_queue.pop();
+            }
+        } else {
+            if(!p_data->fifo_queue.empty()) {
+                result = p_data->fifo_queue.front().m_thread;
+                p_data->fifo_queue.pop();
+            } else if(!p_data->prio_queue.empty()) {
+                result = p_data->prio_queue.top().m_thread;
+                p_data->prio_queue.pop();
+            }
         }
     }
     return result;
@@ -153,10 +201,34 @@ static void pool_pop_many(ABT_pool pool, ABT_thread *threads,
     ABT_pool_get_data(pool, (void**)&p_data);
     {
         auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-        *num_popped = std::min(max_threads, (size_t)p_data->queue.size());
-        for(size_t i = 0; i < *num_popped; ++i) {
-            threads[i] = p_data->queue.top().m_thread;
-            p_data->queue.pop();
+        *num_popped = 0;
+        for(size_t i = 0; i < max_threads; ++i) {
+            p_data->cs_count++;
+            if(p_data->cs_count % 2 == 0) {
+                if(!p_data->prio_queue.empty()) {
+                    threads[i] = p_data->prio_queue.top().m_thread;
+                    p_data->prio_queue.pop();
+                    *num_popped += 1;
+                } else if(!p_data->fifo_queue.empty()) {
+                    threads[i] = p_data->fifo_queue.front().m_thread;
+                    p_data->fifo_queue.pop();
+                    *num_popped += 1;
+                } else {
+                    break;
+                }
+            } else {
+                if(!p_data->fifo_queue.empty()) {
+                    threads[i] = p_data->fifo_queue.front().m_thread;
+                    p_data->fifo_queue.pop();
+                    *num_popped += 1;
+                } else if(!p_data->prio_queue.empty()) {
+                    threads[i] = p_data->prio_queue.top().m_thread;
+                    p_data->prio_queue.pop();
+                    *num_popped += 1;
+                } else {
+                    break;
+                }
+            }
         }
     }
 }
@@ -168,7 +240,10 @@ static void pool_print_all(ABT_pool pool, void *arg,
     ABT_pool_get_data(pool, (void**)&p_data);
     {
         auto guard = std::unique_lock<std::mutex>{p_data->mutex};
-        for(auto& ult : static_cast<QueueAdaptor*>(&p_data->queue)->container()) {
+        for(auto& ult : static_cast<PriorityQueueAdaptor*>(&p_data->prio_queue)->container()) {
+            print_fn(arg, ult.m_thread);
+        }
+        for(auto& ult : static_cast<FifoQueueAdaptor*>(&p_data->fifo_queue)->container()) {
             print_fn(arg, ult.m_thread);
         }
     }

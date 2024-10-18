@@ -21,7 +21,6 @@ class BenchmarkConsumer {
     using json = nlohmann::json;
 
     thallium::engine     m_engine;
-    mofka::Client        m_mofka_client;
     mofka::ServiceHandle m_mofka_service_handle;
     mofka::TopicHandle   m_mofka_topic_handle;
     mofka::Consumer      m_mofka_consumer;
@@ -54,7 +53,6 @@ class BenchmarkConsumer {
         Communicator comm,
         bool run_in_thread = false)
     : m_engine{std::move(engine)}
-    , m_mofka_client{m_engine}
     , m_comm{comm}
     , m_config(config)
     , m_rng(seed*33+42)
@@ -62,7 +60,7 @@ class BenchmarkConsumer {
     {
         auto& group_file = config["group_file"].get_ref<const std::string&>();
         spdlog::trace("[consumer] Connecting to mofka file \"{}\"", group_file);
-        m_mofka_service_handle = m_mofka_client.connect(group_file);
+        m_mofka_service_handle = mofka::ServiceHandle{group_file, m_engine};
 
         auto& topic_name = config["topic_name"].get_ref<const std::string&>();
         spdlog::trace("[consumer] Opening topic \"{}\"", topic_name);
@@ -210,10 +208,12 @@ class BenchmarkConsumer {
                 }
                 t2 = MPI_Wtime();
                 m_pull_stats << (t2 - t1);
+
+                auto uuid = mofka::UUID::from_string(
+                    event.partition().json()["uuid"].get_ref<const std::string&>().c_str());
                 spdlog::trace("[consumer] Done pulling event {}: received event {} from partition {}",
-                             i, event.id(), event.partition().uuid().to_string());
+                              i, event.id(), uuid.to_string());
                 if(event.id() == mofka::NoMoreEvents) break;
-                auto uuid = event.partition().uuid();
                 auto it = events_received.find(uuid);
                 if(it == events_received.end())
                     it = events_received.insert(std::make_pair(uuid, 0)).first;

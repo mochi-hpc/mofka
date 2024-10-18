@@ -17,7 +17,6 @@ namespace mofka {
 
 class ActiveProducerBatchQueue;
 class ThreadPoolImpl;
-class ConsumerImpl;
 
 /**
  * @brief Strongly typped size_t meant to represent the number of
@@ -34,6 +33,14 @@ struct ThreadCount {
 /**
  * @brief A ThreadPool is an object that manages a number of Argobots
  * execution streams and an Argobots pool and pushes works into them.
+ * The pool holds two data structures: a FIFO queue for the ULTs that
+ * have a priority set to std::numeric_limits<uint64_t>::max(), and
+ * a min-heap for the ULTs that have a different priority. The pool
+ * will pick alternatively from each queue.
+ *
+ * @warning For ULTs in the min-heap, a lower priority value means that
+ * the ULT will be picked first. This is so that an EventID can be used
+ * as a priority, allowing events with lower ID to be processed first.
  */
 class ThreadPool {
 
@@ -75,6 +82,20 @@ class ThreadPool {
     ThreadCount threadCount() const;
 
     /**
+     * @brief Push work into the thread pool.
+     *
+     * @param func Function to push.
+     * @param priority Priority.
+     */
+    void pushWork(std::function<void()> func,
+                  uint64_t priority = std::numeric_limits<uint64_t>::max()) const;
+
+    /**
+     * @brief Get the number of ULTs in the pool, including blocked and running ULTs.
+     */
+    size_t size() const;
+
+    /**
      * @brief Checks if the ThreadPool instance is valid.
      */
     operator bool() const;
@@ -91,11 +112,7 @@ class ThreadPool {
 
     std::shared_ptr<ThreadPoolImpl> self;
 
-    friend class Producer;
     friend class ActiveProducerBatchQueue;
-    friend class ConsumerImpl;
-    friend class Consumer;
-    friend class TopicHandle;
 };
 
 }

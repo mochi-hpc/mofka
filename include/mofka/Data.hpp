@@ -18,7 +18,6 @@ namespace mofka {
 class DataImpl;
 class PythonBindingHelper;
 class ProducerBatchImpl;
-class ConsumerImpl;
 
 /**
  * @brief A Data is an object that encapsulates the data of an event.
@@ -87,6 +86,16 @@ class Data {
     size_t size() const;
 
     /**
+     * @brief Write the content of target at the specified offset
+     * into the memory represented by this Data object.
+     *
+     * @param data Data to write.
+     * @param size Size of the data.
+     * @param from_offset Offset from which to write.
+     */
+    void write(char* data, size_t size, size_t offset = 0) const;
+
+    /**
      * @brief Checks if the Data instance is valid.
      */
     operator bool() const;
@@ -109,7 +118,6 @@ class Data {
 
     friend class ProducerBatchImpl;
     friend class Event;
-    friend class ConsumerImpl;
 
 };
 

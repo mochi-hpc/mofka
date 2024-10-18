@@ -23,7 +23,6 @@ class BenchmarkProducer {
     using json = nlohmann::json;
 
     thallium::engine             m_engine;
-    mofka::Client                m_mofka_client;
     mofka::ServiceHandle         m_mofka_service_handle;
     mofka::TopicHandle           m_mofka_topic_handle;
     mofka::Producer              m_mofka_producer;
@@ -50,7 +49,6 @@ class BenchmarkProducer {
         Communicator comm,
         bool run_in_thread = false)
     : m_engine{std::move(engine)}
-    , m_mofka_client{m_engine}
     , m_string_generator(seed)
     , m_metadata_generator(
         m_string_generator,
@@ -72,7 +70,7 @@ class BenchmarkProducer {
     {
         auto& group_file = config["group_file"].get_ref<const std::string&>();
         spdlog::trace("[producer] Connecting to mofka file \"{}\"", group_file);
-        m_mofka_service_handle = m_mofka_client.connect(group_file);
+        m_mofka_service_handle = mofka::ServiceHandle{group_file, m_engine};
 
         auto& topic_name = config["topic"]["name"].get_ref<const std::string&>();
         int rank = comm.rank();

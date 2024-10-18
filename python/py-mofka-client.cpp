@@ -5,7 +5,7 @@
 #include "pybind11_json/pybind11_json.hpp"
 #include <mofka/Client.hpp>
 #include <mofka/Data.hpp>
-#include <mofka/ServiceHandle.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <mofka/ThreadPool.hpp>
 #include "../src/DataImpl.hpp"
@@ -16,26 +16,6 @@
 
 namespace py = pybind11;
 using namespace pybind11::literals;
-
-#if 0
-namespace mofka {
-class PythonBindingHelper {
-
-    public:
-
-    static void SetDataContext(mofka::Data& data, py::object obj) {
-        data.self->m_ctx = static_cast<void*>(new py::object(std::move(obj)));
-        data.self->m_ctx_free = [](void* uargs) -> void {
-            delete static_cast<py::object*>(uargs);
-        };
-    }
-
-    static py::object GetDataContext(const mofka::Data& data) {
-        return *static_cast<py::object*>(data.self->m_ctx);
-    }
-};
-}
-#endif
 
 typedef py::capsule py_margo_instance_id;
 typedef py::capsule py_hg_addr_t;
@@ -91,20 +71,6 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     m.attr("AdaptiveBatchSize") = py::int_(mofka::BatchSize::Adaptive().value);
 
-    py::class_<mofka::Client>(m, "Client")
-        .def_property_readonly("config",
-            [](const mofka::Client& client) -> nlohmann::json {
-                return client.getConfig().json();
-            })
-        .def_property_readonly("engine", &mofka::Client::engine)
-        .def(py::init<py_margo_instance_id>(), "mid"_a)
-        .def("connect",
-             [](const mofka::Client& client, std::string_view filename) -> mofka::ServiceHandle {
-                return client.connect(std::string{filename});
-             },
-            "group_file"_a)
-    ;
-
     py::class_<mofka::Validator>(m, "Validator")
         .def_static("from_metadata",
             [](const char* type, const nlohmann::json& md){
@@ -143,12 +109,6 @@ PYBIND11_MODULE(pymofka_client, m) {
             }, "metadata"_a=nlohmann::json::object())
     ;
 
-    py::class_<mofka::PartitionInfo>(m, "PartitionInfo")
-        .def_property_readonly("uuid", &mofka::PartitionInfo::uuid)
-        .def_property_readonly("address", &mofka::PartitionInfo::address)
-        .def_property_readonly("provider_id", &mofka::PartitionInfo::providerID)
-    ;
-
     py::class_<mofka::PartitionSelector>(m, "PartitionSelector")
         .def_static("from_metadata",
             [](const nlohmann::json& md){
@@ -160,11 +120,12 @@ PYBIND11_MODULE(pymofka_client, m) {
             }, "type"_a, "metadata"_a=nlohmann::json::object())
     ;
 
-    py::class_<mofka::ServiceHandle>(m, "ServiceHandle")
-        .def_property_readonly("client", &mofka::ServiceHandle::client)
-        .def_property_readonly("num_servers", &mofka::ServiceHandle::numServers)
+    py::class_<mofka::MofkaDriver>(m, "MofkaDriver")
+        .def(py::init<const std::string&>(), "group_file"_a)
+        .def(py::init<const std::string&, py_margo_instance_id>(), "group_file"_a, "mid"_a)
+        .def_property_readonly("num_servers", &mofka::MofkaDriver::numServers)
         .def("create_topic",
-             [](mofka::ServiceHandle& service,
+             [](mofka::MofkaDriver& service,
                 const std::string& name,
                 mofka::Validator validator,
                 mofka::PartitionSelector selector,
@@ -174,12 +135,12 @@ PYBIND11_MODULE(pymofka_client, m) {
              "topic_name"_a, "validator"_a=mofka::Validator{}, "selector"_a=mofka::PartitionSelector{},
              "serializer"_a=mofka::Serializer{})
         .def("open_topic",
-            [](mofka::ServiceHandle& service, const std::string& name) -> mofka::TopicHandle {
+            [](mofka::MofkaDriver& service, const std::string& name) -> mofka::TopicHandle {
                 return service.openTopic(name);
             },
             "topic_name"_a)
         .def("add_default_partition",
-            [](mofka::ServiceHandle& service,
+            [](mofka::MofkaDriver& service,
                std::string_view topic_name,
                size_t server_rank,
                std::string_view metadata_provider,
@@ -199,12 +160,12 @@ PYBIND11_MODULE(pymofka_client, m) {
             "partition_config"_a=nlohmann::json::object(),
             "pool_name"_a="")
         .def("add_custom_partition",
-            [](mofka::ServiceHandle& service,
+            [](mofka::MofkaDriver& service,
                std::string_view topic_name,
                size_t server_rank,
                const std::string& partition_type,
                const nlohmann::json& partition_config,
-               const mofka::ServiceHandle::PartitionDependencies& dependencies,
+               const mofka::MofkaDriver::PartitionDependencies& dependencies,
                const std::string& pool_name) {
                 service.addCustomPartition(
                     topic_name, server_rank, partition_type,
@@ -213,10 +174,10 @@ PYBIND11_MODULE(pymofka_client, m) {
             },
             "topic_name"_a, "server_rank"_a, "partition_type"_a="memory",
             "partition_config"_a=nlohmann::json::object(),
-            "dependencies"_a=mofka::ServiceHandle::PartitionDependencies{},
+            "dependencies"_a=mofka::MofkaDriver::PartitionDependencies{},
             "pool_name"_a="")
         .def("add_memory_partition",
-            [](mofka::ServiceHandle& service,
+            [](mofka::MofkaDriver& service,
                std::string_view topic_name,
                size_t server_rank,
                const std::string& pool_name) {
@@ -227,8 +188,13 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::TopicHandle>(m, "TopicHandle")
         .def_property_readonly("name", &mofka::TopicHandle::name)
-        .def_property_readonly("service", &mofka::TopicHandle::service)
-        .def_property_readonly("partitions", &mofka::TopicHandle::partitions)
+        .def_property_readonly("partitions", [](const mofka::TopicHandle& topic) {
+            std::vector<nlohmann::json> result;
+            for(auto& p : topic.partitions()) {
+                result.push_back(p.json());
+            }
+            return result;
+        })
         .def("producer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,
@@ -250,7 +216,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::optional<mofka::ThreadPool> thread_pool,
                PythonDataBroker broker,
                PythonDataSelector selector,
-               std::optional<std::vector<mofka::PartitionInfo>> targets) -> mofka::Consumer {
+               std::optional<std::vector<size_t>> targets) -> mofka::Consumer {
                 auto cpp_broker = broker ?
                     [broker=std::move(broker)]
                     (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::Data {
@@ -277,16 +243,17 @@ PYBIND11_MODULE(pymofka_client, m) {
                         else return mofka::DataDescriptor::Null();
                     }
                 : mofka::DataSelector{};
+                std::vector<size_t> default_targets;
                 return topic.consumer(
                     name, mofka::BatchSize(batch_size),
                     thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
                     mofka::DataBroker{cpp_broker},
                     mofka::DataSelector{cpp_selector},
-                    targets.value_or(topic.partitions()));
+                    targets.value_or(default_targets));
                },
             "name"_a, "batch_size"_a=mofka::BatchSize::Adaptive().value,
             "thread_pool"_a=std::nullopt, "data_broker"_a=PythonDataBroker{},
-            "data_selector"_a=PythonDataSelector{}, "targets"_a=std::optional<std::vector<mofka::PartitionInfo>>{})
+            "data_selector"_a=PythonDataSelector{}, "targets"_a=std::optional<std::vector<size_t>>{})
     ;
 
     py::class_<mofka::Producer>(m, "Producer")

@@ -1,4 +1,4 @@
-#include <mofka/Client.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <iostream>
 
@@ -17,8 +17,7 @@ int main(int argc, char** argv) {
 
     try {
 
-        mofka::Client client = mofka::Client{engine};
-        mofka::ServiceHandle sh = client.connect(group_file);
+        mofka::MofkaDriver driver{group_file, engine};
 
         // START CREATE TOPIC
         mofka::Validator validator =
@@ -39,25 +38,25 @@ int main(int argc, char** argv) {
                 mofka::Metadata{{{"energy_max", 100}}}
             );
 
-        sh.createTopic("collisions", validator, selector, serializer);
+        driver.createTopic("collisions", validator, selector, serializer);
         // END CREATE TOPIC
 
         // START ADD PARTITION
         // add an in-memory partition
-        sh.addMemoryPartition("collisions", 0);
+        driver.addMemoryPartition("collisions", 0);
         // add a default partition (all arguments specified)
-        sh.addDefaultPartition(
+        driver.addDefaultPartition(
                 "collisions", 0,
                 "my_metadata_provider@local",
                 "my_data_provider@local",
                 {}, "__primary__");
         // add a default partition (discover providers automatically)
-        sh.addDefaultPartition("collisions", 0);
+        driver.addDefaultPartition("collisions", 0);
         // END ADD PARTITION
 
         {
         // START PRODUCER
-        mofka::TopicHandle topic = sh.openTopic("collisions");
+        mofka::TopicHandle topic = driver.openTopic("collisions");
 
         mofka::ThreadPool thread_pool{mofka::ThreadCount{4}};
         mofka::BatchSize  batch_size = mofka::BatchSize::Adaptive();
@@ -102,7 +101,7 @@ int main(int argc, char** argv) {
 
         {
         // START CONSUMER
-        mofka::TopicHandle topic = sh.openTopic("collisions");
+        mofka::TopicHandle topic = driver.openTopic("collisions");
         mofka::BatchSize  batch_size = mofka::BatchSize::Adaptive();
         mofka::ThreadPool thread_pool{mofka::ThreadCount{4}};
         mofka::DataSelector data_selector =

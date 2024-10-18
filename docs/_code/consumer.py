@@ -2,12 +2,11 @@ import sys
 import json
 import pymargo.core
 from pymargo.core import Engine
-from mochi.mofka.client import Client
+from mochi.mofka.client import MofkaDriver
 
 
 def consume(engine: Engine, group_file: str, topic_name: str):
-    client = Client(engine)
-    service = client.connect(group_file)
+    driver = MofkaDriver(group_file, engine)
     topic = service.open_topic(topic_name)
     consumer = topic.consumer(name="myconsumer")
 

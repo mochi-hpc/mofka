@@ -38,6 +38,10 @@ std::vector<char>& DataDescriptor::location() {
     return self->m_location;
 }
 
+std::vector<DataDescriptor::Segment> DataDescriptor::flatten() const {
+    return self->flatten();
+}
+
 DataDescriptor DataDescriptor::makeStridedView(
         size_t offset,
         size_t numblocks,

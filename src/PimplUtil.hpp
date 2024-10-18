@@ -8,29 +8,24 @@
 
 #include <memory>
 
+#define PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DCTOR(T) \
+    T::T(const std::shared_ptr<T ## Impl>& impl)  \
+    : self(impl) {}                               \
+    T::T(const T&) = default;                     \
+    T::T(T&&) = default;                          \
+    T& T::operator=(const T&) = default;          \
+    T& T::operator=(T&&) = default;               \
+    T::operator bool() const {                    \
+        return static_cast<bool>(self);           \
+    }
+
 #define PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(T) \
-    T::T(const std::shared_ptr<T ## Impl>& impl) \
-    : self(impl) {}                              \
-    T::T(const T&) = default;                    \
-    T::T(T&&) = default;                         \
-    T& T::operator=(const T&) = default;         \
-    T& T::operator=(T&&) = default;              \
-    T::operator bool() const {                   \
-        return static_cast<bool>(self);          \
-    }                                            \
+    PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DCTOR(T)    \
     T::~T() = default
 
 #define PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DTOR(T) \
     T::T() = default;                            \
-    T::T(const std::shared_ptr<T ## Impl>& impl) \
-    : self(impl) {}                              \
-    T::T(const T&) = default;                    \
-    T::T(T&&) = default;                         \
-    T& T::operator=(const T&) = default;         \
-    T& T::operator=(T&&) = default;              \
-    T::operator bool() const {                   \
-        return static_cast<bool>(self);          \
-    }
+    PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DCTOR(T)
 
 #define PIMPL_DEFINE_COMMON_FUNCTIONS(T)     \
     T::T() = default;                        \

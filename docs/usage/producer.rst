@@ -20,10 +20,9 @@ the event's metadata into batches aimed at the same partition.
 Creating a producer
 -------------------
 
-To obtain a :code:`Producer` instance, one must first instantiate a :code:`Client`,
-connect to obtain a :code:`ServiceHandle`, before obtaining a :code:`TopicHandle`
-by opening a topic. The :code:`TopicHandle` can then be used to create a :code:`Producer`,
-as examplified hereafter.
+To obtain a :code:`Producer` instance, one must first instantiate a :code:`MofkaDriver`,
+before obtaining a :code:`TopicHandle` by opening a topic. The :code:`TopicHandle`
+can then be used to create a :code:`Producer`, as examplified hereafter.
 
 .. tabs::
 

@@ -109,12 +109,11 @@ Python, which handles the Mochi runtime.
    The engine needs to be initialized in *server mode* for Mofka to work.
    This is because Mofka servers will send RPCs to the clients.
 
-Next, we create a :code:`Client` object and use it to create a
-:code:`ServiceHandle`. The latter is initialized using the file
+Next, we create a :code:`MofkaDriver` object  using the file
 created by our running Mofka server (*mofka.json*).
 
-We then open the topic we have created, using :code:`service_handle.openTopic()`
-(:code:`server.open_topic()` in Python), which gives us a :code:`TopicHandle`
+We then open the topic we have created, using :code:`driver.openTopic()`
+(:code:`driver.open_topic()` in Python), which gives us a :code:`TopicHandle`
 to interact with the topic.
 
 We create a :code:`Producer` using :code:`topic.producer()`, and we use

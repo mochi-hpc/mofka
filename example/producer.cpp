@@ -1,4 +1,4 @@
-#include <mofka/Client.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <tclap/CmdLine.h>
 #include <spdlog/spdlog.h>
@@ -24,22 +24,19 @@ int main(int argc, char** argv) {
 
     try {
 
-        // -- Initialize a Client
-        mofka::Client client(engine);
-
-        // -- Create ServiceHandle
-        mofka::ServiceHandle service = client.connect(g_group_file);
+        // -- Create MofkaDriver
+        mofka::MofkaDriver driver{g_group_file, engine};
 
         // -- Create a topic
         // We provide a default validator, selector, and serializer as example for the API.
         mofka::Validator         validator;
         mofka::Serializer        serializer;
         mofka::PartitionSelector selector;
-        service.createTopic("mytopic", validator, selector, serializer);
+        driver.createTopic("mytopic", validator, selector, serializer);
 
-        service.addDefaultPartition("mytopic", 0);
+        driver.addDefaultPartition("mytopic", 0);
 
-        mofka::TopicHandle topic = service.openTopic("mytopic");
+        mofka::TopicHandle topic = driver.openTopic("mytopic");
 
         // -- Get a producer for the topic
         mofka::BatchSize   batchSize   = mofka::BatchSize::Adaptive();
@@ -85,7 +82,7 @@ static void parse_command_line(int argc, char** argv) {
     try {
         TCLAP::CmdLine cmd("Mofka client", ' ', "0.1");
         TCLAP::ValueArg<std::string> groupFileArg(
-                "f", "group-file", "Flock group file of the service", true, "", "string");
+                "f", "group-file", "Flock group file of the driver", true, "", "string");
         TCLAP::ValueArg<std::string> protocolArg(
                 "p", "protocol", "Protocol", true, "na+sm", "string");
         TCLAP::ValuesConstraint<std::string> allowedLogLevels({

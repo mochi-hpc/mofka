@@ -18,7 +18,6 @@
 namespace mofka {
 
 class MetadataImpl;
-class ConsumerImpl;
 
 /**
  * @brief A Metadata is an object that encapsulates the metadata of an event.
@@ -141,7 +140,6 @@ class Metadata {
     template<typename A>
     friend void load(A& ar, Metadata& metadata);
 
-    friend class ConsumerImpl;
     friend class Event;
 };
 
