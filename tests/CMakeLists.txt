@@ -23,15 +23,17 @@ foreach (test-source ${kafka-test-sources})
 endforeach ()
 
 if (ENABLE_PYTHON)
-    add_subdirectory (python)
-endif ()
+
+add_subdirectory (python)
 
 # Set the path to the python directory
 set (PYTHON_MODULE_DIR ${CMAKE_SOURCE_DIR}/python)
-# Use file(GLOB_RECURSE ...) to find all files matching the test_*.py pattern
-file (GLOB_RECURSE PYTHON_TEST_FILES "${PYTHON_MODULE_DIR}/test_*.py")
+# Use file(GLOB_RECURSE ...) to find all files matching the test_mofka_*.py pattern
+file (GLOB_RECURSE PYTHON_MOFKA_TEST_FILES "${PYTHON_MODULE_DIR}/test_mofka_*.py")
+# Use file(GLOB_RECURSE ...) to find all files matching the test_kafka_*.py pattern
+file (GLOB_RECURSE PYTHON_MOFKA_TEST_FILES "${PYTHON_MODULE_DIR}/test_kafka_*.py")
 
-foreach (PYTHON_TEST_FILE ${PYTHON_TEST_FILES})
+foreach (PYTHON_TEST_FILE ${PYTHON_MOFKA_TEST_FILES})
     # Remove the directory part
     file (RELATIVE_PATH PYTHON_TEST_FILE_REL ${PYTHON_MODULE_DIR} ${PYTHON_TEST_FILE})
     # Remove the file extension
@@ -47,4 +49,26 @@ foreach (PYTHON_TEST_FILE ${PYTHON_TEST_FILES})
     endif ()
     set_property (TEST ${PYTHON_TEST_NAME} PROPERTY ENVIRONMENT
                   PYTHONPATH=${CMAKE_SOURCE_DIR}/python/:${CMAKE_BINARY_DIR}/python:$ENV{PYTHONPATH})
-endforeach()
+endforeach ()
+
+foreach (PYTHON_TEST_FILE ${PYTHON_KAFKA_TEST_FILES})
+    # Remove the directory part
+    file (RELATIVE_PATH PYTHON_TEST_FILE_REL ${PYTHON_MODULE_DIR} ${PYTHON_TEST_FILE})
+    # Remove the file extension
+    string (REPLACE ".py" "" PYTHON_TEST_FILE_BASE ${PYTHON_TEST_FILE_REL})
+    # Replace slashes with dots
+    string (REPLACE "/" "." PYTHON_TEST_NAME ${PYTHON_TEST_FILE_BASE})
+    # Add the test
+    if (${ENABLE_COVERAGE})
+        message (STATUS "${PYTHON_TEST_NAME} test will run with code coverage")
+        add_test (NAME ${PYTHON_TEST_NAME} COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/run-test-with-kafka.sh
+                  coverage run -a -m unittest ${PYTHON_TEST_NAME})
+    else ()
+        add_test (NAME ${PYTHON_TEST_NAME} COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/run-test-with-kafka.sh
+                  python -m unittest ${PYTHON_TEST_NAME})
+    endif ()
+    set_property (TEST ${PYTHON_TEST_NAME} PROPERTY ENVIRONMENT
+                  PYTHONPATH=${CMAKE_SOURCE_DIR}/python/:${CMAKE_BINARY_DIR}/python:$ENV{PYTHONPATH})
+endforeach ()
+
+endif ()
