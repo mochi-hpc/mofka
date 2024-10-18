@@ -37,6 +37,7 @@ which manipulate large datasets and their metadata.
    usage/deployment.rst
    usage/restarting.rst
    usage/benchmarking.rst
+   usage/kafka.rst
 
 
 
