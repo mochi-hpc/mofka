@@ -11,6 +11,8 @@ foreach (test-source ${mofka-test-sources})
                   ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/src:$ENV{LD_LIBRARY_PATH}")
 endforeach ()
 
+if (ENABLE_KAFKA)
+
 foreach (test-source ${kafka-test-sources})
     get_filename_component (name ${test-source} NAME_WE)
     add_executable (${name} ${test-source})
@@ -21,6 +23,8 @@ foreach (test-source ${kafka-test-sources})
     set_property (TEST ${name} PROPERTY
                   ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/src:$ENV{LD_LIBRARY_PATH}")
 endforeach ()
+
+endif ()
 
 if (ENABLE_PYTHON)
 
@@ -51,6 +55,8 @@ foreach (PYTHON_TEST_FILE ${PYTHON_MOFKA_TEST_FILES})
                   PYTHONPATH=${CMAKE_SOURCE_DIR}/python/:${CMAKE_BINARY_DIR}/python:$ENV{PYTHONPATH})
 endforeach ()
 
+if (ENABLE_KAFKA)
+
 foreach (PYTHON_TEST_FILE ${PYTHON_KAFKA_TEST_FILES})
     # Remove the directory part
     file (RELATIVE_PATH PYTHON_TEST_FILE_REL ${PYTHON_MODULE_DIR} ${PYTHON_TEST_FILE})
@@ -70,5 +76,7 @@ foreach (PYTHON_TEST_FILE ${PYTHON_KAFKA_TEST_FILES})
     set_property (TEST ${PYTHON_TEST_NAME} PROPERTY ENVIRONMENT
                   PYTHONPATH=${CMAKE_SOURCE_DIR}/python/:${CMAKE_BINARY_DIR}/python:$ENV{PYTHONPATH})
 endforeach ()
+
+endif ()
 
 endif ()
