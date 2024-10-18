@@ -19,6 +19,8 @@ class TestTopicHandle(unittest.TestCase):
         self.service = mofka.KafkaDriver("kafka.json")
         name = "my_topic_" + str(uuid.uuid4())
         self.service.create_topic(name)
+        import time
+        time.sleep(2)
         self.topic = self.service.open_topic(name)
 
     def tearDown(self):

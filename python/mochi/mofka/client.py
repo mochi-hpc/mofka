@@ -10,7 +10,6 @@ PartitionSelector = pymofka_client.PartitionSelector
 Serializer = pymofka_client.Serializer
 ThreadPool = pymofka_client.ThreadPool
 AdaptiveBatchSize = pymofka_client.AdaptiveBatchSize
-MofkaDriver = pymofka_client.MofkaDriver
 Producer = pymofka_client.Producer
 Consumer = pymofka_client.Consumer
 DataDescriptor = pymofka_client.DataDescriptor
@@ -26,6 +25,21 @@ except ModuleNotFoundError:
     class KafkaDriver:
         def __init__(self, *args, **kwargs):
             raise NotImplementedError("Mofka was not compiled with Kafka support")
+
+
+class MofkaDriver(pymofka_client.MofkaDriver):
+
+    def __init__(self, group_file, arg=None):
+        self._engine = None
+        self._mid = None
+        if isinstance(arg, pymargo.core.Engine):
+            self._mid = arg.mid
+        elif isinstance(arg, str):
+            self._engine = pymargo.core.Engine(arg, pymargo.server)
+            self._mid = self._engine.mid
+        else:
+            self._mid = arg
+        super().__init__(group_file, self._mid)
 
 
 class ServiceHandle(MofkaDriver):

@@ -223,7 +223,7 @@ We can now add a partition that uses these providers.
          :end-before: END ADD PARTITION
          :dedent: 8
 
-      Adding a partition is done via the :code:`ServiceHandle` instance by calling
+      Adding a partition is done via the :code:`MofkaDriver` instance by calling
       :code:`addMemoryPartition()` or :code:`addDefaultPartition()`. These functions
       take at least two arguments: the topic name, and the rank of the server in which
       to add the partition. Servers are numbered contiguously from :code:`0` to :code:`N-1`
@@ -240,7 +240,7 @@ We can now add a partition that uses these providers.
          :end-before: END ADD PARTITION
          :dedent: 4
 
-      Adding a partition is done via the :code:`ServiceHandle` instance by calling
+      Adding a partition is done via the :code:`MofkaDriver` instance by calling
       :code:`add_memory_partition()` or :code:`add_default_partition()`. These functions
       take at least two arguments: the topic name, and the rank of the server in which
       to add the partition. Servers are numbered contiguously from :code:`0` to :code:`N-1`
