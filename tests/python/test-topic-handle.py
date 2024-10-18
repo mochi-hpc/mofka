@@ -17,7 +17,7 @@ class TestTopicHandle(unittest.TestCase):
             os.path.dirname(os.path.abspath(__file__)), "config.json")
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
-        self.service = mofka.ServiceHandle("mofka.json", self.bedrock_server.margo.mid)
+        self.service = mofka.MofkaDriver("mofka.json", self.bedrock_server.margo.mid)
 
         name = "my_topic"
         validator = mofka.Validator.from_metadata(

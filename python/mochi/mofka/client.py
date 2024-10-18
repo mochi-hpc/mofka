@@ -18,6 +18,14 @@ Event = pymofka_client.Event
 FutureUint = pymofka_client.FutureUint
 FutureEvent = pymofka_client.FutureEvent
 Ordering = pymofka_client.Ordering
+try:
+    import pymofka_kafka
+    KafkaDriver = pymofka_kafka.KafkaDriver
+except ModuleNotFoundError:
+
+    class KafkaDriver:
+        def __init__(self, *args, **kwargs):
+            raise NotImplementedError("Mofka was not compiled with Kafka support")
 
 
 class ServiceHandle(MofkaDriver):

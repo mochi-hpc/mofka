@@ -33,7 +33,7 @@ class TestConsumer(unittest.TestCase):
         with open(bedrock_config_file) as f:
             self.bedrock_server = BedrockServer("na+sm", config=f.read())
         self.mid = self.bedrock_server.margo.mid
-        self.service = mofka.ServiceHandle("mofka.json", self.mid)
+        self.service = mofka.MofkaDriver("mofka.json", self.mid)
 
         # create data and metadata
         self.metadata = dict()
