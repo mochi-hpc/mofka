@@ -10,16 +10,16 @@ To use it, you will first need a JSON configuration file as follows.
        "bootstrap.servers": "localhost:9092"
    }
 
-Relpace :code:`localhost:9092` with the host and port of one of your Kafka server
+Relpace :code:`localhost:9092` with the host and port of one of your Kafka servers
 (or a comma-separated list of servers).
 
-In your client application, replace include :code:`mofka/KafkaDriver.hpp` (instead
+In your client application, include :code:`mofka/KafkaDriver.hpp` (instead
 or in addition to :code:`mofka/MofkaDriver.hpp`). You may then use the :code:`mofka::KafkaDriver`
 class in place of the :code:`mofka::MofkaDriver` class. This class' constructor takes
-the path to a JSON file as shown above. Its API is almost identical to that of :code:`mofka::MofkaDriver`.
-In particular, the :code:`createTopic` and :code:`openTopic` methods can be used to
-create and open topics. The rest of the classes (:code:`TopicHandle`, :code:`Producer`, etc.)
-remain identical when using a :code:`KafkaDriver`.
+the path to a JSON file with the content shown above. Its API is almost identical to that
+of :code:`mofka::MofkaDriver`. In particular, the :code:`createTopic` and :code:`openTopic`
+methods can be used to create and open topics. The rest of the classes
+(:code:`TopicHandle`, :code:`Producer`, etc.) remain identical when using a :code:`KafkaDriver`.
 
 Bellow are examples of producers and consumer codes using the :code:`KafkaDriver`.
 
