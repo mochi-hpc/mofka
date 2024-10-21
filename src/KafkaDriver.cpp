@@ -165,4 +165,16 @@ TopicHandle KafkaDriver::openTopic(std::string_view name) {
             std::move(partitions))};
 }
 
+bool KafkaDriver::topicExists(std::string_view name) {
+    try {
+        openTopic(name);
+    } catch(const Exception& ex) {
+        if(std::string_view{ex.what()}.find("does not exist")) {
+            return false;
+        }
+        throw;
+    }
+    return true;
+}
+
 }

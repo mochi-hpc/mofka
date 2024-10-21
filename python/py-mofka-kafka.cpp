@@ -42,5 +42,10 @@ PYBIND11_MODULE(pymofka_kafka, m) {
                 return service.openTopic(name);
             },
             "topic_name"_a)
+        .def("topic_exists",
+            [](mofka::KafkaDriver& service, const std::string& name) -> bool {
+                return service.topicExists(name);
+            },
+            "topic_name"_a)
     ;
 }

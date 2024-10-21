@@ -32,7 +32,9 @@ TEST_CASE("Mofka driver test", "[driver]") {
         SECTION("Create a topic") {
             mofka::TopicHandle topic;
             REQUIRE(!static_cast<bool>(topic));
+            REQUIRE(!driver.topicExists("mytopic"));
             REQUIRE_NOTHROW(driver.createTopic("mytopic"));
+            REQUIRE(driver.topicExists("mytopic"));
             REQUIRE_THROWS_AS(driver.createTopic("mytopic"), mofka::Exception);
 
             mofka::Metadata partition_config;

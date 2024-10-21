@@ -139,6 +139,11 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return service.openTopic(name);
             },
             "topic_name"_a)
+        .def("topic_exists",
+            [](mofka::MofkaDriver& service, const std::string& name) -> bool {
+                return service.topicExists(name);
+            },
+            "topic_name"_a)
         .def("add_default_partition",
             [](mofka::MofkaDriver& service,
                std::string_view topic_name,

@@ -301,6 +301,17 @@ TopicHandle MofkaDriver::openTopic(std::string_view name) {
         std::move(partitionsList))};
 }
 
+bool MofkaDriver::topicExists(std::string_view name) {
+    try {
+        openTopic(name);
+    } catch(const Exception& ex) {
+        if(std::string_view{ex.what()}.find("not found"))
+            return false;
+        throw;
+    }
+    return true;
+}
+
 void MofkaDriver::addMemoryPartition(std::string_view topic_name,
                                        size_t server_rank,
                                        std::string_view pool_name) {

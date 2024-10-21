@@ -94,6 +94,11 @@ class KafkaDriver {
      */
     TopicHandle openTopic(std::string_view name);
 
+    /**
+     * @brief Checks if a topic exists.
+     */
+    bool topicExists(std::string_view name);
+
     private:
 
     KafkaDriver(const std::shared_ptr<KafkaDriverImpl>& impl)

@@ -32,11 +32,13 @@ TEST_CASE("Kafka driver test", "[kafka-driver]") {
         REQUIRE(static_cast<bool>(driver));
 
         SECTION("Create a topic") {
+            REQUIRE(!driver.topicExists("mytopic"));
             REQUIRE_NOTHROW(driver.createTopic("mytopic"));
 
             REQUIRE_THROWS_AS(driver.createTopic("mytopic"), mofka::Exception);
             mofka::TopicHandle topic;
             REQUIRE(!static_cast<bool>(topic));
+            REQUIRE(driver.topicExists("mytopic"));
             REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
             REQUIRE(static_cast<bool>(topic));
             REQUIRE_THROWS_AS(driver.openTopic("mytopic2"), mofka::Exception);

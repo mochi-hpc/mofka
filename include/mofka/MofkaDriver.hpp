@@ -108,6 +108,11 @@ class MofkaDriver {
     TopicHandle openTopic(std::string_view name);
 
     /**
+     * @brief Checks if a topic exists.
+     */
+    bool topicExists(std::string_view name);
+
+    /**
      * @brief Map of dependency descriptors for the partition.
      * Please refer to the partition type's documentation for more information
      * on its expected dependencies.
