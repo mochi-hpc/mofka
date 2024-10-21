@@ -7,7 +7,7 @@ from mochi.mofka.client import MofkaDriver
 
 def consume(engine: Engine, group_file: str, topic_name: str):
     driver = MofkaDriver(group_file, engine)
-    topic = service.open_topic(topic_name)
+    topic = driver.open_topic(topic_name)
     consumer = topic.consumer(name="myconsumer")
 
     for i in range(0, 100):

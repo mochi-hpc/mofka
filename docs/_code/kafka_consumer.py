@@ -7,7 +7,7 @@ from mochi.mofka.client import KafkaDriver
 
 def consume(config_file: str, topic_name: str):
     driver = KafkaDriver(config_file)
-    topic = service.open_topic(topic_name)
+    topic = driver.open_topic(topic_name)
     consumer = topic.consumer(name="myconsumer")
 
     for i in range(0, 100):
