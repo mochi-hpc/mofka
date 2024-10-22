@@ -49,24 +49,15 @@ DataDescriptor DataDescriptor::makeStridedView(
         size_t gapsize) const {
     if(offset > self->m_size || numblocks == 0 || blocksize == 0)
         return Null();
-    size_t sub_size = self->m_size - offset;
-    // find the actual number of blocks that fit in self->m_size
-    size_t s = blocksize + gapsize;
-    size_t max_num_blocks = std::ceil((double)(sub_size)/(double)s);
-    numblocks = std::min(numblocks, max_num_blocks);
-    // find out if the last block is cut
-    size_t num_full_blocks = sub_size/s;
-    size_t remaining = (numblocks - num_full_blocks)*s;
-    if(remaining > s) {
-        num_full_blocks += 1;
-        remaining = 0;
-    }
-    size_t view_size = num_full_blocks*blocksize + remaining;
+    // check that the stride doesn't exceeds the available size
+    if(offset + numblocks*(blocksize + gapsize) > self->m_size)
+        throw Exception{"Invalid strided view: would go out of bounds"};
+
     // make the new descriptor
     auto newDesc = std::make_shared<DataDescriptorImpl>(*self);
     newDesc->m_views.emplace_back(
         DataDescriptorImpl::Strided{offset, numblocks, blocksize, gapsize});
-    newDesc->m_size = view_size;
+    newDesc->m_size = numblocks*blocksize;
     // TODO optimize further the content of the new descriptor
     return newDesc;
 }
@@ -95,26 +86,25 @@ DataDescriptor DataDescriptor::makeUnstructuredView(
     DataDescriptorImpl::Unstructured u;
     for(auto& [offset, size] : segments) {
         if(offset < current_offset)
-            throw Exception("Invalid unstructured view: overlapping segments");
-        if(!u.segments.empty() && u.segments.back().first + u.segments.back().second == offset) {
-            size_t s = std::min(size, self->m_size - current_offset);
-            u.segments.back().second += s;
-            view_size += s;
-            current_offset = offset + s;
+            throw Exception("Invalid unstructured view: segments overlapping or out of order");
+        if(offset + size > self->m_size)
+            throw Exception("Invalid unstructured view: would go out of bounds");
+        if(!u.segments.empty() && u.segments.back().offset + u.segments.back().size == offset) {
+            u.segments.back().size += size;
+            view_size += size;
+            current_offset = offset + size;
         } else {
-            size_t s = std::min(size, self->m_size - current_offset);
-            u.segments.emplace_back(offset, s);
-            view_size += s;
-            current_offset = offset + s;
+            u.segments.emplace_back(Segment{offset, size});
+            view_size += size;
+            current_offset = offset + size;
         }
-        if(current_offset == self->m_size)
-            break;
     }
     if(u.segments.size() == 0)
         return Null();
     if(u.segments.size() == 1)
-        return makeSubView(u.segments[0].first, u.segments[0].second);
+        return makeSubView(u.segments[0].offset, u.segments[0].size);
     newDesc->m_size = view_size;
+    newDesc->m_views.push_back(std::move(u));
     return newDesc;
 }
 

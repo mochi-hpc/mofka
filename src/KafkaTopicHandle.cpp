@@ -121,7 +121,6 @@ void KafkaTopicHandle::markAsComplete() const {
         rd_kafka_headers_t *headers = rd_kafka_headers_new(1);
         rd_kafka_header_add(headers, "NoMoreEvents", -1, "", 0);
 
-        size_t payload = 0;
         auto err = rd_kafka_producev(kprod,
                     RD_KAFKA_V_TOPIC(m_name.c_str()),
                     RD_KAFKA_V_PARTITION(m_partitions[i]->m_id),

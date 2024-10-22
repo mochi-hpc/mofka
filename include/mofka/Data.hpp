@@ -93,7 +93,7 @@ class Data {
      * @param size Size of the data.
      * @param from_offset Offset from which to write.
      */
-    void write(char* data, size_t size, size_t offset = 0) const;
+    void write(const char* data, size_t size, size_t offset = 0) const;
 
     /**
      * @brief Checks if the Data instance is valid.

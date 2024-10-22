@@ -26,6 +26,9 @@ class MemoryPartitionManager : public mofka::PartitionManager {
         }
 
         void fromDataDescriptor(const DataDescriptor& desc) {
+            if(desc.flatten().size() != 1) {
+                throw Exception{"Fragmented DataDescriptor not supported by memory partition"};
+            }
             std::memcpy(&offset, desc.location().data(), sizeof(offset));
             std::memcpy(&size, desc.location().data() + sizeof(offset), sizeof(size));
         }

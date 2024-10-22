@@ -10,6 +10,7 @@
 #include "PimplUtil.hpp"
 
 #include <cstring>
+#include <iostream>
 
 namespace mofka {
 
@@ -36,7 +37,7 @@ Data::Context Data::context() const {
     return self->m_context;
 }
 
-void Data::write(char* data, size_t size, size_t offset) const {
+void Data::write(const char* data, size_t size, size_t offset) const {
     size_t off = 0;
     for(auto& seg : segments()) {
         if(offset >= seg.size) {
@@ -45,8 +46,8 @@ void Data::write(char* data, size_t size, size_t offset) const {
         }
         // current segment needs to be copied
         auto size_to_copy = std::min(size, seg.size);
-        std::memcpy(seg.ptr, data + off, size_to_copy);
-        offset -= size_to_copy;
+        std::memcpy((char*)seg.ptr + offset, data + off, size_to_copy);
+        offset = 0;
         off += size_to_copy;
         size -= size_to_copy;
         if(size == 0) break;

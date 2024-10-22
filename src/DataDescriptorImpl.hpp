@@ -16,6 +16,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <numeric>
 
 namespace mofka {
 
@@ -33,8 +34,7 @@ class DataDescriptorImpl {
     };
 
     struct Unstructured {
-        std::vector<
-            std::pair<std::size_t, std::size_t>> segments;
+        std::vector<Sub> segments;
     };
 
     enum class ViewType : std::uint8_t {
@@ -44,51 +44,69 @@ class DataDescriptorImpl {
     using Selection = std::variant<Sub, Strided, Unstructured>;
 
     std::vector<Sub> flatten() const {
-        std::vector<Sub> current = {{0, m_size}};
-        auto visitor = Overloaded{
+        std::vector<Sub> flat = {{0, m_base_size}};
 
-            [&current](const Sub& sub) -> decltype(current) {
-                decltype(current) result;
-                size_t size_read = 0;
-                size_t remaining_size = sub.size;
-                for(auto& s : current) {
-                    if(size_read >= sub.offset + sub.size) {
-                        break;
-                    }
-                    if(size_read + s.size < s.offset) {
-                        size_read += s.size;
-                        continue;
-                    }
-                    size_t offset, size;
-                    if(size_read < sub.offset) {
-                        offset = s.offset + sub.offset - size_read;
-                    } else {
-                        offset = s.offset;
-                    }
-                    size = s.size - (offset - s.offset);
-                    if(size > remaining_size) {
-                        size = remaining_size;
-                    }
-                    result.emplace_back(Sub{offset, size});
-                    remaining_size -= size;
-                    size_read += s.size;
+        auto parse_sub = [&flat](const Sub& sub) -> decltype(flat) {
+            decltype(flat) result;
+            size_t cursor = 0;
+            size_t remaining_size = sub.size;
+            for(auto& segment : flat) {
+                if(cursor + segment.size < sub.offset) {
+                    // we haven't reached the start of sub yet
+                    cursor += segment.size;
+                    continue;
                 }
-                return result;
-            },
-
-            [&current](const Strided& strided) -> decltype(current) {
-                // TODO
-                throw Exception("\"Strided\" descriptor type not yet supported");
-            },
-
-            [&current](const Unstructured& u) -> decltype(current) {
-                // TODO
-                throw Exception("\"Unstructured\" descriptor type not yet supported");
+                if(cursor >= sub.offset + sub.size) {
+                    // we are past the end of the sub
+                    break;
+                }
+                size_t offset, size;
+                if(cursor < sub.offset) {
+                    offset = segment.offset + sub.offset - cursor;
+                } else { // cursor >= sub.offset
+                    offset = segment.offset;
+                }
+                size = segment.size - (offset - segment.offset);
+                if(size > remaining_size) {
+                    size = remaining_size;
+                }
+                result.emplace_back(Sub{offset, size});
+                remaining_size -= size;
+                cursor += segment.size;
             }
+            return result;
+        };
+
+        auto parse_unstructured = [&flat](const Unstructured& u) -> decltype(flat) {
+            decltype(flat) result;
+            if(flat.size() != 1) {
+                throw Exception{"Stacked \"unstructured\" or \"strided\" descriptors are not yet supported"};
+            }
+            // flat if of size 1, but it can still start at a particular offset
+            result.reserve(u.segments.size());
+            for(auto& seg : u.segments) {
+                result.push_back(Sub{flat[0].offset + seg.offset, seg.size});
+            }
+            return result;
+        };
+
+        auto parse_strided = [&parse_unstructured](const Strided& strided) -> decltype(flat) {
+            Unstructured unstructured;
+            unstructured.segments.reserve(strided.numblocks);
+            size_t offset = strided.offset;
+            for(size_t i = 0; i < strided.numblocks; ++i) {
+                unstructured.segments.push_back(Sub{offset, strided.blocksize});
+                offset += strided.blocksize + strided.gapsize;
+            }
+            return parse_unstructured(unstructured);
+        };
+
+        auto visitor = Overloaded{
+            parse_sub, parse_strided, parse_unstructured
         };
         for(auto& view : m_views)
-            current = std::visit(visitor, view);
-        return current;
+            flat = std::visit(visitor, view);
+        return flat;
     };
 
     void save(Archive& ar) const {
@@ -115,6 +133,7 @@ class DataDescriptorImpl {
                 ar.write(u.segments.data(), num_segments*sizeof(u.segments[0]));
             }
         };
+        ar.write(&m_base_size, sizeof(m_base_size));
         ar.write(&m_size, sizeof(m_size));
         size_t location_size = m_location.size();
         ar.write(&location_size, sizeof(location_size));
@@ -126,6 +145,7 @@ class DataDescriptorImpl {
     }
 
     void load(Archive& ar) {
+        ar.read(&m_base_size, sizeof(m_base_size));
         ar.read(&m_size, sizeof(m_size));
         size_t location_size = 0;
         ar.read(&location_size, sizeof(location_size));
@@ -141,7 +161,7 @@ class DataDescriptorImpl {
             switch(t) {
             case ViewType::SUB:
                 {
-                    Sub s;
+                    Sub s{0,0};
                     ar.read(&s.offset, sizeof(s.offset));
                     ar.read(&s.size, sizeof(s.size));
                     m_views.push_back(std::move(s));
@@ -175,15 +195,18 @@ class DataDescriptorImpl {
 
     DataDescriptorImpl(std::string_view location, size_t size)
     : m_location(location.data(), location.data() + location.size())
-    , m_size(size) {}
+    , m_size(size)
+    , m_base_size(size) {}
 
     DataDescriptorImpl(std::vector<char> location, size_t size)
     : m_location(std::move(location))
-    , m_size(size) {}
+    , m_size(size)
+    , m_base_size(size) {}
 
-    std::vector<char>      m_location;   /* implementation defined data location */
-    std::vector<Selection> m_views;      /* stack of selections on top of the data */
-    size_t                 m_size = 0;   /* size of the data */
+    std::vector<char>      m_location;      /* implementation defined data location */
+    std::vector<Selection> m_views;         /* stack of selections on top of the data */
+    size_t                 m_size = 0;      /* size of the data after selections applied */
+    size_t                 m_base_size = 0; /* size of the underlying contiguous memory */
 };
 
 }

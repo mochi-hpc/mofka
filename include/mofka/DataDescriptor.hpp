@@ -27,8 +27,17 @@ class DataDescriptor {
     public:
 
     struct Segment {
+
         std::size_t offset;
         std::size_t size;
+
+        Segment(std::size_t o = 0, std::size_t s = 0)
+        : offset(o), size(s) {}
+
+        Segment(const Segment&) = default;
+        Segment(Segment&&) = default;
+        Segment& operator=(const Segment&) = default;
+        Segment& operator=(Segment&&) = default;
     };
 
     /**

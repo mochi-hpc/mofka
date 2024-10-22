@@ -110,17 +110,22 @@ class WarabiDataStore {
         std::vector<warabi::AsyncRequest> requests(descriptors.size());
         size_t currentOffset = remoteBulk.offset;
         for(size_t i = 0; i < descriptors.size(); ++i) {
-            const auto descriptor     = getWarabiDataDescriptor(i);
-            const auto region         = descriptor->region_id;
-            const auto offsetInRegion = descriptor->offset;
-            const auto size           = descriptors[i].size();
-            if(size == 0) continue;
-            m_target.read(region, {{offsetInRegion, size}},
+            if(descriptors[i].size() == 0) continue;
+            const auto descriptor         = getWarabiDataDescriptor(i);
+            const auto region             = descriptor->region_id;
+            const auto baseOffsetInRegion = descriptor->offset;
+            auto flattened = descriptors[i].flatten();
+            std::vector<std::pair<size_t, size_t>> regionOffsetSizes(flattened.size());
+            for(size_t j = 0; j < flattened.size(); ++j) {
+                regionOffsetSizes[j].first  = baseOffsetInRegion + flattened[j].offset;
+                regionOffsetSizes[j].second = flattened[j].size;
+            }
+            m_target.read(region, regionOffsetSizes,
                           remoteBulk.handle,
                           remoteBulk.address,
                           currentOffset,
                           &requests[i]);
-            currentOffset += size;
+            currentOffset += descriptors[i].size();
         }
 
         // wait for all the requests

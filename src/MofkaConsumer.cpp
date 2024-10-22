@@ -246,7 +246,7 @@ Data MofkaConsumer::requestData(
     auto& ph  = partition->m_ph;
 
     Result<std::vector<Result<void>>> result = rpc.on(ph)(
-            Cerealized<DataDescriptor>(descriptor),
+            Cerealized<DataDescriptor>(requested_descriptor),
             local_bulk_ref);
 
     if(!result.success())

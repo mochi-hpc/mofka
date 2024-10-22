@@ -179,7 +179,8 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
                     auto payload_ptr = payload_base_ptr + seg.offset;
                     if(seg.offset + seg.size > data_size)
                         throw Exception{"Invalid segment in DataDescriptor would read beyond size of data"};
-                    data.write(payload_ptr, seg.size, data_offset);
+                    if(seg.size)
+                        data.write(payload_ptr, seg.size, data_offset);
                     data_offset += seg.size;
                  }
                  // create the event
