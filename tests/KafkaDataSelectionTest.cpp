@@ -9,6 +9,7 @@
 #include <mofka/TopicHandle.hpp>
 #include "Ensure.hpp"
 #include <fstream>
+#include <unistd.h>
 
 static size_t topic_num = 0;
 
