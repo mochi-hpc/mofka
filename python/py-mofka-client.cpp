@@ -200,6 +200,7 @@ PYBIND11_MODULE(pymofka_client, m) {
             }
             return result;
         })
+        .def("mark_as_complete", &mofka::TopicHandle::markAsComplete)
         .def("producer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,
