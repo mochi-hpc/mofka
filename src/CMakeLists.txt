@@ -76,7 +76,6 @@ if (ENABLE_KAFKA)
          PUBLIC mofka::client
          PRIVATE
              nlohmann_json::nlohmann_json
-             CURL::libcurl
              PkgConfig::kafka
              coverage_config
              warnings_config)

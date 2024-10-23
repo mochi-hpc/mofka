@@ -19,7 +19,6 @@ spack:
   - py-configspace
   - librdkafka
   - kafka
-  - curl
   concretizer:
     unify: true
     reuse: true

@@ -9,7 +9,7 @@ enable_testing ()
 # library version set here (e.g. for shared libs).
 set (MOFKA_VERSION_MAJOR 0)
 set (MOFKA_VERSION_MINOR 3)
-set (MOFKA_VERSION_PATCH 0)
+set (MOFKA_VERSION_PATCH 1)
 set (MOFKA_VERSION
      "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}.${MOFKA_VERSION_PATCH}")
 
@@ -91,9 +91,8 @@ if (ENABLE_PYTHON)
 endif ()
 
 if (ENABLE_KAFKA)
-    find_package (CURL REQUIRED)
     pkg_check_modules (kafka REQUIRED IMPORTED_TARGET rdkafka)
-    set (OPTIONAL_KAFKA CURL::libcurl PkgConfig::kafka)
+    set (OPTIONAL_KAFKA PkgConfig::kafka)
 endif ()
 
 add_subdirectory (src)
