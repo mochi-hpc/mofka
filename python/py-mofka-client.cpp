@@ -363,7 +363,12 @@ PYBIND11_MODULE(pymofka_client, m) {
                     auto owner = event.data().context();
                     return *static_cast<py::object*>(owner);
                 })
-        .def_property_readonly("event_id", &mofka::Event::id)
+        .def_property_readonly("event_id", [](const mofka::Event& event) -> py::object {
+                if(event.id() == mofka::NoMoreEvents)
+                    return py::none();
+                else
+                    return py::cast(event.id());
+                })
         .def_property_readonly("partition", &mofka::Event::partition)
         .def("acknowledge",
              [](const mofka::Event& event){
