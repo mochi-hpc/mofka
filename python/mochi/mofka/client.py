@@ -39,7 +39,10 @@ class MofkaDriver(pymofka_client.MofkaDriver):
             self._mid = self._engine.mid
         else:
             self._mid = arg
-        super().__init__(group_file, self._mid)
+        if self._mid is None:
+            super().__init__(group_file)
+        else:
+            super().__init__(group_file, self._mid)
 
 
 class ServiceHandle(MofkaDriver):
