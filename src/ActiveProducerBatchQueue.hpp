@@ -87,6 +87,7 @@ class ActiveProducerBatchQueue {
         {
             std::unique_lock<thallium::mutex> guard{m_mutex};
             m_request_flush = true;
+            m_cv.notify_one();
             m_cv.wait(guard, [this]() { return m_batch_queue.empty(); });
         }
     }
