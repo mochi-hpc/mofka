@@ -66,8 +66,7 @@ KafkaProducer::~KafkaProducer() {
 
 struct Message {
     Promise<EventID>                                            promise;
-    std::vector<char>                                           serialized_metadata;
-    size_t                                                      serialized_metadata_size;
+    std::vector<char>                                           payload;
     std::function<void(rd_kafka_t*, const rd_kafka_message_t*)> on_delivery;
 };
 
@@ -87,12 +86,20 @@ Future<EventID> KafkaProducer::push(Metadata metadata, Data data) {
         auto partition_index = m_topic->selector().selectPartitionFor(metadata);
 
         auto msg = new Message();
-
-        /* serialize the metadata */
-        BufferWrapperOutputArchive archive{msg->serialized_metadata};
-        m_topic->serializer().serialize(archive, metadata);
-        msg->serialized_metadata_size = msg->serialized_metadata.size();
         msg->promise = promise;
+
+        /* serialize the payload */
+        msg->payload.resize(sizeof(size_t));
+        BufferWrapperOutputArchive archive{msg->payload};
+        m_topic->serializer().serialize(archive, metadata);
+        size_t metadata_size = msg->payload.size() - sizeof(size_t);
+        std::memcpy(msg->payload.data(), &metadata_size, sizeof(metadata_size));
+        size_t offset = msg->payload.size();
+        msg->payload.resize(offset + data.size());
+        for(auto& seg : data.segments()) {
+            std::memcpy(msg->payload.data() + offset, seg.ptr, seg.size);
+            offset += seg.size;
+        }
 
         msg->on_delivery = [msg,this](rd_kafka_t*, const rd_kafka_message_t* kmsg) {
             if(!kmsg->err) {
@@ -107,7 +114,7 @@ Future<EventID> KafkaProducer::push(Metadata metadata, Data data) {
         };
 
         /* send to kafka */
-        std::vector<rd_kafka_vu_t> args(data.segments().size() + 5);
+        std::vector<rd_kafka_vu_t> args(4);
         args[0].vtype      = RD_KAFKA_VTYPE_RKT;
         args[0].u.rkt      = m_kafka_topic.get();
         args[1].vtype      = RD_KAFKA_VTYPE_PARTITION;
@@ -115,16 +122,8 @@ Future<EventID> KafkaProducer::push(Metadata metadata, Data data) {
         args[2].vtype      = RD_KAFKA_VTYPE_OPAQUE;
         args[2].u.ptr      = &msg->on_delivery;
         args[3].vtype      = RD_KAFKA_VTYPE_VALUE;
-        args[3].u.mem.ptr  = &msg->serialized_metadata_size;
-        args[3].u.mem.size = sizeof(msg->serialized_metadata_size);
-        args[4].vtype      = RD_KAFKA_VTYPE_VALUE;
-        args[4].u.mem.ptr  = msg->serialized_metadata.data();
-        args[4].u.mem.size = msg->serialized_metadata.size();
-        for(size_t i = 0; i < data.segments().size(); ++i) {
-            args[5+i].vtype      = RD_KAFKA_VTYPE_VALUE;
-            args[5+i].u.mem.ptr  = data.segments()[i].ptr;
-            args[5+i].u.mem.size = data.segments()[i].size;
-        }
+        args[3].u.mem.ptr  = msg->payload.data();
+        args[3].u.mem.size = msg->payload.size();
 
         m_num_pending_messages++;
         auto err = rd_kafka_produceva(m_kafka_producer.get(), args.data(), args.size());
