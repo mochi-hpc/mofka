@@ -54,7 +54,8 @@ void KafkaProducer::start() {
         }
         m_poll_ult_stopped.set_value();
     };
-    m_thread_pool.pushWork(std::move(run));
+    m_poll_thread_pool = ThreadPool{ThreadCount{1}};
+    m_poll_thread_pool.pushWork(std::move(run));
 }
 
 KafkaProducer::~KafkaProducer() {

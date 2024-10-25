@@ -35,6 +35,7 @@ class KafkaProducer : public BatchProducer {
     std::shared_ptr<rd_kafka_topic_t> m_kafka_topic;
     std::atomic<bool>                 m_should_stop = true;
     tl::eventual<void>                m_poll_ult_stopped;
+    ThreadPool                        m_poll_thread_pool;
 
     KafkaProducer(std::string_view name,
                   BatchSize batch_size,
