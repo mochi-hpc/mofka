@@ -34,6 +34,20 @@ Producer KafkaTopicHandle::makeProducer(
     // Create configuration for producer
     auto kconf = rd_kafka_conf_dup(m_driver->m_kafka_config);
     rd_kafka_conf_set_dr_msg_cb(kconf, dr_msg_cb);
+    if(batch_size != BatchSize::Adaptive()) {
+        auto ret = rd_kafka_conf_set(kconf, "queue.buffering.max.messages",
+                                     std::to_string(batch_size.value).c_str(), errstr, sizeof(errstr));
+        if (ret != RD_KAFKA_CONF_OK)
+            throw Exception{
+                "Could not set Kafka queue.buffering.max.messages configuration: " + std::string(errstr)};
+    }
+    /*
+    auto ret = rd_kafka_conf_set(kconf, "enable.idempotence",
+                            ordering == Ordering::Strict ? "true" : "false", errstr, sizeof(errstr));
+    if (ret != RD_KAFKA_CONF_OK)
+        throw Exception{
+            "Could not set Kafka enable.idempotence configuration: " + std::string(errstr)};
+    */
 
     // Create producer instance
     auto kprod = rd_kafka_new(RD_KAFKA_PRODUCER, kconf, errstr, sizeof(errstr));

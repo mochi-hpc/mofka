@@ -9,7 +9,6 @@
 #include "KafkaTopicHandle.hpp"
 #include "KafkaPartitionInfo.hpp"
 #include "KafkaProducerBatch.hpp"
-#include "BatchProducer.hpp"
 
 #include "mofka/TopicHandle.hpp"
 #include "mofka/Producer.hpp"
@@ -26,16 +25,20 @@ namespace tl = thallium;
 
 class KafkaTopicHandle;
 
-class KafkaProducer : public BatchProducer {
+class KafkaProducer : public ProducerInterface {
 
     public:
 
+    std::string                       m_name;
+    BatchSize                         m_batch_size;
+    ThreadPool                        m_thread_pool;
+    Ordering                          m_ordering;
     std::shared_ptr<KafkaTopicHandle> m_topic;
     std::shared_ptr<rd_kafka_t>       m_kafka_producer;
     std::shared_ptr<rd_kafka_topic_t> m_kafka_topic;
     std::atomic<bool>                 m_should_stop = true;
     tl::eventual<void>                m_poll_ult_stopped;
-    ThreadPool                        m_poll_thread_pool;
+    std::atomic<size_t>               m_num_pending_messages = 0;
 
     KafkaProducer(std::string_view name,
                   BatchSize batch_size,
@@ -47,7 +50,23 @@ class KafkaProducer : public BatchProducer {
 
     ~KafkaProducer();
 
-    std::shared_ptr<ProducerBatchInterface> newBatchForPartition(size_t index) const override;
+    const std::string& name() const override {
+        return m_name;
+    }
+
+    TopicHandle topic() const override;
+
+    BatchSize batchSize() const override {
+        return m_batch_size;
+    }
+
+    ThreadPool threadPool() const override {
+        return m_thread_pool;
+    }
+
+    Future<EventID> push(Metadata metadata, Data data) override;
+
+    void flush() override;
 
     void start();
 };
