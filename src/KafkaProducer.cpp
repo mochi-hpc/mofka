@@ -48,7 +48,7 @@ void KafkaProducer::start() {
     m_should_stop = false;
     auto run = [this](){
         while(!m_should_stop) {
-            int timeout = m_thread_pool.size() > 1 ? 0 : 100;
+            int timeout = m_poll_thread_pool.size() > 1 ? 0 : 100;
             rd_kafka_poll(m_kafka_producer.get(), timeout);
             tl::thread::yield();
         }
