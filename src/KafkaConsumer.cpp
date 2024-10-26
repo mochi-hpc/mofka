@@ -71,7 +71,7 @@ void KafkaConsumer::subscribe() {
     m_should_stop = false;
     auto run = [this](){
         while(!m_should_stop) {
-            int timeout = m_thread_pool.size() > 1 ? 0 : 100;
+            int timeout = 0; // m_thread_pool.size() > 1 ? 0 : 100;
             rd_kafka_message_t* msg = rd_kafka_consumer_poll(
                 m_kafka_consumer.get(), timeout);
             if(!msg) {
