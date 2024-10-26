@@ -67,7 +67,8 @@ class MofkaTopicHandle : public std::enable_shared_from_this<MofkaTopicHandle>,
           std::string_view name,
           BatchSize batch_size,
           ThreadPool thread_pool,
-          Ordering ordering) const override;
+          Ordering ordering,
+          Metadata options) const override;
 
     Consumer makeConsumer(
           std::string_view name,
@@ -75,7 +76,8 @@ class MofkaTopicHandle : public std::enable_shared_from_this<MofkaTopicHandle>,
           ThreadPool thread_pool,
           DataBroker data_broker,
           DataSelector data_selector,
-          const std::vector<size_t>& targets) const override;
+          const std::vector<size_t>& targets,
+          Metadata options) const override;
 
     const std::vector<PartitionInfo>& partitions() const override {
         return m_partitions_info;

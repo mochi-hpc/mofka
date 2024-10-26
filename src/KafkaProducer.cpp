@@ -43,9 +43,11 @@ void KafkaProducer::start() {
     m_should_stop = false;
     auto run = [this](){
         while(!m_should_stop) {
-            std::unique_lock<tl::mutex> pending_msg_guard{m_num_pending_messages_mtx};
-            m_num_pending_messages_cv.wait(pending_msg_guard,
-                [this](){ return m_should_stop || m_num_pending_messages > 0; });
+            {
+                std::unique_lock<tl::mutex> pending_msg_guard{m_num_pending_messages_mtx};
+                m_num_pending_messages_cv.wait(pending_msg_guard,
+                        [this](){ return m_should_stop || m_num_pending_messages > 0; });
+            }
             while(rd_kafka_poll(m_kafka_producer.get(), 0) != 0) {
                 if(m_should_stop) break;
             }

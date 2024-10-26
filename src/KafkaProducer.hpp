@@ -18,6 +18,7 @@
 #include <thallium.hpp>
 #include <string_view>
 #include <queue>
+#include <librdkafka/rdkafka.h>
 
 namespace mofka {
 

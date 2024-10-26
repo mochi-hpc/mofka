@@ -28,6 +28,8 @@ set (kafka-src-files
      KafkaDriver.cpp
      KafkaTopicHandle.cpp
      KafkaProducer.cpp
+     KafkaBatchProducer.cpp
+     KafkaProducerBatch.cpp
      KafkaConsumer.cpp
      KafkaEvent.cpp)
 
