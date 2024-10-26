@@ -38,7 +38,10 @@ class KafkaProducer : public ProducerInterface {
     std::shared_ptr<rd_kafka_topic_t> m_kafka_topic;
     std::atomic<bool>                 m_should_stop = true;
     tl::eventual<void>                m_poll_ult_stopped;
-    std::atomic<size_t>               m_num_pending_messages = 0;
+
+    size_t                 m_num_pending_messages = 0;
+    tl::mutex              m_num_pending_messages_mtx;
+    tl::condition_variable m_num_pending_messages_cv;
 
     KafkaProducer(std::string_view name,
                   BatchSize batch_size,

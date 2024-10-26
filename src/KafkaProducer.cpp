@@ -43,8 +43,13 @@ void KafkaProducer::start() {
     m_should_stop = false;
     auto run = [this](){
         while(!m_should_stop) {
-            int timeout = m_thread_pool.size() > 1 ? 0 : 100;
-            rd_kafka_poll(m_kafka_producer.get(), timeout);
+            std::unique_lock<tl::mutex> pending_msg_guard{m_num_pending_messages_mtx};
+            m_num_pending_messages_cv.wait(pending_msg_guard,
+                [this](){ return m_should_stop || m_num_pending_messages > 0; });
+            while(rd_kafka_poll(m_kafka_producer.get(), 0) != 0) {
+                if(m_should_stop) break;
+            }
+            if(m_should_stop) break;
             tl::thread::yield();
         }
         m_poll_ult_stopped.set_value();
@@ -60,6 +65,7 @@ KafkaProducer::~KafkaProducer() {
     flush();
     if(!m_should_stop) {
         m_should_stop = true;
+        m_num_pending_messages_cv.notify_all();
         m_poll_ult_stopped.wait();
     }
 }
@@ -125,15 +131,27 @@ Future<EventID> KafkaProducer::push(Metadata metadata, Data data) {
         args[3].u.mem.ptr  = msg->payload.data();
         args[3].u.mem.size = msg->payload.size();
 
-        m_num_pending_messages++;
+        bool notify = true;
+        {
+            std::unique_lock<tl::mutex> pending_msg_guard{m_num_pending_messages_mtx};
+            m_num_pending_messages++;
+        }
         auto err = rd_kafka_produceva(m_kafka_producer.get(), args.data(), args.size());
         if(err) {
-            m_num_pending_messages--;
+            {
+                std::unique_lock<tl::mutex> pending_msg_guard{m_num_pending_messages_mtx};
+                m_num_pending_messages--;
+                notify = false;
+            }
             auto err_str = std::string{rd_kafka_error_string(err)};
             rd_kafka_error_destroy(err);
             delete msg;
             throw Exception{"Failed to produce all messages: " + err_str};
         }
+
+        rd_kafka_poll(m_kafka_producer.get(), 0);
+
+        if(notify) m_num_pending_messages_cv.notify_one();
 
     } catch(const Exception& ex) {
         promise.setException(ex);
@@ -143,10 +161,9 @@ Future<EventID> KafkaProducer::push(Metadata metadata, Data data) {
 }
 
 void KafkaProducer::flush() {
-    while(m_num_pending_messages != 0) {
-        rd_kafka_flush(m_kafka_producer.get(), 100);
-        tl::thread::yield();
-    }
+    std::unique_lock<tl::mutex> pending_msg_guard{m_num_pending_messages_mtx};
+    if(m_num_pending_messages)
+        rd_kafka_flush(m_kafka_producer.get(), -1);
 }
 
 }
