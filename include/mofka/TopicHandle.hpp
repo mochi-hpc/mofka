@@ -72,13 +72,15 @@ class TopicHandleInterface {
      * @param batch_size Batch size.
      * @param thread_pool Thread pool.
      * @param ordering Whether to enforce strict ordering.
+     * @param options Extra options.
      *
      * @return Producer instance.
      */
     virtual Producer makeProducer(std::string_view name,
                                   BatchSize batch_size,
                                   ThreadPool thread_pool,
-                                  Ordering ordering) const = 0;
+                                  Ordering ordering,
+                                  Metadata options) const = 0;
 
     /**
      * @brief Create a Consumer object from the full
@@ -90,6 +92,7 @@ class TopicHandleInterface {
      * @param data_broker Data broker.
      * @param data_selector Data selector.
      * @param targets Indices of the partitions to consumer from.
+     * @param options Extra options.
      *
      * @return Consumer instance.
      */
@@ -98,7 +101,8 @@ class TopicHandleInterface {
                                   ThreadPool thread_pool,
                                   DataBroker data_broker,
                                   DataSelector data_selector,
-                                  const std::vector<size_t>& targets) const = 0;
+                                  const std::vector<size_t>& targets,
+                                  Metadata options) const = 0;
 
 };
 
@@ -166,7 +170,8 @@ class TopicHandle {
             GetArgOrDefault(std::string_view{""}, std::forward<Options>(opts)...),
             GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
-            GetArgOrDefault(Ordering::Strict, std::forward<Options>(opts)...));
+            GetArgOrDefault(Ordering::Strict, std::forward<Options>(opts)...),
+            GetArgOrDefaultExactType(Metadata{}, std::forward<Options>(opts)...));
     }
 
     /**
@@ -185,7 +190,8 @@ class TopicHandle {
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataBroker{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataSelector{}, std::forward<Options>(opts)...),
-            GetArgOrDefault(std::vector<size_t>(), std::forward<Options>(opts)...));
+            GetArgOrDefault(std::vector<size_t>(), std::forward<Options>(opts)...),
+            GetArgOrDefault(Metadata{}, std::forward<Options>(opts)...));
     }
 
     /**
@@ -250,8 +256,10 @@ class TopicHandle {
     Producer makeProducer(std::string_view name,
                           BatchSize batch_size,
                           ThreadPool thread_pool,
-                          Ordering ordering) const {
-        return self->makeProducer(name, batch_size, std::move(thread_pool), ordering);
+                          Ordering ordering,
+                          Metadata options) const {
+        return self->makeProducer(
+            name, batch_size, std::move(thread_pool), ordering, std::move(options));
     }
 
     /**
@@ -272,8 +280,11 @@ class TopicHandle {
                           ThreadPool thread_pool,
                           DataBroker data_broker,
                           DataSelector data_selector,
-                          const std::vector<size_t>& targets) const {
-        return self->makeConsumer(name, batch_size, thread_pool, data_broker, data_selector, targets);
+                          const std::vector<size_t>& targets,
+                          Metadata options) const {
+        return self->makeConsumer(
+            name, batch_size, std::move(thread_pool), data_broker,
+            data_selector, targets, std::move(options));
     }
 
 };

@@ -38,8 +38,15 @@ TEST_CASE("KafkaProducer test", "[kafka-producer]") {
         REQUIRE_NOTHROW(topic = driver.openTopic(topic_name));
         REQUIRE(static_cast<bool>(topic));
 
+        auto thread_count = GENERATE(as<mofka::ThreadCount>{}, 0, 1);//, 2);
+        auto batch_size   = GENERATE(mofka::BatchSize::Adaptive(), 0, 10);
+        auto ordering     = GENERATE(mofka::Ordering::Strict);//, mofka::Ordering::Loose);
+        //auto thread_count = mofka::ThreadCount{0};
+        //auto batch_size = mofka::BatchSize{10};
+        //auto ordering = mofka::Ordering::Strict;
+
         mofka::Producer producer;
-        REQUIRE_NOTHROW(producer = topic.producer("myproducer"));
+        REQUIRE_NOTHROW(producer = topic.producer("myproducer", thread_count, batch_size, ordering));
         REQUIRE(static_cast<bool>(producer));
         std::vector<std::string> data(100);
         {
@@ -52,8 +59,13 @@ TEST_CASE("KafkaProducer test", "[kafka-producer]") {
                 REQUIRE_NOTHROW(future = producer.push(
                             metadata,
                             mofka::Data{data[i].data(), data[i].size()}));
-                if(i % 5 == 0)
-                    REQUIRE_NOTHROW(future.wait());
+                if(batch_size == mofka::BatchSize::Adaptive() || batch_size == mofka::BatchSize{0}) {
+                    if((i+1) % 5 == 0)
+                        REQUIRE_NOTHROW(future.wait());
+                } else {
+                    if((i+1) % batch_size.value == 0)
+                        REQUIRE_NOTHROW(future.wait());
+                }
             }
             REQUIRE_NOTHROW(producer.flush());
         }

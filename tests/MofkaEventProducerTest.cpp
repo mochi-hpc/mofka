@@ -39,7 +39,7 @@ TEST_CASE("Event producer test", "[event-producer]") {
         REQUIRE(static_cast<bool>(topic));
 
         auto thread_count = GENERATE(as<mofka::ThreadCount>{}, 0, 1, 2);
-        auto batch_size   = GENERATE(mofka::BatchSize::Adaptive(), mofka::BatchSize::Adaptive());
+        auto batch_size   = GENERATE(mofka::BatchSize::Adaptive(), 10);
         auto ordering     = GENERATE(mofka::Ordering::Strict, mofka::Ordering::Loose);
 
         auto producer = topic.producer(
@@ -47,22 +47,39 @@ TEST_CASE("Event producer test", "[event-producer]") {
         REQUIRE(static_cast<bool>(producer));
 
         {
-            mofka::Future<mofka::EventID> future;
-            REQUIRE_NOTHROW(future = producer.push(
-                mofka::Metadata("{\"name\":\"matthieu\"}"),
-                mofka::Data{nullptr, 0}));
+            for(size_t i = 0; i < 100; ++i) {
+                mofka::Future<mofka::EventID> future;
+                auto metadata = mofka::Metadata{
+                    fmt::format("{{\"event_num\":{}}}", i)
+                };
+                REQUIRE_NOTHROW(future = producer.push(metadata, mofka::Data{0, nullptr}));
+                if((i+1) % 5 == 0) {
+                    if(batch_size != mofka::BatchSize::Adaptive())
+                        REQUIRE_NOTHROW(producer.flush());
+                    REQUIRE_NOTHROW(future.wait());
+                }
+            }
             REQUIRE_NOTHROW(producer.flush());
-            REQUIRE_NOTHROW(future.wait());
         }
 
+        std::vector<std::string> data(100);
         {
-            std::string someData = "This is some data";
-            mofka::Future<mofka::EventID> future;
-            REQUIRE_NOTHROW(future = producer.push(
-                mofka::Metadata("{\"name\":\"matthieu\"}"),
-                mofka::Data{someData.data(), someData.size()}));
+            for(size_t i = 0; i < 100; ++i) {
+                mofka::Future<mofka::EventID> future;
+                auto metadata = mofka::Metadata{
+                    fmt::format("{{\"event_num\":{}}}", i)
+                };
+                data[i] = fmt::format("This is some data for event {}", i);
+                REQUIRE_NOTHROW(future = producer.push(
+                            metadata,
+                            mofka::Data{data[i].data(), data[i].size()}));
+                if((i+1) % 5 == 0) {
+                    if(batch_size != mofka::BatchSize::Adaptive())
+                        REQUIRE_NOTHROW(producer.flush());
+                    REQUIRE_NOTHROW(future.wait());
+                }
+            }
             REQUIRE_NOTHROW(producer.flush());
-            REQUIRE_NOTHROW(future.wait());
         }
     }
 }

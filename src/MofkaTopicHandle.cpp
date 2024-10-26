@@ -21,7 +21,9 @@ Producer MofkaTopicHandle::makeProducer(
         std::string_view name,
         BatchSize batch_size,
         ThreadPool thread_pool,
-        Ordering ordering) const {
+        Ordering ordering,
+        Metadata options) const {
+    (void)options;
     return Producer{std::make_shared<MofkaProducer>(
         m_engine, name, batch_size, std::move(thread_pool), ordering,
         const_cast<MofkaTopicHandle*>(this)->shared_from_this())};
@@ -33,7 +35,9 @@ Consumer MofkaTopicHandle::makeConsumer(
         ThreadPool thread_pool,
         DataBroker data_broker,
         DataSelector data_selector,
-        const std::vector<size_t>& targets) const {
+        const std::vector<size_t>& targets,
+        Metadata options) const {
+    (void)options;
     std::vector<SP<MofkaPartitionInfo>> partitions;
     if(targets.empty()) {
         partitions = m_partitions;

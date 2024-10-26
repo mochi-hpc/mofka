@@ -34,6 +34,20 @@ decltype(auto) GetArgOrDefault(Expected&& exp, T1&& arg1, Ts&&... args) {
 }
 
 template<typename Expected>
+decltype(auto) GetArgOrDefaultExactType(Expected&& exp) {
+    return std::forward<Expected>(exp);
+}
+
+template<typename Expected, typename T1, typename ... Ts>
+decltype(auto) GetArgOrDefaultExactType(Expected&& exp, T1&& arg1, Ts&&... args) {
+    if constexpr (std::is_same_v<std::decay_t<Expected>, std::decay_t<T1>>) {
+        return std::forward<T1>(arg1);
+    } else {
+        return GetArgOrDefault(exp, std::forward<Ts>(args)...);
+    }
+}
+
+template<typename Expected>
 decltype(auto) GetArg() {
     static_assert(std::is_same_v<void,Expected>, "Could not find mandatory argument of Expected type");
     return Expected{};

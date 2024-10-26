@@ -10,16 +10,45 @@
 #include "PimplUtil.hpp"
 #include "KafkaTopicHandle.hpp"
 #include "KafkaProducer.hpp"
+#include "KafkaBatchProducer.hpp"
 #include "KafkaDriverImpl.hpp"
 #include "KafkaConsumer.hpp"
 
 namespace mofka {
 
+static inline void checkOptions(const Metadata& options) {
+    auto& options_json = options.json();
+    if(!options_json.is_object()) {
+        throw Exception{"Producer options should be a JSON object"};
+    }
+    for(auto& p : options_json.items()) {
+        if(!p.value().is_string()) {
+            throw Exception{"Producer options should only have string values"};
+        }
+    }
+}
+
+static inline void addOptions(const Metadata& options, rd_kafka_conf_t* config) {
+    auto& options_json = options.json();
+    char errstr[512];
+    for(auto& p : options_json.items()) {
+        auto ret = rd_kafka_conf_set(config,
+                p.key().c_str(), p.value().get_ref<const std::string&>().c_str(),
+                errstr, sizeof(errstr));
+        if (ret != RD_KAFKA_CONF_OK)
+            throw Exception{"Could not set options \"" + p.key() + "\": " + errstr};
+    }
+}
+
+
 Producer KafkaTopicHandle::makeProducer(
         std::string_view name,
         BatchSize batch_size,
         ThreadPool thread_pool,
-        Ordering ordering) const {
+        Ordering ordering,
+        Metadata options) const {
+
+    checkOptions(options);
 
     char errstr[512];
     // Create callback for message delivery
@@ -34,6 +63,17 @@ Producer KafkaTopicHandle::makeProducer(
     // Create configuration for producer
     auto kconf = rd_kafka_conf_dup(m_driver->m_kafka_config);
     rd_kafka_conf_set_dr_msg_cb(kconf, dr_msg_cb);
+#if 0
+    if(batch_size != BatchSize::Adaptive()) {
+        auto ret = rd_kafka_conf_set(kconf, "queue.buffering.max.messages",
+                                     std::to_string(batch_size.value).c_str(), errstr, sizeof(errstr));
+        if (ret != RD_KAFKA_CONF_OK)
+            throw Exception{
+                "Could not set Kafka queue.buffering.max.messages configuration: " + std::string(errstr)};
+    }
+#endif
+
+    addOptions(options, kconf);
 
     // Create producer instance
     auto kprod = rd_kafka_new(RD_KAFKA_PRODUCER, kconf, errstr, sizeof(errstr));
@@ -49,10 +89,17 @@ Producer KafkaTopicHandle::makeProducer(
     auto ktopic_ptr = std::shared_ptr<rd_kafka_topic_t>{ktopic, rd_kafka_topic_destroy};
 
     // Create the KafkaProducer instance
-    return Producer{std::make_shared<KafkaProducer>(
-        name, batch_size, std::move(thread_pool), ordering,
-        const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
-        std::move(kprod_ptr), std::move(ktopic_ptr))};
+    if(batch_size == BatchSize{0}) {
+        return Producer{std::make_shared<KafkaProducer>(
+            name, batch_size, std::move(thread_pool), ordering,
+            const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
+            std::move(kprod_ptr), std::move(ktopic_ptr))};
+    } else {
+        return Producer{std::make_shared<KafkaBatchProducer>(
+            name, batch_size, std::move(thread_pool), ordering,
+            const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
+            std::move(kprod_ptr), std::move(ktopic_ptr))};
+    }
 }
 
 Consumer KafkaTopicHandle::makeConsumer(
@@ -61,7 +108,10 @@ Consumer KafkaTopicHandle::makeConsumer(
         ThreadPool thread_pool,
         DataBroker data_broker,
         DataSelector data_selector,
-        const std::vector<size_t>& targets) const {
+        const std::vector<size_t>& targets,
+        Metadata options) const {
+
+    checkOptions(options);
 
     char errstr[512];
 
@@ -79,6 +129,7 @@ Consumer KafkaTopicHandle::makeConsumer(
 
     // Create configuration for consumer
     auto kconf = rd_kafka_conf_dup(m_driver->m_kafka_config);
+    addOptions(options, kconf);
     auto ret = rd_kafka_conf_set(kconf, "group.id", name.data(), errstr, sizeof(errstr));
     if (ret != RD_KAFKA_CONF_OK)
         throw Exception{"Could not set Kafka group.id configuration: " + std::string(errstr)};
@@ -93,13 +144,12 @@ Consumer KafkaTopicHandle::makeConsumer(
     auto kcons = rd_kafka_new(RD_KAFKA_CONSUMER, kconf, errstr, sizeof(errstr));
     if (!kcons) throw Exception{"Failed to create Kafka consumer: " + std::string{errstr}};
     auto kcons_ptr = std::shared_ptr<rd_kafka_t>{kcons, rd_kafka_destroy};
-    //rd_kafka_poll_set_consumer(kcons);
 
     auto consumer = std::make_shared<KafkaConsumer>(
             name, batch_size, std::move(thread_pool),
             data_broker, data_selector,
             const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
-            std::move(partitions), kcons_ptr);//, ktopic_ptr);
+            std::move(partitions), kcons_ptr);
     consumer->subscribe();
     return Consumer{std::move(consumer)};
 }
