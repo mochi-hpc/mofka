@@ -275,6 +275,8 @@ void MofkaConsumer::forwardBatchToConsumer(
         result.error() = "Consumer seems to have be destroyed be client";
         result.success() = false;
     } else {
+        // NOTE: we convert the pointer into a shared pointer to prevent
+        // the consumer from disappearing while the RPC executes.
         std::shared_ptr<MofkaConsumer> consumer_ptr;
         try {
             consumer_ptr = consumer_impl->shared_from_this();
@@ -284,12 +286,16 @@ void MofkaConsumer::forwardBatchToConsumer(
             req.respond(result);
             return;
         }
-        // NOTE: we convert the pointer into a shared pointer to prevent
-        // the consumer from disappearing while the RPC executes.
-        consumer_impl->recvBatch(
-                target_info_index, count, firstID,
-                metadata_sizes, metadata,
-                data_desc_sizes, data_desc);
+        auto thread_pool = consumer_ptr->m_thread_pool;
+        tl::eventual<void> completed;
+        thread_pool.pushWork([&]() {
+            consumer_ptr->recvBatch(
+                    target_info_index, count, firstID,
+                    metadata_sizes, metadata,
+                    data_desc_sizes, data_desc);
+            completed.set_value();
+        });
+        completed.wait();
     }
     req.respond(result);
 }

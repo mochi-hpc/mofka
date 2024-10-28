@@ -17,6 +17,9 @@ Event = pymofka_client.Event
 FutureUint = pymofka_client.FutureUint
 FutureEvent = pymofka_client.FutureEvent
 Ordering = pymofka_client.Ordering
+FullDataSelector = pymofka_client.FullDataSelector
+ByteArrayAllocator = pymofka_client.ByteArrayAllocator
+
 try:
     import pymofka_kafka
     KafkaDriver = pymofka_kafka.KafkaDriver

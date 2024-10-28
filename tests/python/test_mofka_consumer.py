@@ -108,6 +108,19 @@ class TestConsumer(unittest.TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0], self.data)
 
+    def test_consumer_with_full_selector(self):
+        """Test FullDataSelector and ByteArrayAllocator"""
+        consumer = self.topic.consumer(
+                  name="full_consumer",
+                  batch_size=1,
+                  data_broker=mofka.ByteArrayAllocator,
+                  data_selector=mofka.FullDataSelector)
+        f = self.consumer.pull()
+        event = f.wait()
+        data = event.data
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0], self.data)
+
 
 if __name__ == '__main__':
     unittest.main()

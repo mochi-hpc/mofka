@@ -75,13 +75,13 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
     thallium::mutex                                      m_futures_mtx;
 
     MofkaConsumer(thallium::engine engine,
-                 std::string_view name,
-                 BatchSize batch_size,
-                 ThreadPool thread_pool,
-                 DataBroker broker,
-                 DataSelector selector,
-                 SP<MofkaTopicHandle> topic,
-                 std::vector<SP<MofkaPartitionInfo>> partitions)
+                  std::string_view name,
+                  BatchSize batch_size,
+                  ThreadPool thread_pool,
+                  DataBroker broker,
+                  DataSelector selector,
+                  SP<MofkaTopicHandle> topic,
+                  std::vector<SP<MofkaPartitionInfo>> partitions)
     : m_engine(std::move(engine))
     , m_name(name)
     , m_batch_size(batch_size)
@@ -95,7 +95,11 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
     , m_consumer_ack_event(m_engine.define("mofka_consumer_ack_event"))
     , m_consumer_remove_consumer(m_engine.define("mofka_consumer_remove_consumer"))
     , m_consumer_request_data(m_engine.define("mofka_consumer_request_data"))
-    , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch", forwardBatchToConsumer))
+    , m_consumer_recv_batch(
+        m_engine.define("mofka_consumer_recv_batch",
+                        forwardBatchToConsumer,
+                        0,
+                        m_engine.get_progress_pool()))
     {}
 
     ~MofkaConsumer() {

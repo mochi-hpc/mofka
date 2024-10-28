@@ -48,7 +48,7 @@ static auto data_helper(const py::buffer& buffer) {
 static auto data_helper(const py::list& buffers) {
     std::vector<mofka::Data::Segment> segments;
     segments.reserve(buffers.size());
-    for (auto buff : buffers){
+    for (auto& buff : buffers){
         auto buff_info = get_buffer_info(buff.cast<py::buffer>());
         check_buffer_is_contiguous(buff_info);
         segments.push_back(
@@ -386,4 +386,20 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def("wait", &mofka::Future<mofka::Event>::wait)
         .def("completed", &mofka::Future<mofka::Event>::completed)
     ;
+
+    PythonDataSelector select_full_data =
+        [](const nlohmann::json&, const mofka::DataDescriptor& d) -> std::optional<mofka::DataDescriptor> {
+            return d;
+        };
+    m.attr("FullDataSelector") = py::cast(select_full_data);
+
+    PythonDataBroker bytes_data_broker =
+        [](const nlohmann::json&, const mofka::DataDescriptor& d) -> py::list {
+            auto buffer = py::bytearray();
+            auto ret = PyByteArray_Resize(buffer.ptr(), d.size());
+            py::list result;
+            result.append(std::move(buffer));
+            return result;
+        };
+    m.attr("ByteArrayAllocator") = py::cast(bytes_data_broker);
 }
