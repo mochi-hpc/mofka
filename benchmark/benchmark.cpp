@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
         configStr = config.dump();
 
         // validate the configuration file against the schema
-        mofka::JsonValidator validator{configSchema};
+        mofka::JsonSchemaValidator validator{configSchema};
         auto errors = validator.validate(config);
         if(!errors.empty()) {
             std::cerr << "Invalid configuration: ";

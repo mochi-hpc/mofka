@@ -18,8 +18,8 @@ class SchemaValidator : public ValidatorInterface {
 
     using json = nlohmann::json;
 
-    json          m_json_schema;
-    JsonValidator m_json_validator;
+    json                m_json_schema;
+    JsonSchemaValidator m_json_validator;
 
     public:
 

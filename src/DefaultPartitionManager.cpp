@@ -120,7 +120,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     )"_json;
 
     /* Validate configuration against schema */
-    static JsonValidator schemaValidator{configSchema};
+    static JsonSchemaValidator schemaValidator{configSchema};
     auto validationErrors = schemaValidator.validate(config.json());
     if(!validationErrors.empty()) {
         spdlog::error("[mofka] Error(s) while validating JSON config for DefaultPartitionManager:");

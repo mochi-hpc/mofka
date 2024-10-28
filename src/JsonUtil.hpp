@@ -54,21 +54,21 @@ static inline bool ValidateIsJson(std::string_view json) {
     return brackets.empty();
 }
 
-struct JsonValidator {
+struct JsonSchemaValidator {
 
     using ErrorList = std::vector<std::string>;
 
     nlohmann::json_schema::json_validator m_validator;
 
-    JsonValidator(const nlohmann::json& schema) {
+    JsonSchemaValidator(const nlohmann::json& schema) {
         m_validator.set_root_schema(schema);
     }
 
-    JsonValidator(nlohmann::json&& schema) {
+    JsonSchemaValidator(nlohmann::json&& schema) {
         m_validator.set_root_schema(std::move(schema));
     }
 
-    JsonValidator(const char* schema) {
+    JsonSchemaValidator(const char* schema) {
         m_validator.set_root_schema(nlohmann::json::parse(schema));
     }
 

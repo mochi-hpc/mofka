@@ -105,7 +105,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             "required": ["uuid", "type", "topic"]
         }
         )"_json;
-        static JsonValidator jsonValidator{configSchema};
+        static JsonSchemaValidator jsonValidator{configSchema};
 
         /* Validate configuration against schema */
         auto errors = jsonValidator.validate(config.json());

@@ -56,7 +56,7 @@ class SchemaSerializer : public SerializerInterface {
         if(!metadata.json().contains("schema"))
             throw Exception{"SchemaSerializer is expecting a \"schema\" entry in its configuration"};
         // check that the schema field indeed is a schema
-        JsonValidator{metadata.json()["schema"]};
+        JsonSchemaValidator{metadata.json()["schema"]};
         // build the schema serializer and deserialize
         auto serializer   = makeSerializer(metadata.json()["schema"]);
         auto deserializer = makeDeserializer(metadata.json()["schema"]);
