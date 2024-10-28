@@ -147,7 +147,9 @@ class Serializer {
      *
      * @return Serializer instance.
      */
-    static Serializer FromMetadata(const char* type, const Metadata& metadata);
+    static Serializer FromMetadata(
+            const char* type,
+            const Metadata& metadata);
 
     /**
      * @brief Same as the above function but the type is expected

@@ -43,6 +43,10 @@ class MofkaProducer : public BatchProducer {
                   std::shared_ptr<MofkaTopicHandle> topic);
 
     std::shared_ptr<ProducerBatchInterface> newBatchForPartition(size_t index) const override;
+
+    ~MofkaProducer() {
+        flush();
+    }
 };
 
 }

@@ -31,24 +31,18 @@ class TestMofkaDriver(unittest.TestCase):
     def test_create_open_topic(self):
         """Test create and open a topic"""
         name = "my_topic"
-        validator = mofka.Validator.from_metadata(
-            {"__type__":"my_validator:libmy_validator.so"})
-        selector = mofka.PartitionSelector.from_metadata(
-            {"__type__":"my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer.from_metadata(
-            {"__type__":"my_serializer:libmy_serializer.so"})
+        validator = mofka.Validator.from_metadata("my_validator:libmy_validator.so")
+        selector = mofka.PartitionSelector.from_metadata("my_partition_selector:libmy_partition_selector.so")
+        serializer = mofka.Serializer.from_metadata("my_serializer:libmy_serializer.so")
         self.service.create_topic(name, validator, selector, serializer)
         topic = self.service.open_topic(name)
 
     def test_add_memory_partition(self):
         """Test add partition"""
         topic_name = "my_topic"
-        validator = mofka.Validator.from_metadata(
-            {"__type__":"my_validator:libmy_validator.so"})
-        selector = mofka.PartitionSelector.from_metadata(
-            {"__type__":"my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer.from_metadata(
-            {"__type__":"my_serializer:libmy_serializer.so"})
+        validator = mofka.Validator.from_metadata("my_validator:libmy_validator.so")
+        selector = mofka.PartitionSelector.from_metadata("my_partition_selector:libmy_partition_selector.so")
+        serializer = mofka.Serializer.from_metadata("my_serializer:libmy_serializer.so")
         server_rank = 0
         self.service.create_topic(topic_name, validator, selector, serializer)
         self.service.add_memory_partition(topic_name, server_rank)

@@ -136,7 +136,9 @@ class Validator {
      *
      * @return Validator instance.
      */
-    static Validator FromMetadata(const char* type, const Metadata& metadata);
+    static Validator FromMetadata(
+            const char* type,
+            const Metadata& metadata);
 
     /**
      * @brief Same as the above function but will look for a "__type__"

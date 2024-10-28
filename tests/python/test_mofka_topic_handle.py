@@ -20,12 +20,9 @@ class TestTopicHandle(unittest.TestCase):
         self.service = mofka.MofkaDriver("mofka.json", self.bedrock_server.margo.mid)
 
         name = "my_topic"
-        validator = mofka.Validator.from_metadata(
-            {"__type__":"my_validator:libmy_validator.so"})
-        selector = mofka.PartitionSelector.from_metadata(
-            {"__type__":"my_partition_selector:libmy_partition_selector.so"})
-        serializer = mofka.Serializer.from_metadata(
-            {"__type__":"my_serializer:libmy_serializer.so"})
+        validator = mofka.Validator.from_metadata("my_validator:libmy_validator.so")
+        selector = mofka.PartitionSelector.from_metadata("my_partition_selector:libmy_partition_selector.so")
+        serializer = mofka.Serializer.from_metadata("my_serializer:libmy_serializer.so")
         self.service.create_topic(name, validator, selector, serializer)
         self.topic = self.service.open_topic(name)
 

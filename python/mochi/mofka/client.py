@@ -44,6 +44,11 @@ class MofkaDriver(pymofka_client.MofkaDriver):
         else:
             super().__init__(group_file, self._mid)
 
+    def create_topic(self, *args, schema: dict|None = None, **kwargs):
+        if schema is not None:
+            kwargs["validator"] = Validator.from_metadata("schema", {"schema":schema})
+        super().create_topic(*args, **kwargs)
+
 
 class ServiceHandle(MofkaDriver):
 

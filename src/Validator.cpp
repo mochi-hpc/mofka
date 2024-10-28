@@ -40,14 +40,14 @@ Validator Validator::FromMetadata(const Metadata& metadata) {
             "Cannot create Validator from Metadata: "
             "invalid Metadata (expected JSON object)");
     }
-    if(!json.contains("__type__")) {
+    if(!json.contains("type")) {
         return Validator{};
     }
-    auto& type = json["__type__"];
+    auto& type = json["type"];
     if(!type.is_string()) {
         throw Exception(
             "Cannot create Validator from Metadata: "
-            "invalid __type__ in Metadata (expected string)");
+            "invalid \"type\" field in Metadata (expected string)");
     }
     auto& type_str = type.get_ref<const std::string&>();
     std::shared_ptr<ValidatorInterface> v = ValidatorFactory::create(type_str, metadata);
@@ -62,7 +62,7 @@ Validator Validator::FromMetadata(const char* type, const Metadata& metadata) {
             "invalid Metadata (expected JSON object)");
     }
     auto md_copy = metadata;
-    md_copy.json()["__type__"] = type;
+    md_copy.json()["type"] = type;
     std::shared_ptr<ValidatorInterface> v = ValidatorFactory::create(type, md_copy);
     return v;
 }

@@ -54,9 +54,7 @@ class BatchProducer : public ProducerInterface {
     , m_topic(std::move(topic))
     {}
 
-    ~BatchProducer() {
-        flush();
-    }
+    virtual ~BatchProducer() = default;
 
     const std::string& name() const override {
         return m_name;

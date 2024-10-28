@@ -14,9 +14,10 @@ class MyPartitionSelector : public mofka::PartitionSelectorInterface {
         (void)metadata;
         if(m_targets.size() == 0)
             throw mofka::Exception("PartitionSelector has no target to select from");
-        if(m_index >= m_targets.size()) m_index = m_index % m_targets.size();
+        auto result = m_index;
         m_index += 1;
-        return m_targets.at(m_index-1);
+        if(m_index == m_targets.size()) m_index = 0;
+        return result;
     }
 
     mofka::Metadata metadata() const override {

@@ -534,7 +534,7 @@ void EventbridgeValidator::validate(const Metadata& metadata, const Data& data) 
 
 Metadata EventbridgeValidator::metadata() const {
     json config = json::object();
-    config["__type__"] = "eventbridge";
+    config["type"] = "eventbridge";
     config["schema"] = m_schema;
     return Metadata{std::move(config)};
 }

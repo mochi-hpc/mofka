@@ -44,14 +44,14 @@ Serializer Serializer::FromMetadata(const Metadata& metadata) {
                 "Cannot create Serializer from Metadata: "
                 "invalid Metadata (expected JSON object)");
     }
-    if(!json.contains("__type__")) {
+    if(!json.contains("type")) {
         return Serializer{};
     }
-    auto& type = json["__type__"];
+    auto& type = json["type"];
     if(!type.is_string()) {
         throw Exception(
                 "Cannot create Serializer from Metadata: "
-                "invalid __type__ in Metadata (expected string)");
+                "invalid \"type\" field in Metadata (expected string)");
     }
     const auto& type_str = type.get_ref<const std::string&>();
     std::shared_ptr<SerializerInterface> s = SerializerFactory::create(type_str, metadata);
@@ -66,7 +66,7 @@ Serializer Serializer::FromMetadata(const char* type, const Metadata& metadata) 
                 "invalid Metadata (expected JSON object)");
     }
     auto md_copy = metadata;
-    md_copy.json()["__type__"] = type;
+    md_copy.json()["type"] = type;
     std::shared_ptr<SerializerInterface> s = SerializerFactory::create(type, md_copy);
     return Serializer(std::move(s));
 }

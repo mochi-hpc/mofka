@@ -111,13 +111,13 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::PartitionSelector>(m, "PartitionSelector")
         .def_static("from_metadata",
-            [](const nlohmann::json& md){
-                return mofka::PartitionSelector::FromMetadata(md);
-            }, "metadata"_a=nlohmann::json::object())
-        .def_static("from_metadata",
             [](const char* type, const nlohmann::json& md){
                 return mofka::PartitionSelector::FromMetadata(type, md);
             }, "type"_a, "metadata"_a=nlohmann::json::object())
+        .def_static("from_metadata",
+            [](const nlohmann::json& md){
+                return mofka::PartitionSelector::FromMetadata(md);
+            }, "metadata"_a=nlohmann::json::object())
     ;
 
     py::class_<mofka::MofkaDriver>(m, "MofkaDriver")

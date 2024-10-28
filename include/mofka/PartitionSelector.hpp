@@ -146,7 +146,9 @@ class PartitionSelector {
      *
      * @return PartitionSelector instance.
      */
-    static PartitionSelector FromMetadata(const char* type, const Metadata& metadata);
+    static PartitionSelector FromMetadata(
+            const char* type,
+            const Metadata& metadata);
 
     /**
      * @brief Version of the above function that does not require a type.
