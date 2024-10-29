@@ -41,13 +41,20 @@ TEST_CASE("Mofka driver test", "[driver]") {
             mofka::MofkaDriver::PartitionDependencies partition_dependencies;
             getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
-            REQUIRE_NOTHROW(driver.addCustomPartition(
-                        "mytopic", 0, partition_type,
-                        partition_config, partition_dependencies));
+            for(size_t i = 0; i < 4; ++i) {
+                REQUIRE_NOTHROW(driver.addCustomPartition(
+                                "mytopic", 0, partition_type,
+                                partition_config, partition_dependencies));
+            }
 
             REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
             REQUIRE(static_cast<bool>(topic));
             REQUIRE_THROWS_AS(driver.openTopic("mytopic2"), mofka::Exception);
+
+            REQUIRE(topic.partitions().size() == 4);
+
+            //std::cerr << "---------------------------------------------" << std::endl;
+            //std::cerr << server.getCurrentConfig() << std::endl;
         }
     }
 }
