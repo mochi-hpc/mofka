@@ -95,6 +95,7 @@ class MofkaProducerBatch : public ProducerBatchInterface {
             meta_sizes.push_back(meta_size);
             size_t data_size = 0;
             for(const auto& seg : entry.data.segments()) {
+                if(seg.size == 0) continue;
                 data_segments.emplace_back(seg.ptr, seg.size);
                 data_size += seg.size;
             }
