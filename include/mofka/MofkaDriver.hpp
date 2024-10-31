@@ -37,7 +37,7 @@ class MofkaDriver {
     /**
      * @brief Constructor.
      */
-    MofkaDriver(const std::string& groupfile);
+    MofkaDriver(const std::string& groupfile, bool use_progress_thread = false);
 
     /**
      * @brief Constructor.
