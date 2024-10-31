@@ -10,7 +10,6 @@ namespace mofka {
 
 void KafkaProducerBatch::push(
         const Metadata& metadata,
-        const Serializer& serializer,
         const Data& data,
         Promise<EventID> promise) {
     Message msg{std::move(promise)};
@@ -19,7 +18,7 @@ void KafkaProducerBatch::push(
     msg.m_payload.resize(sizeof(size_t));
     // serialize the metadata
     BufferWrapperOutputArchive archive(msg.m_payload);
-    serializer.serialize(archive, metadata);
+    m_serializer.serialize(archive, metadata);
     size_t metadata_size = msg.m_payload.size() - sizeof(size_t);
     std::memcpy(msg.m_payload.data(), &metadata_size, sizeof(metadata_size));
     // serialize the data, one segment at a time

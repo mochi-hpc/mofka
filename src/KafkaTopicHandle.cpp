@@ -63,15 +63,6 @@ Producer KafkaTopicHandle::makeProducer(
     // Create configuration for producer
     auto kconf = rd_kafka_conf_dup(m_driver->m_kafka_config);
     rd_kafka_conf_set_dr_msg_cb(kconf, dr_msg_cb);
-#if 0
-    if(batch_size != BatchSize::Adaptive()) {
-        auto ret = rd_kafka_conf_set(kconf, "queue.buffering.max.messages",
-                                     std::to_string(batch_size.value).c_str(), errstr, sizeof(errstr));
-        if (ret != RD_KAFKA_CONF_OK)
-            throw Exception{
-                "Could not set Kafka queue.buffering.max.messages configuration: " + std::string(errstr)};
-    }
-#endif
 
     addOptions(options, kconf);
 
@@ -89,7 +80,7 @@ Producer KafkaTopicHandle::makeProducer(
     auto ktopic_ptr = std::shared_ptr<rd_kafka_topic_t>{ktopic, rd_kafka_topic_destroy};
 
     // Create the KafkaProducer instance
-    if(batch_size == BatchSize{0}) {
+    if(batch_size == BatchSize{0} || batch_size == BatchSize::Adaptive()) {
         return Producer{std::make_shared<KafkaProducer>(
             name, batch_size, std::move(thread_pool), ordering,
             const_cast<KafkaTopicHandle*>(this)->shared_from_this(),

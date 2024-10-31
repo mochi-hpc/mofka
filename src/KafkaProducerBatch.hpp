@@ -40,6 +40,7 @@ class KafkaBatchProducer;
 class KafkaProducerBatch : public ProducerBatchInterface {
 
     const KafkaBatchProducer*         m_owner;
+    Serializer                        m_serializer;
     std::shared_ptr<rd_kafka_t>       m_kafka_prod;
     std::shared_ptr<rd_kafka_topic_t> m_kafka_topic;
     int32_t                           m_partition;
@@ -66,17 +67,18 @@ class KafkaProducerBatch : public ProducerBatchInterface {
 
     KafkaProducerBatch(
         const KafkaBatchProducer* owner,
+        Serializer serializer,
         std::shared_ptr<rd_kafka_t> kprod,
         std::shared_ptr<rd_kafka_topic_t> ktopic,
         int32_t partition)
     : m_owner{owner}
+    , m_serializer{std::move(serializer)}
     , m_kafka_prod{std::move(kprod)}
     , m_kafka_topic{std::move(ktopic)}
     , m_partition{partition} {}
 
     void push(
             const Metadata& metadata,
-            const Serializer& serializer,
             const Data& data,
             Promise<EventID> promise) override;
 

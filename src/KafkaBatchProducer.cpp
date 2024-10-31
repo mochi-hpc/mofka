@@ -41,7 +41,7 @@ std::shared_ptr<ProducerBatchInterface> KafkaBatchProducer::newBatchForPartition
         throw Exception{"Invalid index returned by partition selector"};
     }
     return std::make_shared<KafkaProducerBatch>(
-            this, m_kafka_producer, m_kafka_topic, index);
+            this, m_topic->m_serializer, m_kafka_producer, m_kafka_topic, index);
 }
 
 void KafkaBatchProducer::flush() {

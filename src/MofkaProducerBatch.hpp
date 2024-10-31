@@ -38,6 +38,7 @@ class MofkaProducerBatch : public ProducerBatchInterface {
 
     std::string                m_producer_name;
     thallium::engine           m_engine;
+    Serializer                 m_serializer;
     thallium::provider_handle  m_partition_ph;
     thallium::remote_procedure m_send_batch_rpc;
 
@@ -54,22 +55,23 @@ class MofkaProducerBatch : public ProducerBatchInterface {
     MofkaProducerBatch(
         std::string producer_name,
         thallium::engine engine,
+        Serializer serializer,
         thallium::provider_handle partition_ph,
         thallium::remote_procedure send_batch)
     : m_producer_name{std::move(producer_name)}
     , m_engine{std::move(engine)}
+    , m_serializer{std::move(serializer)}
     , m_partition_ph{std::move(partition_ph)}
     , m_send_batch_rpc{std::move(send_batch)}
     {}
 
     void push(
             const Metadata& metadata,
-            const Serializer& serializer,
             const Data& data,
             Promise<EventID> promise) override {
         size_t meta_buffer_size = m_meta_buffer.size();
         BufferWrapperOutputArchive archive(m_meta_buffer);
-        serializer.serialize(archive, metadata);
+        m_serializer.serialize(archive, metadata);
         size_t meta_size = m_meta_buffer.size() - meta_buffer_size;
         m_meta_sizes.push_back(meta_size);
         size_t data_size = 0;

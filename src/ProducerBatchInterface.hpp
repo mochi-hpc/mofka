@@ -25,7 +25,6 @@ class ProducerBatchInterface {
 
     virtual void push(
             const Metadata& metadata,
-            const Serializer& serializer,
             const Data& data,
             Promise<EventID> promise) = 0;
 
