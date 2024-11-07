@@ -9,8 +9,8 @@
 namespace mofka {
 
 void KafkaProducerBatch::push(
-        const Metadata& metadata,
-        const Data& data,
+        Metadata metadata,
+        Data data,
         Promise<EventID> promise) {
     Message msg{std::move(promise)};
     // make space at the beginning of the message to

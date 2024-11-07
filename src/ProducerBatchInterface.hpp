@@ -24,8 +24,8 @@ class ProducerBatchInterface {
     virtual ~ProducerBatchInterface() = default;
 
     virtual void push(
-            const Metadata& metadata,
-            const Data& data,
+            Metadata metadata,
+            Data data,
             Promise<EventID> promise) = 0;
 
     virtual void send() = 0;

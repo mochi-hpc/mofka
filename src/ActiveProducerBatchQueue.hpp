@@ -41,10 +41,9 @@ class ActiveProducerBatchQueue {
         stop();
     }
 
-    void push(
-            const Metadata& metadata,
-            const Data& data,
-            Promise<EventID> promise) {
+    void push(Metadata metadata,
+              Data data,
+              Promise<EventID> promise) {
         bool need_notification;
         {
             auto adaptive = m_batch_size == BatchSize::Adaptive();
@@ -58,7 +57,7 @@ class ActiveProducerBatchQueue {
                 last_batch = m_batch_queue.back();
                 need_notification = true;
             }
-            last_batch->push(metadata, data, std::move(promise));
+            last_batch->push(std::move(metadata), std::move(data), std::move(promise));
         }
         if(need_notification) {
             m_cv.notify_one();

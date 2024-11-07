@@ -148,7 +148,8 @@ void rdkafka_consume_messages(
 template <typename Driver>
 void produce(Driver driver, const std::string& topic_name, int num_events,
              int threads, mofka::BatchSize batch_size, int flush_every,
-             int metadata_size, int data_size, int warmup_events) {
+             int metadata_size, int data_size, int warmup_events,
+             std::optional<thallium::engine> engine = std::nullopt) {
     spdlog::info("Opening topic {}", topic_name);
     auto topic = driver.openTopic(topic_name);
 
@@ -169,26 +170,38 @@ void produce(Driver driver, const std::string& topic_name, int num_events,
     if (warmup_events > 0) {
         spdlog::info("Start producing {} for warmup...", warmup_events);
         for (int i = 0; i < warmup_events; ++i) {
-            producer.push(metadata[i], mofka::Data{data[i].data(), data[i].size()});
+            producer.push(std::move(metadata[i]), mofka::Data{data[i].data(), data[i].size()});
         }
         producer.flush();
+    }
+    if(engine) {
+        margo_monitor_dump(engine.value().get_margo_instance(), nullptr, nullptr, true);
     }
 
     spdlog::info("Start producing {}...", num_events);
     auto t_start = std::chrono::high_resolution_clock::now();
+    double t_push = 0;
+    double t_flush = 0;
     for (int i = 0; i < num_events; ++i) {
         int j = i + warmup_events;
+        double t1 = thallium::timer::wtime();
         producer.push(metadata[j],mofka::Data{data[j].data(), data[j].size()});
+        t_push += thallium::timer::wtime() - t1;
         if (flush_every && (j + 1) % flush_every == 0) {
+            double t2 = thallium::timer::wtime();
             producer.flush();
+            t_flush += thallium::timer::wtime() - t2;
         }
     }
+    double t2 = thallium::timer::wtime();
     producer.flush();
+    t_flush += thallium::timer::wtime() - t2;
     auto t_end = std::chrono::high_resolution_clock::now();
     spdlog::info("Marking topic as complete");
     topic.markAsComplete();
-    spdlog::info("Producing {} events took {} seconds", num_events,
-                 std::chrono::duration<double>(t_end - t_start).count());
+    spdlog::info("Producing {} events took {} seconds (push: {}, flush: {})", num_events,
+                 std::chrono::duration<double>(t_end - t_start).count(),
+                 t_push, t_flush);
 }
 
 void produce(int argc, char** argv) {
@@ -226,7 +239,9 @@ void produce(int argc, char** argv) {
         : mofka::BatchSize::Adaptive();
 
     if(backend_name == "mofka") {
-        auto driver = mofka::MofkaDriver{bootstrap_file};
+        auto engine = thallium::engine{"verbs", THALLIUM_SERVER_MODE, true};
+        margo_set_progress_when_needed(engine.get_margo_instance(), true);
+        auto driver = mofka::MofkaDriver{bootstrap_file, engine};
         driver.createTopic(topicArg.getValue());
         driver.addMemoryPartition(topicArg.getValue(), 0);
         produce(driver,
@@ -237,7 +252,8 @@ void produce(int argc, char** argv) {
                 flushEveryArg.getValue(),
                 metadataSizeArg.getValue(),
                 dataSizeArg.getValue(),
-                warmupArg.getValue());
+                warmupArg.getValue(),
+                engine);
     } else if(backend_name == "kafka") {
         auto driver = mofka::KafkaDriver{bootstrap_file};
         driver.createTopic(topicArg.getValue(), 1, 1);

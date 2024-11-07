@@ -47,7 +47,7 @@ Future<EventID> BatchProducer::push(Metadata metadata, Data data) {
             m_batch_queues[partition_index] = queue;
         }
     }
-    queue->push(metadata, data, promise);
+    queue->push(std::move(metadata), std::move(data), promise);
     return future;
 }
 

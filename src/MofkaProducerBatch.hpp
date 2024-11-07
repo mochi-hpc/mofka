@@ -65,11 +65,10 @@ class MofkaProducerBatch : public ProducerBatchInterface {
     , m_send_batch_rpc{std::move(send_batch)}
     {}
 
-    void push(
-            const Metadata& metadata,
-            const Data& data,
-            Promise<EventID> promise) override {
-        m_entries.push_back({metadata, data, std::move(promise)});
+    void push(Metadata metadata,
+              Data data,
+              Promise<EventID> promise) override {
+        m_entries.push_back({std::move(metadata), std::move(data), std::move(promise)});
     }
 
     void send() override {

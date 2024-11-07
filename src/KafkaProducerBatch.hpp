@@ -78,8 +78,8 @@ class KafkaProducerBatch : public ProducerBatchInterface {
     , m_partition{partition} {}
 
     void push(
-            const Metadata& metadata,
-            const Data& data,
+            Metadata metadata,
+            Data data,
             Promise<EventID> promise) override;
 
     void send() override;
