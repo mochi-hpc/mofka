@@ -137,7 +137,7 @@ static void rdkafka_produce_messages(
         if (i == warmup_events)
             t_start = std::chrono::high_resolution_clock::now();
         /* Note: technically because we have created the messages above and they won't
-         * disappear from memory, we could avoid using RD_KAFKA_MSG_F_COPY bellow. 
+         * disappear from memory, we could avoid using RD_KAFKA_MSG_F_COPY bellow.
          * However for a more fair comparison with Mofka, which makes a copy, we use
          * RD_KAFKA_MSG_F_COPY here.
          * */
@@ -153,7 +153,9 @@ static void rdkafka_produce_messages(
             auto t_flush_start = std::chrono::high_resolution_clock::now();
             while(RD_KAFKA_RESP_ERR__TIMED_OUT == rd_kafka_flush(producer, 100)) {};
             auto t_flush_end = std::chrono::high_resolution_clock::now();
-            flush_time += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
+            if(i >= warmup_events) {
+                flush_time += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
+            }
         }
     }
     auto t_flush_start = std::chrono::high_resolution_clock::now();
@@ -216,7 +218,9 @@ static void rdkafka_consume_messages(
                     auto t_commit_start = std::chrono::high_resolution_clock::now();
                     rd_kafka_commit_message(consumer, msg, 0);
                     auto t_commit_end = std::chrono::high_resolution_clock::now();
-                    commit_time += std::chrono::duration<double>(t_commit_end - t_commit_start).count();
+                    if(i > warmup_events) {
+                        commit_time += std::chrono::duration<double>(t_commit_end - t_commit_start).count();
+                    }
                 }
             }
             rd_kafka_message_destroy(msg);
@@ -426,6 +430,7 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     spdlog::info("Start consuming events...");
     int num_events = 0;
     auto t_start = std::chrono::high_resolution_clock::now();
+    double t_ack = 0;
 
     while (true) {
         auto event = consumer.pull().wait();
@@ -435,13 +440,19 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
         if (event.id() == mofka::NoMoreEvents) break;
         ++num_events;
         if (acknowledge_every && num_events % acknowledge_every.value() == 0) {
+            auto t1 = std::chrono::high_resolution_clock::now();
             event.acknowledge();
+            auto t2 = std::chrono::high_resolution_clock::now();
+            if(num_events >= warmup_events)
+                t_ack += std::chrono::duration<double>(t2 - t1).count();
         }
     }
 
     auto t_end = std::chrono::high_resolution_clock::now();
-    spdlog::info("Consuming {} events took {} seconds", num_events - warmup_events,
-                 std::chrono::duration<double>(t_end - t_start).count());
+    spdlog::info("Consuming {} events took {} seconds (including {} seconds of ack time)",
+                 num_events - warmup_events,
+                 std::chrono::duration<double>(t_end - t_start).count(),
+                 t_ack);
 }
 
 /**
