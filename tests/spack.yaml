@@ -55,6 +55,9 @@ spack:
       - "+bedrock"
       - "+python"
       - "+mpi"
+    mochi-margo:
+      require:
+      - "@0.18.3:"
     mercury:
       require: "~checksum~boostsys"
     libfabric:

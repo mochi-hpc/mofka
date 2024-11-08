@@ -117,6 +117,10 @@ size_t MofkaDriver::numServers() const {
     return self->m_bsgh.size();
 }
 
+thallium::engine MofkaDriver::engine() const {
+    return self->m_engine;
+}
+
 void MofkaDriver::createTopic(
         std::string_view name,
         Validator validator,

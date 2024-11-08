@@ -16,7 +16,10 @@
 #include <librdkafka/rdkafka.h>
 
 
-std::string random_bytes(size_t n) {
+/**
+ * @brief Generate a string of random letters of size n.
+ */
+static std::string random_bytes(size_t n) {
     const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     std::default_random_engine rng(std::random_device{}());
     std::uniform_int_distribution<size_t> dist(0, sizeof(charset) - 2);
@@ -28,7 +31,15 @@ std::string random_bytes(size_t n) {
     return result;
 }
 
-void rdkafka_create_topic(
+/**
+ * @brief Create a topic in a Kafka cluster using librdkafka.
+ *
+ * @param bootstrap_servers Comma-separated list of bootstrap server addresses.
+ * @param topic_name Name of the topic to create.
+ * @param num_partitions Number of partitions.
+ * @param replication_factor Replication factor.
+ */
+static void rdkafka_create_topic(
         const std::string &bootstrap_servers,
         const std::string &topic_name,
         int num_partitions,
@@ -38,7 +49,8 @@ void rdkafka_create_topic(
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
 
     rd_kafka_AdminOptions_t *options = rd_kafka_AdminOptions_new(rk, RD_KAFKA_ADMIN_OP_ANY);
-    rd_kafka_NewTopic_t *new_topic = rd_kafka_NewTopic_new(topic_name.c_str(), num_partitions, replication_factor, nullptr, 0);
+    rd_kafka_NewTopic_t *new_topic = rd_kafka_NewTopic_new(
+            topic_name.c_str(), num_partitions, replication_factor, nullptr, 0);
 
     rd_kafka_NewTopic_t *new_topics[] = {new_topic};
     rd_kafka_CreateTopics(rk, new_topics, 1, options, nullptr);
@@ -50,7 +62,17 @@ void rdkafka_create_topic(
     spdlog::info("Topic {} created successfully!", topic_name);
 }
 
-void rdkafka_produce_messages(
+/**
+ * @brief Produce messages into a Kafka topic using librdkafka.
+ *
+ * @param bootstrap_servers Comma-separated list of bootstrap server addresses.
+ * @param topic_name Name of the topic in which to produce events.
+ * @param num_events Number of events.
+ * @param message_size Size of each message.
+ * @param warmup_events Number of warmup events to produce before actually measuring performance.
+ * @param flush_every Frequency of flush calls.
+ */
+static void rdkafka_produce_messages(
         const std::string &bootstrap_servers,
         const std::string &topic_name,
         int num_events,
@@ -64,41 +86,67 @@ void rdkafka_produce_messages(
     rd_kafka_t *producer = rd_kafka_new(RD_KAFKA_PRODUCER, conf, nullptr, 0);
 
     int total_num_events = warmup_events + num_events;
-    auto t_start = std::chrono::high_resolution_clock::now();
+    spdlog::info("Preparring {} messages...", total_num_events);
+    std::vector<std::string> messages(total_num_events);
+    for(auto& msg : messages)
+        msg = random_bytes(message_size);
+
+    decltype(std::chrono::high_resolution_clock::now()) t_start;
+    spdlog::info("Producing {} messages...", total_num_events);
+
+    double flush_time = 0.0;
 
     for (int i = 0; i < total_num_events; ++i) {
-        std::string message = random_bytes(message_size);
+        if (i == warmup_events)
+            t_start = std::chrono::high_resolution_clock::now();
+        /* Note: technically because we have created the messages above and they won't
+         * disappear from memory, we could avoid using RD_KAFKA_MSG_F_COPY bellow. 
+         * However for a more fair comparison with Mofka, which makes a copy, we use
+         * RD_KAFKA_MSG_F_COPY here.
+         * */
         rd_kafka_producev(producer,
                           RD_KAFKA_V_TOPIC(topic_name.c_str()),
                           RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
-                          RD_KAFKA_V_VALUE(const_cast<char*>(message.data()), message.size()),
+                          RD_KAFKA_V_VALUE(const_cast<char*>(messages[i].data()), messages[i].size()),
                           RD_KAFKA_V_END);
 
         rd_kafka_poll(producer, 0);
 
         if (flush_every > 0 && (i + 1) % flush_every == 0) {
-            rd_kafka_flush(producer, 1000);
-        }
-
-        if (i == warmup_events) {
-            t_start = std::chrono::high_resolution_clock::now();
+            auto t_flush_start = std::chrono::high_resolution_clock::now();
+            while(RD_KAFKA_RESP_ERR__TIMED_OUT == rd_kafka_flush(producer, 100)) {};
+            auto t_flush_end = std::chrono::high_resolution_clock::now();
+            flush_time += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
         }
     }
-
-    rd_kafka_flush(producer, 1000);
+    auto t_flush_start = std::chrono::high_resolution_clock::now();
+    while(RD_KAFKA_RESP_ERR__TIMED_OUT == rd_kafka_flush(producer, 100)) {};
+    auto t_flush_end = std::chrono::high_resolution_clock::now();
+    flush_time += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
     auto t_end = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double>(t_end - t_start).count();
-    spdlog::info("Successfully produced {} messages in {} seconds", num_events, elapsed);
+    spdlog::info("Successfully produced {} messages in {} seconds (including {} seconds flush time)",
+                 num_events, elapsed, flush_time);
 
     rd_kafka_destroy(producer);
 }
 
-void rdkafka_consume_messages(
+/**
+ * @brief Consume messages from a Kafka cluster using librdkafka.
+ *
+ * @param bootstrap_servers Comma-separated list of bootstrap server addresses.
+ * @param consumer_name Name of the consumer.
+ * @param topic_name Topic name.
+ * @param num_events Number of events to consumer.
+ * @param acknowledge_every  Frequency of commits.
+ * @param warmup_events Number of events to consume before starting to measure time.
+ */
+static void rdkafka_consume_messages(
         const std::string &bootstrap_servers,
         const std::string &consumer_name,
         const std::string &topic_name,
         int num_events,
-        int acknowledge_every,
+        std::optional<int> acknowledge_every,
         int warmup_events) {
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
@@ -114,30 +162,36 @@ void rdkafka_consume_messages(
 
     rd_kafka_subscribe(consumer, topics);
 
-    int i = 0;
-    auto t_start = std::chrono::high_resolution_clock::now();
+    decltype(std::chrono::high_resolution_clock::now()) t_start;
 
-    while (true) {
-        rd_kafka_message_t *msg = rd_kafka_consumer_poll(consumer, 1000);
+    spdlog::info("Consuming {} messages...", warmup_events + num_events);
+    int i = 0;
+    double commit_time = 0.0;
+    while(true) {
+        if (i == warmup_events)
+            t_start = std::chrono::high_resolution_clock::now();
+
+        rd_kafka_message_t *msg = rd_kafka_consumer_poll(consumer, 100);
 
         if (msg && !msg->err) {
             if (i >= warmup_events) {
-                if (i == warmup_events) {
-                    t_start = std::chrono::high_resolution_clock::now();
-                }
-                if (acknowledge_every > 0 && (i - warmup_events + 1) % acknowledge_every == 0) {
+                if (acknowledge_every.has_value() && (i - warmup_events + 1) % acknowledge_every.value() == 0) {
+                    auto t_commit_start = std::chrono::high_resolution_clock::now();
                     rd_kafka_commit_message(consumer, msg, 0);
+                    auto t_commit_end = std::chrono::high_resolution_clock::now();
+                    commit_time += std::chrono::duration<double>(t_commit_end - t_commit_start).count();
                 }
-                ++i;
             }
             rd_kafka_message_destroy(msg);
         }
-        if (i == num_events) break;
+
+        if (i == warmup_events + num_events) break;
     }
 
     auto t_end = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double>(t_end - t_start).count();
-    spdlog::info("Successfully consumed {} messages in {} seconds", num_events, elapsed);
+    spdlog::info("Successfully consumed {} messages in {} seconds (including {} seconds commit time)",
+                 num_events, elapsed, commit_time);
 
     rd_kafka_topic_partition_list_destroy(topics);
     rd_kafka_consumer_close(consumer);
@@ -145,11 +199,27 @@ void rdkafka_consume_messages(
 }
 
 
+/**
+ * @brief Template produce function that can accept either a MofkaDriver or a KafkaDriver
+ * as template parameter. It produces events in a specified topic.
+ *
+ * @tparam Driver Driver type (MofkaDriver or KafkaDriver).
+ * @param driver Driver.
+ * @param topic_name Topic name.
+ * @param num_events Number of events to produce.
+ * @param threads Number of backing threads for background work.
+ * @param batch_size Batch size.
+ * @param flush_every Frequency of flush operations.
+ * @param metadata_size Size of the metadata.
+ * @param data_size Size of the data part.
+ * @param warmup_events Number of warmup events before measuring performance.
+ * @param engine Optional thallium engine (used for MofkaDriver).
+ */
 template <typename Driver>
-void produce(Driver driver, const std::string& topic_name, int num_events,
-             int threads, mofka::BatchSize batch_size, int flush_every,
-             int metadata_size, int data_size, int warmup_events,
-             std::optional<thallium::engine> engine = std::nullopt) {
+static void produce(Driver driver, const std::string& topic_name, int num_events,
+                    int threads, mofka::BatchSize batch_size, int flush_every,
+                    int metadata_size, int data_size, int warmup_events,
+                    std::optional<thallium::engine> engine = std::nullopt) {
     spdlog::info("Opening topic {}", topic_name);
     auto topic = driver.openTopic(topic_name);
 
@@ -157,11 +227,12 @@ void produce(Driver driver, const std::string& topic_name, int num_events,
     auto ordering = mofka::Ordering::Strict;
     int total_num_events = warmup_events + num_events;
 
+    spdlog::info("Preparing metadata and data for {} events", total_num_events);
     std::vector<std::string> data(total_num_events);
     std::vector<std::string> metadata(total_num_events);
     for (int i = 0; i < total_num_events; ++i) {
         data[i] = random_bytes(data_size);
-        metadata[i] = "\"" + random_bytes(metadata_size) + "\"";
+        metadata[i] = "\"" + random_bytes(metadata_size-2) + "\"";
     }
 
     spdlog::info("Creating producer");
@@ -175,36 +246,47 @@ void produce(Driver driver, const std::string& topic_name, int num_events,
         producer.flush();
     }
     if(engine) {
+        /* Reset all internal RPC statistics. Use the following environmane variables
+         * to enable RPC statistics for the MofkaDriver:
+         *
+         * export MARGO_ENABLE_MONITORING=1
+         * export MARGO_MONITORING_FILENAME_PREFIX=mofka
+         * export MARGO_MONITORING_DISABLE_TIME_SERIES=true
+         */
         margo_monitor_dump(engine.value().get_margo_instance(), nullptr, nullptr, true);
     }
 
-    spdlog::info("Start producing {}...", num_events);
+    spdlog::info("Start producing {} events...", num_events);
     auto t_start = std::chrono::high_resolution_clock::now();
-    double t_push = 0;
     double t_flush = 0;
     for (int i = 0; i < num_events; ++i) {
         int j = i + warmup_events;
-        double t1 = thallium::timer::wtime();
         producer.push(metadata[j],mofka::Data{data[j].data(), data[j].size()});
-        t_push += thallium::timer::wtime() - t1;
         if (flush_every && (j + 1) % flush_every == 0) {
-            double t2 = thallium::timer::wtime();
+            auto t_flush_start = std::chrono::high_resolution_clock::now();
             producer.flush();
-            t_flush += thallium::timer::wtime() - t2;
+            auto t_flush_end = std::chrono::high_resolution_clock::now();
+            t_flush += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
         }
     }
-    double t2 = thallium::timer::wtime();
+    auto t_flush_start = std::chrono::high_resolution_clock::now();
     producer.flush();
-    t_flush += thallium::timer::wtime() - t2;
+    auto t_flush_end = std::chrono::high_resolution_clock::now();
+    t_flush += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
     auto t_end = std::chrono::high_resolution_clock::now();
     spdlog::info("Marking topic as complete");
     topic.markAsComplete();
-    spdlog::info("Producing {} events took {} seconds (push: {}, flush: {})", num_events,
-                 std::chrono::duration<double>(t_end - t_start).count(),
-                 t_push, t_flush);
+    spdlog::info("Producing {} events took {} seconds (including {} seconds flush time)", num_events,
+                 std::chrono::duration<double>(t_end - t_start).count(), t_flush);
 }
 
-void produce(int argc, char** argv) {
+/**
+ * @brief Main "produce" function.
+ *
+ * @param argc argc-1 from main.
+ * @param argv argv+1 from main.
+ */
+static void produce(int argc, char** argv) {
 
     auto backend_name = std::string{argv[1]};
     if(backend_name != "mofka" && backend_name != "kafka" && backend_name != "rdkafka")
@@ -239,9 +321,8 @@ void produce(int argc, char** argv) {
         : mofka::BatchSize::Adaptive();
 
     if(backend_name == "mofka") {
-        auto engine = thallium::engine{"verbs", THALLIUM_SERVER_MODE, true};
-        margo_set_progress_when_needed(engine.get_margo_instance(), true);
-        auto driver = mofka::MofkaDriver{bootstrap_file, engine};
+        auto driver = mofka::MofkaDriver{bootstrap_file, true};
+        margo_set_progress_when_needed(driver.engine().get_margo_instance(), true);
         driver.createTopic(topicArg.getValue());
         driver.addMemoryPartition(topicArg.getValue(), 0);
         produce(driver,
@@ -253,7 +334,7 @@ void produce(int argc, char** argv) {
                 metadataSizeArg.getValue(),
                 dataSizeArg.getValue(),
                 warmupArg.getValue(),
-                engine);
+                driver.engine());
     } else if(backend_name == "kafka") {
         auto driver = mofka::KafkaDriver{bootstrap_file};
         driver.createTopic(topicArg.getValue(), 1, 1);
@@ -266,7 +347,7 @@ void produce(int argc, char** argv) {
                 metadataSizeArg.getValue(),
                 dataSizeArg.getValue(),
                 warmupArg.getValue());
-    } else {
+    } else { /* rdkafka */
         rdkafka_produce_messages(
             bootstrapArg.getValue(),
             topicArg.getValue(),
@@ -277,11 +358,10 @@ void produce(int argc, char** argv) {
     }
 }
 
-#if 0
 template <typename Driver>
-void consume(Driver driver, const std::string& consumer_name, const std::string& topic_name,
-             int threads, std::optional<int> batch_size, double data_selection,
-             std::optional<int> acknowledge_every, int warmup_events) {
+static void consume(Driver driver, const std::string& consumer_name, const std::string& topic_name,
+                    int threads, mofka::BatchSize batch_size, double data_selection,
+                    std::optional<int> acknowledge_every, int warmup_events) {
     spdlog::info("Opening topic {}", topic_name);
     auto topic = driver.openTopic(topic_name);
 
@@ -289,9 +369,7 @@ void consume(Driver driver, const std::string& consumer_name, const std::string&
         throw std::invalid_argument("data_selection should be in [0,1]");
     }
 
-    auto thread_pool = mofka::ThreadPool{threads};
-    auto actual_batch_size = mofka::BatchSize{
-        batch_size.value_or(mofka::BatchSize::Adaptive().value)};
+    auto thread_pool = mofka::ThreadPool{mofka::ThreadCount{(size_t)threads}};
 
     mofka::DataSelector data_selector =
         [data_selection](const mofka::Metadata&, const mofka::DataDescriptor& desc) {
@@ -306,7 +384,7 @@ void consume(Driver driver, const std::string& consumer_name, const std::string&
 
     spdlog::info("Creating consumer");
     auto consumer = topic.consumer(
-            consumer_name, thread_pool, actual_batch_size, data_selector, data_broker);
+            consumer_name, thread_pool, batch_size, data_selector, data_broker);
 
     spdlog::info("Start consuming events...");
     int num_events = 0;
@@ -328,7 +406,83 @@ void consume(Driver driver, const std::string& consumer_name, const std::string&
     spdlog::info("Consuming {} events took {} seconds", num_events - warmup_events,
                  std::chrono::duration<double>(t_end - t_start).count());
 }
-#endif
+
+/**
+ * @brief Main "consume" function.
+ *
+ * @param argc argc-1 from main.
+ * @param argv argv+1 from main.
+ */
+static void consume(int argc, char** argv) {
+
+    auto backend_name = std::string{argv[1]};
+    if(backend_name != "mofka" && backend_name != "kafka" && backend_name != "rdkafka")
+        throw mofka::Exception{"Backend name should be either \"mofka\", \"kafka\", or \"rdkafka\""};
+
+    TCLAP::CmdLine cmd("MOFKA/Kafka CLI", ' ', "1.0");
+    TCLAP::ValueArg<std::string> bootstrapArg("b", "bootstrap-file", "Bootstrap file or server",
+                                              true, "", "string");
+    TCLAP::ValueArg<int> eventsArg("n", "num-events", "Number of events", false, 0, "int");
+    TCLAP::ValueArg<std::string> topicArg("t", "topic-name", "Topic name", true, "", "string");
+    TCLAP::ValueArg<std::string> consumerArg("c", "consumer-name", "Consumer name", true, "", "string");
+    TCLAP::ValueArg<int> threadsArg("p", "threads", "Number of threads", false, 0, "int");
+    TCLAP::ValueArg<int> batchSizeArg("s", "batch-size", "Batch size", false, 0, "int");
+    TCLAP::ValueArg<int> ackEveryArg("a", "ack-every", "Acknowledge/commit every N events", false, 0, "int");
+    TCLAP::ValueArg<double> dataSelectionArg("d", "data-selection", "Data selection", false, 0.0, "double");
+    TCLAP::ValueArg<int> warmupArg("w", "num-warmup-events", "Number of warmup events", false, 0, "int");
+
+    cmd.add(bootstrapArg);
+    cmd.add(topicArg);
+    cmd.add(eventsArg);
+    cmd.add(consumerArg);
+    cmd.add(threadsArg);
+    cmd.add(batchSizeArg);
+    cmd.add(ackEveryArg);
+    cmd.add(dataSelectionArg);
+    cmd.add(warmupArg);
+    cmd.parse(argc - 1, argv + 1);
+
+    auto bootstrap_file = bootstrapArg.getValue();
+    mofka::BatchSize batch_size = batchSizeArg.isSet() ?
+        mofka::BatchSize{(size_t)batchSizeArg.getValue()}
+        : mofka::BatchSize::Adaptive();
+    std::optional<int> ack_every = ackEveryArg.isSet() ? std::optional{ackEveryArg.getValue()} : std::nullopt;
+
+    if(backend_name == "mofka") {
+        if(eventsArg.isSet())
+            spdlog::warn("-n/--num-events is ignored (all the messages will be consumed");
+        auto driver = mofka::MofkaDriver{bootstrap_file, true};
+        margo_set_progress_when_needed(driver.engine().get_margo_instance(), true);
+        consume(driver,
+                consumerArg.getValue(),
+                topicArg.getValue(),
+                threadsArg.getValue(),
+                batch_size,
+                dataSelectionArg.getValue(),
+                ack_every,
+                warmupArg.getValue());
+    } else if(backend_name == "kafka") {
+        if(eventsArg.isSet())
+            spdlog::warn("-n/--num-events is ignored (all the messages will be consumed");
+        auto driver = mofka::KafkaDriver{bootstrap_file};
+        consume(driver,
+                consumerArg.getValue(),
+                topicArg.getValue(),
+                threadsArg.getValue(),
+                batch_size,
+                dataSelectionArg.getValue(),
+                ack_every,
+                warmupArg.getValue());
+    } else { /* rdkafka */
+        rdkafka_consume_messages(
+                bootstrapArg.getValue(),
+                consumerArg.getValue(),
+                topicArg.getValue(),
+                eventsArg.getValue(),
+                ack_every,
+                warmupArg.getValue());
+    }
+}
 
 int main(int argc, char** argv) {
     spdlog::set_level(spdlog::level::info);
@@ -340,9 +494,12 @@ int main(int argc, char** argv) {
     if(argv1 == "produce") {
         produce(argc-1, argv+1);
     } else if(argv1 == "consume") {
-
+        consume(argc-1, argv+1);
+    } else if(argv1 == "help") {
+        std::cerr << "Please run " << argv[0] << " produce help or "
+                                   << argv[0] << " consume help" << std::endl;
     } else {
-        throw mofka::Exception{"Invalid command (expected \"produce\" or \"consume\")"};
+        std::cerr << "Invalid command (expected \"produce\" or \"consume\" or \"help\")";
     }
 
     return 0;

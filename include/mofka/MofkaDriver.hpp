@@ -81,6 +81,11 @@ class MofkaDriver {
     operator bool() const;
 
     /**
+     * @brief Get the internal Thallium engine.
+     */
+    thallium::engine engine() const;
+
+    /**
      * @brief Returns the number of servers this service currently has.
      */
     size_t numServers() const;
