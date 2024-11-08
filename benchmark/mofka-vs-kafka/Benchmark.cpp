@@ -44,21 +44,57 @@ static void rdkafka_create_topic(
         const std::string &topic_name,
         int num_partitions,
         int replication_factor) {
-    rd_kafka_conf_t *conf = rd_kafka_conf_new();
+    char errstr[512];
+    auto conf = rd_kafka_conf_new();
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
 
-    rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf, nullptr, 0);
+    rd_kafka_t *rk = rd_kafka_new(
+            RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
+    if (!rk) {
+        rd_kafka_conf_destroy(conf);
+        throw std::runtime_error{"Could not create rd_kafka_t instance: " + std::string{errstr}};
+    }
+    auto _rk = std::shared_ptr<rd_kafka_t>{rk, rd_kafka_destroy};
 
-    rd_kafka_AdminOptions_t *options = rd_kafka_AdminOptions_new(rk, RD_KAFKA_ADMIN_OP_ANY);
-    rd_kafka_NewTopic_t *new_topic = rd_kafka_NewTopic_new(
-            topic_name.c_str(), num_partitions, replication_factor, nullptr, 0);
+    // Create the NewTopic object
+    auto new_topic = rd_kafka_NewTopic_new(
+            topic_name.data(), num_partitions, replication_factor, errstr, sizeof(errstr));
+    if (!new_topic) throw std::runtime_error{"Failed to create NewTopic object: " + std::string{errstr}};
+    auto _new_topic = std::shared_ptr<rd_kafka_NewTopic_s>{new_topic, rd_kafka_NewTopic_destroy};
+
+    // Create an admin options object
+    auto options = rd_kafka_AdminOptions_new(rk, RD_KAFKA_ADMIN_OP_CREATETOPICS);
+    if (!options) throw std::runtime_error{"Failed to create rd_kafka_AdminOptions_t"};
+    auto _options = std::shared_ptr<rd_kafka_AdminOptions_s>{options, rd_kafka_AdminOptions_destroy};
+
+    // Create a queue for the result of the operation
+    auto queue = rd_kafka_queue_new(rk);
+    auto _queue = std::shared_ptr<rd_kafka_queue_t>{queue, rd_kafka_queue_destroy};
 
     rd_kafka_NewTopic_t *new_topics[] = {new_topic};
-    rd_kafka_CreateTopics(rk, new_topics, 1, options, nullptr);
+    rd_kafka_CreateTopics(rk, new_topics, 1, options, queue);
 
-    rd_kafka_NewTopic_destroy(new_topic);
-    rd_kafka_AdminOptions_destroy(options);
-    rd_kafka_destroy(rk);
+    auto event = rd_kafka_queue_poll(queue, 10000);
+    if (!event) throw std::runtime_error{"Timed out waiting for CreateTopics result"};
+    auto _event = std::shared_ptr<rd_kafka_event_t>{event, rd_kafka_event_destroy};
+
+    // Check if the event type is CreateTopics result
+    if (rd_kafka_event_type(event) != RD_KAFKA_EVENT_CREATETOPICS_RESULT)
+        throw std::runtime_error{"Unexpected event type when waiting for CreateTopics"};
+
+    // Extract the result from the event
+    auto result = rd_kafka_event_CreateTopics_result(event);
+    size_t topic_count;
+    auto topics_result = rd_kafka_CreateTopics_result_topics(result, &topic_count);
+
+    // Check the results for errors
+    for (size_t i = 0; i < topic_count; i++) {
+        const rd_kafka_topic_result_t *topic_result = topics_result[i];
+        if (rd_kafka_topic_result_error(topic_result) != RD_KAFKA_RESP_ERR_NO_ERROR) {
+            throw std::runtime_error{"Failed to create topic: "
+                + std::string{rd_kafka_err2str(rd_kafka_topic_result_error(topic_result))}};
+        }
+    }
 
     spdlog::info("Topic {} created successfully!", topic_name);
 }
