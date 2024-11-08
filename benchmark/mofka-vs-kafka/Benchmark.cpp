@@ -196,7 +196,7 @@ static void rdkafka_consume_messages(
     rd_kafka_poll_set_consumer(consumer);
 
     rd_kafka_topic_partition_list_t *topics = rd_kafka_topic_partition_list_new(1);
-    rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), -1);
+    rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), 0);
     rd_kafka_subscribe(consumer, topics);
 
     rd_kafka_subscribe(consumer, topics);
