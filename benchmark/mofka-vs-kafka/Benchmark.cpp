@@ -45,8 +45,9 @@ static void rdkafka_create_topic(
         int num_partitions,
         int replication_factor) {
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
-    rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf, nullptr, 0);
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
+
+    rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf, nullptr, 0);
 
     rd_kafka_AdminOptions_t *options = rd_kafka_AdminOptions_new(rk, RD_KAFKA_ADMIN_OP_ANY);
     rd_kafka_NewTopic_t *new_topic = rd_kafka_NewTopic_new(
