@@ -199,8 +199,6 @@ static void rdkafka_consume_messages(
     rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), 0);
     rd_kafka_subscribe(consumer, topics);
 
-    rd_kafka_subscribe(consumer, topics);
-
     decltype(std::chrono::high_resolution_clock::now()) t_start;
 
     spdlog::info("Consuming {} messages...", warmup_events + num_events);
@@ -225,6 +223,7 @@ static void rdkafka_consume_messages(
             }
         }
         if(msg) rd_kafka_message_destroy(msg);
+        i += 1;
         if (i == warmup_events + num_events) break;
     }
 
