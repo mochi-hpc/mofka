@@ -223,9 +223,8 @@ static void rdkafka_consume_messages(
                     }
                 }
             }
-            rd_kafka_message_destroy(msg);
         }
-
+        if(msg) rd_kafka_message_destroy(msg);
         if (i == warmup_events + num_events) break;
     }
 
