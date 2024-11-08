@@ -191,6 +191,7 @@ static void rdkafka_consume_messages(
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
     rd_kafka_conf_set(conf, "group.id", consumer_name.c_str(), nullptr, 0);
     rd_kafka_conf_set(conf, "enable.auto.commit", "false", nullptr, 0);
+    rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", nullptr, 0);
 
     rd_kafka_t *consumer = rd_kafka_new(RD_KAFKA_CONSUMER, conf, nullptr, 0);
     rd_kafka_poll_set_consumer(consumer);
@@ -221,9 +222,9 @@ static void rdkafka_consume_messages(
                     }
                 }
             }
+            i += 1;
         }
         if(msg) rd_kafka_message_destroy(msg);
-        i += 1;
         if (i == warmup_events + num_events) break;
     }
 
