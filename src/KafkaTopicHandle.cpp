@@ -80,6 +80,7 @@ Producer KafkaTopicHandle::makeProducer(
     auto ktopic_ptr = std::shared_ptr<rd_kafka_topic_t>{ktopic, rd_kafka_topic_destroy};
 
     // Create the KafkaProducer instance
+#if 0
     if(batch_size == BatchSize{0} || batch_size == BatchSize::Adaptive()) {
         return Producer{std::make_shared<KafkaProducer>(
             name, batch_size, std::move(thread_pool), ordering,
@@ -91,6 +92,11 @@ Producer KafkaTopicHandle::makeProducer(
             const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
             std::move(kprod_ptr), std::move(ktopic_ptr))};
     }
+#endif
+        return Producer{std::make_shared<KafkaProducer>(
+            name, batch_size, std::move(thread_pool), ordering,
+            const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
+            std::move(kprod_ptr), std::move(ktopic_ptr))};
 }
 
 Consumer KafkaTopicHandle::makeConsumer(
