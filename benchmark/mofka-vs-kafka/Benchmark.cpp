@@ -14,7 +14,7 @@
 #include <mofka/Consumer.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <librdkafka/rdkafka.h>
-
+#include <unistd.h>
 
 /**
  * @brief Generate a string of random letters of size n.
@@ -416,10 +416,15 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
         return desc.makeSubView(0, desc.size()*data_selection);
     };
 
+    std::vector<std::vector<char>> data;
+
     mofka::DataBroker data_broker =
-        [](const mofka::Metadata&, const mofka::DataDescriptor& desc) {
+        [&data](const mofka::Metadata&, const mofka::DataDescriptor& desc) {
         if(desc.size() == 0) return mofka::Data{};
-        return mofka::Data{new char[desc.size()], desc.size()};
+        data.resize(data.size()+1);
+        auto& v = data.back();
+        v.resize(desc.size());
+        return mofka::Data{v.data(), v.size()};
     };
 
     spdlog::info("Creating consumer");
@@ -430,6 +435,8 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     int num_events = 0;
     auto t_start = std::chrono::high_resolution_clock::now();
     double t_ack = 0;
+
+    sleep(1);
 
     while (true) {
         auto event = consumer.pull().wait();
