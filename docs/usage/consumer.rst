@@ -75,6 +75,12 @@ A consumer can be created with five parameters, four of which are optional.
    in the code above (we could have, alternatively, not specified the :code:`thread_pool` argument
    at all).
 
+In Python, if your consumer intends to alway request the full data part of each event, and would
+like said data in the form of a :code:`bytearray`, you may use the :code:`FullDataSelector`
+and :code:`ByteArrayAllocator` from the :code:`mochi.mofka.client` module as data selector and
+data broker respectively. These are variables, not classes. The latter will create a Python
+:code:`bytearray` to host the data.
+
 
 Pulling events
 --------------

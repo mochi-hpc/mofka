@@ -4,8 +4,8 @@ from pymargo.core import Engine
 from mochi.mofka.client import MofkaDriver
 
 
-def main(engine: Engine, group_file: str):
-    driver = MofkaDriver(group_file, engine)
+def main(group_file: str):
+    driver = MofkaDriver(group_file, use_progress_thread=True)
 
     # START CREATE TOPIC
     from mochi.mofka.client import Validator, PartitionSelector, Serializer
@@ -116,11 +116,7 @@ def main(engine: Engine, group_file: str):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <protocol> <groupfile>")
-    protocol   = sys.argv[1]
-    group_file = sys.argv[2]
-
-    with Engine(protocol, pymargo.core.server) as engine:
-        main(engine, group_file)
-        engine.finalize()
+    if len(sys.argv) != 2:
+        print(f"Usage: {sys.argv[0]} <groupfile>")
+    group_file = sys.argv[1]
+    main(group_file)

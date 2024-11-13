@@ -31,7 +31,7 @@ give it a name, and optionally provide three objects.
 .. image:: ../_static/TopicPipeline-light.svg
    :class: only-light
 
-Mofka will take advantage of multithreading to parallelize and pipeline the execution
+Mofka may take advantage of multithreading to parallelize and pipeline the execution
 of the validator, partition selector, and serializer over many events. These objects
 can be customized and parameterized. For instance, a validator that checks the content
 of a JSON metadata could be provided with a list of fields it expects to find in the

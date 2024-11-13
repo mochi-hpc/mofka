@@ -4,20 +4,17 @@
 
 int main(int argc, char** argv) {
 
-    if(argc != 3) {
+    if(argc != 2) {
         std::cerr << "Usage: "
-                  << argv[0] << " <protocol> <groupfile>" << std::endl;
+                  << argv[0] << " <groupfile>" << std::endl;
         return -1;
     }
 
-    auto protocol   = argv[1];
-    auto group_file = argv[2];
-
-    auto engine = thallium::engine(protocol, THALLIUM_SERVER_MODE);
+    auto group_file = argv[1];
 
     try {
 
-        mofka::MofkaDriver driver{group_file, engine};
+        mofka::MofkaDriver driver{group_file, true};
 
         // START CREATE TOPIC
         mofka::Validator validator =
@@ -139,6 +136,5 @@ int main(int argc, char** argv) {
         std::cerr << ex.what() << std::endl;
     }
 
-    engine.finalize();
     return 0;
 }

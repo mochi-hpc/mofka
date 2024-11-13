@@ -72,12 +72,19 @@ A producer can be created with four optional parameters.
   if necessary.
 
 
+.. note::
+
+   As of Mofka 0.4.0, the thread pool of a producer will only run one task that operates
+   the serialization events into batches and the sending of these batches. A recommended
+   practice is therefore to initialize a ThreadPool with 1 thread.
+
+
 Producing events
 ----------------
 
 As explained earlier, Mofka splits events into two parts: metadata and data.
-The metadata part is JSON-structured, small, and can be batched with the metadata
-of other events to issue fewer RPCs to partition managers. The Data part is optional
+The metadata part is a small string, optionally JSON-structured, and can be batched with
+the metadata of other events to issue fewer RPCs to partition managers. The data part is optional
 and represents potentially larger, raw data that can benefit from being transferred
 via zero-copy mechanisms such as RDMA.
 
@@ -86,6 +93,14 @@ series of detectors at regular intervalles. The metadata part of an event might
 by a JSON fragment containing the timestamp and detector information (e.g., callibration
 parameters), as well as information about the images (e.g., dimensions, pixel format).
 The data part of an event would be the image itself.
+
+.. note::
+
+   As of Mofka 0.4.0, the metadata part does not have to be JSON-formatted. A raw string
+   with any format may be used. the :code:`Metadata` class provides useful members functions
+   such as :code:`json()` that will convert the content in JSON format in a lazy manner.
+   Mofka itself won't use this function, and will not make assumption that the metadata is
+   in JSON format.
 
 The code bellow shows how to create the data and metadata pieces of an event.
 
@@ -177,12 +192,3 @@ increasing and are per-partition, so two events stored in distinct partitions ca
 Calling :code:`producer.flush()` is a blocking call that will force all the pending batches of events
 to be sent, regardless of whether they have reached the requested size. It can be useful to ensure
 that all the events have been sent either periodically or before terminating the application.
-
-.. important::
-
-   If the batch size used by the producer is anything else than adaptive,
-   a call to :code:`future.wait()` will block until the batch containing the corresponding event
-   has been filled up to the requested size and sent to its target partition. Hence, an easy
-   mistake to do is to call :code:`future.wait()` when the batch is not full and with no other threads
-   pushing more events to it. In this situation the batch will never get full, will never be sent,
-   and :code:`future.wait()` will never complete.

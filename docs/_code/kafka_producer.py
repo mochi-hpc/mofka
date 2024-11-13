@@ -6,7 +6,7 @@ from mochi.mofka.client import KafkaDriver
 
 def produce(config_file: str, topic_name: str):
 
-    driver = KafkaDriver(config_file, engine)
+    driver = KafkaDriver(config_file)
     topic = driver.open_topic(topic_name)
     producer = topic.producer()
 
