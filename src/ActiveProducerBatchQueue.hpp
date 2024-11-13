@@ -41,11 +41,9 @@ class ActiveProducerBatchQueue {
         stop();
     }
 
-    void push(
-            const Metadata& metadata,
-            const Serializer& serializer,
-            const Data& data,
-            Promise<EventID> promise) {
+    void push(Metadata metadata,
+              Data data,
+              Promise<EventID> promise) {
         bool need_notification;
         {
             auto adaptive = m_batch_size == BatchSize::Adaptive();
@@ -59,7 +57,7 @@ class ActiveProducerBatchQueue {
                 last_batch = m_batch_queue.back();
                 need_notification = true;
             }
-            last_batch->push(metadata, serializer, data, std::move(promise));
+            last_batch->push(std::move(metadata), std::move(data), std::move(promise));
         }
         if(need_notification) {
             m_cv.notify_one();
@@ -79,6 +77,7 @@ class ActiveProducerBatchQueue {
 
     void start() {
         if(m_running) return;
+        m_running = true;
         m_thread_pool.pushWork([this]() { loop(); });
     }
 
@@ -95,14 +94,13 @@ class ActiveProducerBatchQueue {
     private:
 
     void loop() {
-        m_running = true;
         std::unique_lock<thallium::mutex> guard{m_mutex};
         while(!m_need_stop || !m_batch_queue.empty()) {
             m_cv.wait(guard, [this]() {
                 if(m_need_stop || m_request_flush)        return true;
                 if(m_batch_queue.empty())                 return false;
                 if(m_batch_size == BatchSize::Adaptive()) return true;
-                auto batch = m_batch_queue.front();
+                auto& batch = m_batch_queue.front();
                 if(batch->count() == m_batch_size.value)  return true;
                 return false;
             });

@@ -72,6 +72,8 @@ void MofkaConsumer::subscribe() {
             }
         );
     }
+    auto mid = m_engine.get_margo_instance();
+    margo_set_progress_when_needed(mid, false);
     // wait for the ULTs to complete
     for(auto& ev : ult_completed)
         ev.wait();
@@ -96,6 +98,8 @@ void MofkaConsumer::unsubscribe() {
     // wait for the ULTs to complete
     for(auto& ev : ult_completed)
         ev.wait();
+    auto mid = m_engine.get_margo_instance();
+    margo_set_progress_when_needed(mid, true);
 }
 
 void MofkaConsumer::recvBatch(size_t partition_index,
@@ -105,7 +109,6 @@ void MofkaConsumer::recvBatch(size_t partition_index,
                              const BulkRef &metadata,
                              const BulkRef &data_desc_sizes,
                              const BulkRef &data_desc) {
-
     if(count == 0) { // no more events from this partition
         m_completed_partitions += 1;
         // check if there will be no more events any more, if so, set

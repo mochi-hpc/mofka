@@ -78,9 +78,7 @@ void save(A& ar, const Metadata& metadata) {
 
 template<typename A>
 void load(A& ar, Metadata& metadata) {
-    std::string str;
-    ar(str);
-    metadata.string() = std::move(str);
+    ar(metadata.string());
 }
 
 }

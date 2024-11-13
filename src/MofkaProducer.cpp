@@ -41,6 +41,7 @@ std::shared_ptr<ProducerBatchInterface> MofkaProducer::newBatchForPartition(size
     return std::make_shared<MofkaProducerBatch>(
             m_name,
             m_engine,
+            m_mofka_topic->m_serializer,
             partition->m_ph,
             m_producer_send_batch
     );

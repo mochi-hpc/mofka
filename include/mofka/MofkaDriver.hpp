@@ -37,7 +37,7 @@ class MofkaDriver {
     /**
      * @brief Constructor.
      */
-    MofkaDriver(const std::string& groupfile);
+    MofkaDriver(const std::string& groupfile, bool use_progress_thread = false);
 
     /**
      * @brief Constructor.
@@ -79,6 +79,11 @@ class MofkaDriver {
      * @brief Checks if the MofkaDriver instance is valid.
      */
     operator bool() const;
+
+    /**
+     * @brief Get the internal Thallium engine.
+     */
+    thallium::engine engine() const;
 
     /**
      * @brief Returns the number of servers this service currently has.

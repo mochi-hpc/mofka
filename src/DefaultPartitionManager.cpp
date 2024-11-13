@@ -68,8 +68,9 @@ Result<void> DefaultPartitionManager::feedConsumer(
     EventID first_id;
     {
         auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
-        if(m_consumer_cursor.count(consumerHandle.name()) == 0)
+        if(m_consumer_cursor.count(consumerHandle.name()) == 0) {
             m_consumer_cursor[consumerHandle.name()] = 0;
+        }
         first_id = m_consumer_cursor[consumerHandle.name()];
     }
     m_event_store->feed(consumerHandle, first_id, batchSize);

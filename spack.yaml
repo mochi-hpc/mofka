@@ -50,6 +50,9 @@ spack:
       - "+bedrock"
       - "+python"
       - "+mpi"
+    mochi-margo:
+      require:
+      - "@0.18.3:"
     nlohmann-json-schema-validator:
       require: "@2.3.0:"
     py-configspace:

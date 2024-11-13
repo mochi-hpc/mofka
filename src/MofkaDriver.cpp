@@ -52,7 +52,7 @@ static inline std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
     return masters[0];
 }
 
-MofkaDriver::MofkaDriver(const std::string& groupfile) {
+MofkaDriver::MofkaDriver(const std::string& groupfile, bool use_progress_thread) {
     // try to infer the address from one of the members
     std::ifstream inputFile(groupfile);
     if(!inputFile.is_open()) {
@@ -70,7 +70,7 @@ MofkaDriver::MofkaDriver(const std::string& groupfile) {
             throw Exception{"Group file doesn't appear to be a correctly formatted Flock group file"};
         auto& address = content["members"][0]["address"].get_ref<const std::string&>();
         auto protocol = address.substr(0, address.find(':'));
-        auto engine = thallium::engine{protocol, THALLIUM_SERVER_MODE};
+        auto engine = thallium::engine{protocol, THALLIUM_SERVER_MODE, use_progress_thread};
         auto sh = MofkaDriver{groupfile, engine};
         self = std::move(sh.self);
     } catch(const std::exception& ex) {
@@ -115,6 +115,10 @@ MofkaDriver::MofkaDriver(const std::string& groupfile, thallium::engine engine) 
 
 size_t MofkaDriver::numServers() const {
     return self->m_bsgh.size();
+}
+
+thallium::engine MofkaDriver::engine() const {
+    return self->m_engine;
 }
 
 void MofkaDriver::createTopic(

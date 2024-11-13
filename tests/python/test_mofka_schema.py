@@ -57,9 +57,8 @@ class TestProducer(unittest.TestCase):
 
     def test_produce_invalid(self):
         metadata = {"x": 123, "y": "abc", "z": "abc"}
-        future = self.producer.push(metadata)
         with self.assertRaises(mofka.ClientException) as context:
-            future.wait()
+            self.producer.push(metadata).wait()
 
 
 if __name__ == '__main__':
