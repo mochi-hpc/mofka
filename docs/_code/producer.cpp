@@ -32,7 +32,5 @@ int main(int argc, char** argv) {
     } catch(const mofka::Exception& ex) {
         std::cerr << ex.what() << std::endl;
     }
-
-    engine.finalize();
     return 0;
 }
