@@ -27,6 +27,9 @@ spack:
   packages:
     argobots:
       require: "@1.2:"
+    mochi-margo:
+      require:
+      - "@0.18.3:"
     mochi-yokan:
       require:
       - "@0.7.0:"

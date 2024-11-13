@@ -32,6 +32,9 @@ spack:
         mpi: [mpich]
     argobots:
       require: "@1.2:"
+    mochi-margo:
+      require:
+      - "@0.18.3:"
     mochi-yokan:
       require:
       - "@0.7.0:"
@@ -55,9 +58,6 @@ spack:
       - "+bedrock"
       - "+python"
       - "+mpi"
-    mochi-margo:
-      require:
-      - "@0.18.3:"
     mercury:
       require: "~checksum~boostsys"
     libfabric:
