@@ -5,8 +5,8 @@ from pymargo.core import Engine
 from mochi.mofka.client import MofkaDriver
 
 
-def consume(engine: Engine, group_file: str, topic_name: str):
-    driver = MofkaDriver(group_file, engine)
+def consume(group_file: str, topic_name: str):
+    driver = MofkaDriver(group_file, use_progress_thread=True)
     topic = driver.open_topic(topic_name)
     consumer = topic.consumer(name="myconsumer")
 
@@ -20,11 +20,7 @@ def consume(engine: Engine, group_file: str, topic_name: str):
 if __name__ == "__main__":
 
     if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} <protocol> <groupfile> <topic>")
-    protocol   = sys.argv[1]
-    group_file = sys.argv[2]
-    topic_name = sys.argv[3]
-
-    with Engine(protocol, pymargo.core.server) as engine:
-        consume(engine, group_file, topic_name)
-        engine.finalize()
+        print(f"Usage: {sys.argv[0]} <groupfile> <topic>")
+    group_file = sys.argv[1]
+    topic_name = sys.argv[2]
+    consume(group_file, topic_name)

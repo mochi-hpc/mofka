@@ -100,17 +100,14 @@ Simple producer application
 ---------------------------
 
 The following code examplified a producer.
+We first create a :code:`MofkaDriver` object  using the file
+created by our running Mofka server (*mofka.json*) as first argument.
 
-We first need to initialize a :code:`thallium::engine` in C++, or a :code:`pymargo.core.Engine` in
-Python, which handles the Mochi runtime.
+.. note::
 
-.. important::
-
-   The engine needs to be initialized in *server mode* for Mofka to work.
-   This is because Mofka servers will send RPCs to the clients.
-
-Next, we create a :code:`MofkaDriver` object  using the file
-created by our running Mofka server (*mofka.json*).
+   The second argument here specifies that the network progress loop
+   should run in its own thread. This is a recommended setting since
+   Mofka's API encourages non-blocking calls.
 
 We then open the topic we have created, using :code:`driver.openTopic()`
 (:code:`driver.open_topic()` in Python), which gives us a :code:`TopicHandle`
@@ -119,11 +116,22 @@ to interact with the topic.
 We create a :code:`Producer` using :code:`topic.producer()`, and we use
 it in a loop to create 100 events with their :code:`Metadata` and :code:`Data`
 parts (we always send the same metadata here and we don't provide any data).
-In Python, the metadata part can be a :code:`dict` convertible to JSON,
-and the data part can be anything that satisfies the buffer protocol.
+In Python, the metadata part can be either a :code:`str`, or a a :code:`dict`
+convertible to JSON, and the data part can be anything that satisfies the buffer protocol.
 
-The :code:`push()` function is non-blocking. To ensure that the events
-have all been sent, we call :code:`producer.flush()`.
+The :code:`push()` function is non-blocking. It returns a future object that callers
+can wait on to obtain the event ID after the event has been stored. The call to :code:`wait()`
+in the code bellow is however commented: a better practice consists of periodically flushing
+the producer by calling :code:`producer.flush()`, or at least wait on futures as later as possible
+so as to overlap the sending of the event with actual work from the application.
+
+.. important::
+
+   While the producer will make a copy of the metadata part of an event,
+   it will NOT make a copy of its data part. It is the caller's responsibility
+   to ensure that the data part remains alive and is not modified until the
+   corresponding call to :code:`wait()` or :code:`flush()`. Forgetting this is
+   the number one cause of data corruption or crashes.
 
 .. tabs::
 
@@ -136,11 +144,6 @@ have all been sent, we call :code:`producer.flush()`.
 
       .. literalinclude:: ../_code/producer.py
          :language: python
-
-.. note::
-
-   You may see a warning on your standard output about event ordering.
-   You can ignore it for now.
 
 
 Simple consumer application
@@ -179,10 +182,8 @@ you will learn how to pull this data, or part of it.
 Shutting down Mofka
 -------------------
 
-To shutdown Mofka properly, the :code:`bedrock-shutdown` command can be used as
-follows.
+To shutdown Mofka properly, the :code:`bedrock-shutdown` command can be used as follows.
 
 .. code-block:: bash
 
    bedrock-shutdown na+sm -f mofka.json
-
