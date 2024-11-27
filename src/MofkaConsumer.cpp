@@ -67,7 +67,9 @@ void MofkaConsumer::subscribe() {
                 auto& rpc = m_consumer_request_events;
                 auto& ph = partition->m_ph;
                 auto consumer_ptr = reinterpret_cast<intptr_t>(this);
-                Result<void> result = rpc.on(ph)(consumer_ptr, (size_t)i, m_name, (size_t)0, (size_t)0);
+                Result<void> result = rpc.on(ph)(
+                    consumer_ptr, (size_t)i, m_name,
+                    (size_t)0, m_batch_size.value);
                 ult_completed[i].set_value();
             }
         );

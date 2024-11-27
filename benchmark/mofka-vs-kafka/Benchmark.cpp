@@ -360,6 +360,20 @@ static void produce(int argc, char** argv) {
         mofka::BatchSize{(size_t)batchSizeArg.getValue()}
         : mofka::BatchSize::Adaptive();
 
+    spdlog::info("=======================================================");
+    spdlog::info("Producer will be executed with the following parameters");
+    spdlog::info("  backend: {}", backend_name);
+    spdlog::info("  bootstrap: {}", bootstrap_file);
+    spdlog::info("  topic: {}", topicArg.getValue());
+    spdlog::info("  events: {}", eventsArg.getValue());
+    spdlog::info("  threads: {}", threadsArg.getValue());
+    spdlog::info("  batch size: {}", batch_size.value);
+    spdlog::info("  flush every: {}", flushEveryArg.getValue());
+    spdlog::info("  metadata size: {}", metadataSizeArg.getValue());
+    spdlog::info("  data size: {}", dataSizeArg.getValue());
+    spdlog::info("  warmup events: {}", warmupArg.getValue());
+    spdlog::info("=======================================================");
+
     if(backend_name == "mofka") {
         auto driver = mofka::MofkaDriver{bootstrap_file, true};
         margo_set_progress_when_needed(driver.engine().get_margo_instance(), true);
@@ -501,6 +515,21 @@ static void consume(int argc, char** argv) {
         mofka::BatchSize{(size_t)batchSizeArg.getValue()}
         : mofka::BatchSize::Adaptive();
     std::optional<int> ack_every = ackEveryArg.isSet() ? std::optional{ackEveryArg.getValue()} : std::nullopt;
+
+    spdlog::info("=======================================================");
+    spdlog::info("Consumer will be executed with the following parameters");
+    spdlog::info("  backend: {}", backend_name);
+    spdlog::info("  bootstrap: {}", bootstrap_file);
+    spdlog::info("  topic: {}", topicArg.getValue());
+    spdlog::info("  threads: {}", threadsArg.getValue());
+    spdlog::info("  batch size: {}", batch_size.value);
+    spdlog::info("  data selection ratio: {}", dataSelectionArg.getValue());
+    if(ackEveryArg.isSet())
+        spdlog::info("  acknowledge every: {}", ackEveryArg.getValue());
+    else
+        spdlog::info("  acknowledge every: never");
+    spdlog::info("  warmup events: {}", warmupArg.getValue());
+    spdlog::info("=======================================================");
 
     if(backend_name == "mofka") {
         if(eventsArg.isSet())
