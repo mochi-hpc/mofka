@@ -98,7 +98,7 @@ class ThreadPool {
     /**
      * @brief Checks if the ThreadPool instance is valid.
      */
-    operator bool() const;
+    explicit operator bool() const;
 
     private:
 

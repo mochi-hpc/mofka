@@ -535,7 +535,6 @@ static void consume(int argc, char** argv) {
         if(eventsArg.isSet())
             spdlog::warn("-n/--num-events is ignored (all the messages will be consumed");
         auto driver = mofka::MofkaDriver{bootstrap_file, true};
-        margo_set_progress_when_needed(driver.engine().get_margo_instance(), true);
         consume(driver,
                 consumerArg.getValue(),
                 topicArg.getValue(),

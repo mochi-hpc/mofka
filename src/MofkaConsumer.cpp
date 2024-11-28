@@ -104,48 +104,45 @@ void MofkaConsumer::unsubscribe() {
     margo_set_progress_when_needed(mid, true);
 }
 
-void MofkaConsumer::recvBatch(size_t partition_index,
-                             size_t count,
-                             EventID startID,
-                             const BulkRef &metadata_sizes,
-                             const BulkRef &metadata,
-                             const BulkRef &data_desc_sizes,
-                             const BulkRef &data_desc) {
-    if(count == 0) { // no more events from this partition
-        m_completed_partitions += 1;
-        // check if there will be no more events any more, if so, set
-        // the promise of all the pending Futures to NoMoreEvents.
-        std::unique_lock<thallium::mutex> guard{m_futures_mtx};
-        if(m_completed_partitions != m_partitions.size()) {
-            return;
-        }
-        if(!m_futures_credit) return;
-        while(!m_futures.empty()) {
-            auto promise = std::move(m_futures.front().first);
-            m_futures.pop_front();
-            m_futures_credit = true;
-            promise.setValue(Event{std::make_shared<MofkaEvent>()});
-        }
+void MofkaConsumer::partitionCompleted() {
+    m_completed_partitions += 1;
+    // check if there will be no more events any more, if so, set
+    // the promise of all the pending Futures to NoMoreEvents.
+    std::unique_lock<thallium::mutex> guard{m_futures_mtx};
+    if(m_completed_partitions != m_partitions.size())
         return;
+    if(!m_futures_credit)
+        return;
+    while(!m_futures.empty()) {
+        auto promise = std::move(m_futures.front().first);
+        m_futures.pop_front();
+        m_futures_credit = true;
+        promise.setValue(Event{std::make_shared<MofkaEvent>()});
     }
+}
 
-    auto partition = m_partitions[partition_index];
+void MofkaConsumer::recvBatch(const tl::request& req,
+                              size_t partition_index,
+                              size_t count,
+                              EventID startID,
+                              const BulkRef &metadata_sizes,
+                              const BulkRef &metadata,
+                              const BulkRef &data_desc_sizes,
+                              const BulkRef &data_desc) {
 
     auto batch = std::make_shared<ConsumerBatchImpl>(
         m_engine, count, metadata.size, data_desc.size);
     batch->pullFrom(metadata_sizes, metadata, data_desc_sizes, data_desc);
 
-    auto serializer = m_topic->m_serializer;
-    thallium::future<void> ults_completed{(uint32_t)count};
-    size_t metadata_offset  = 0;
-    size_t data_desc_offset = 0;
+    std::vector<Promise<Event>> promises;
+    promises.reserve(count);
 
-    for(size_t i = 0; i < count; ++i) {
-        auto eventID = startID + i;
-        // get a promise/future pair
-        Promise<Event> promise;
-        {
-            std::unique_lock<thallium::mutex> guard{m_futures_mtx};
+    // Create all the Future/Promise pairs first (to avoid locking over and over)
+    {
+        std::unique_lock<thallium::mutex> guard{m_futures_mtx};
+        for(size_t i = 0; i < count; ++i) {
+            // get a promise/future pair
+            Promise<Event> promise;
             if(!m_futures_credit || m_futures.empty()) {
                 // the queue of futures is empty or the futures
                 // already in the queue have been created by
@@ -162,11 +159,25 @@ void MofkaConsumer::recvBatch(size_t partition_index,
                 m_futures.pop_front();
                 m_futures_credit = true;
             }
+            promises.push_back(std::move(promise));
         }
-        // create the ULT
-        auto ult = [this, &batch, i, eventID, promise,
-                    partition, metadata_offset, data_desc_offset,
-                    &serializer, &ults_completed]() mutable {
+    }
+
+    Result<void> result;
+    req.respond(result);
+
+    auto ult = [this, self = shared_from_this(),
+                count, startID, batch = std::move(batch),
+                serializer = m_topic->m_serializer,
+                partition = m_partitions[partition_index],
+                promises = std::move(promises)]() mutable {
+
+        size_t metadata_offset  = 0;
+        size_t data_desc_offset = 0;
+
+        // Deserialize each event
+        for(size_t i = 0; i < count; ++i) {
+            auto eventID = startID + i;
             try {
                 // deserialize its metadata
                 auto metadata = Metadata{};
@@ -194,19 +205,17 @@ void MofkaConsumer::recvBatch(size_t partition_index,
                         m_name, m_consumer_ack_event
                 )};
                 // set the promise
-                promise.setValue(std::move(event));
+                promises[i].setValue(std::move(event));
             } catch(const Exception& ex) {
                 // something bad happened somewhere,
                 // pass the exception to the promise.
-                promise.setException(ex);
+                promises[i].setException(ex);
             }
-            ults_completed.set(nullptr);
-        };
-        m_thread_pool.pushWork(std::move(ult), eventID);
-        metadata_offset  += batch->m_meta_sizes[i];
-        data_desc_offset += batch->m_data_desc_sizes[i];
-    }
-    ults_completed.wait();
+            metadata_offset  += batch->m_meta_sizes[i];
+            data_desc_offset += batch->m_data_desc_sizes[i];
+        }
+    };
+    m_thread_pool.pushWork(std::move(ult));
 }
 
 Data MofkaConsumer::requestData(
@@ -274,11 +283,12 @@ void MofkaConsumer::forwardBatchToConsumer(
         const BulkRef &metadata,
         const BulkRef &data_desc_sizes,
         const BulkRef &data_desc) {
-    Result<void> result;
     MofkaConsumer* consumer_impl = reinterpret_cast<MofkaConsumer*>(consumer_ctx);
     if(consumer_impl->m_magic_number != MOFKA_MAGIC_NUMBER) {
+        Result<void> result;
         result.error() = "Consumer seems to have be destroyed be client";
         result.success() = false;
+        req.respond(result);
     } else {
         // NOTE: we convert the pointer into a shared pointer to prevent
         // the consumer from disappearing while the RPC executes.
@@ -286,23 +296,24 @@ void MofkaConsumer::forwardBatchToConsumer(
         try {
             consumer_ptr = consumer_impl->shared_from_this();
         } catch(const std::exception& ex) {
+            Result<void> result;
             result.error() = "Consumer seems to have be destroyed be client";
             result.success() = false;
             req.respond(result);
             return;
         }
-        auto thread_pool = consumer_ptr->m_thread_pool;
-        tl::eventual<void> completed;
-        thread_pool.pushWork([&]() {
+        // in this code path, req.respond() will be called by recvBatch
+        if (count == 0) {
+            consumer_ptr->partitionCompleted();
+            Result<void> result;
+            req.respond(result);
+        } else {
             consumer_ptr->recvBatch(
-                    target_info_index, count, firstID,
-                    metadata_sizes, metadata,
-                    data_desc_sizes, data_desc);
-            completed.set_value();
-        });
-        completed.wait();
+                req, target_info_index, count, firstID,
+                metadata_sizes, metadata,
+                data_desc_sizes, data_desc);
+        }
     }
-    req.respond(result);
 }
 
 }

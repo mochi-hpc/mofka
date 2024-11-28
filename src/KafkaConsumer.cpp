@@ -15,7 +15,6 @@
 #include "KafkaEvent.hpp"
 #include "Promise.hpp"
 #include "KafkaConsumer.hpp"
-#include "ConsumerBatchImpl.hpp"
 #include <limits>
 
 using namespace std::string_literals;

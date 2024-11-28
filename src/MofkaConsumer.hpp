@@ -136,7 +136,10 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
 
     void subscribe();
 
+    void partitionCompleted();
+
     void recvBatch(
+        const tl::request& req,
         size_t target_info_index,
         size_t count,
         EventID firstID,
