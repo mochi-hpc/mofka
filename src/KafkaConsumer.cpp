@@ -27,32 +27,26 @@ TopicHandle KafkaConsumer::topic() const {
 
 Future<Event> KafkaConsumer::pull() {
     Future<Event> future;
-    std::unique_lock<thallium::mutex> guard{m_futures_mtx};
-    if(m_futures_credit || m_futures.empty()) {
-        // the queue of futures is empty or the futures
-        // already in the queue have been created by
-        // previous calls to pull() that haven't completed
-        Promise<Event> promise;
-        std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
-        if(m_completed_partitions != m_partitions.size()) {
-            // there are uncompleted partitions, put the future in the queue
-            // and it will be picked up by a recvBatch RPC from any partition
-            m_futures.emplace_back(std::move(promise), future);
-            m_futures_credit = true;
+    auto on_wait = [this]() mutable {
+        std::unique_lock<thallium::mutex> guard{m_events_mtx};
+        m_events_cv.wait(guard, [&](){
+            return !m_events.empty() || (m_completed_partitions == m_partitions.size()); });
+        if(!m_events.empty()) {
+            auto v = std::move(m_events.front());
+            m_events.pop_front();
+            if(std::holds_alternative<Exception>(v))
+                throw std::get<Exception>(v);
+            return std::get<Event>(std::move(v));
         } else {
-            // all partitions are completed, create a NoMoreEvents event
-            // (arbitrarily from partition 0)
-            // create new event instance
-            promise.setValue(Event{std::make_shared<KafkaEvent>()});
+            return Event{std::make_shared<KafkaEvent>()};
         }
-    } else {
-        // the queue of futures has futures already
-        // created by the consumer
-        future = std::move(m_futures.front().second);
-        m_futures.pop_front();
-        m_futures_credit = false;
-    }
-    return future;
+    };
+    auto on_test = [this]() mutable {
+        std::unique_lock<thallium::mutex> guard{m_events_mtx};
+        return !m_events.empty() || (m_completed_partitions == m_partitions.size());
+        // XXX technically this is wrong
+    };
+    return Future<Event>{std::move(on_wait), std::move(on_test)};
 }
 
 void KafkaConsumer::subscribe() {
@@ -93,53 +87,33 @@ void KafkaConsumer::subscribe() {
 }
 
 void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
-    // get a promise/future pair
-    Promise<Event> promise;
-    {
-        std::unique_lock<thallium::mutex> guard{m_futures_mtx};
-        if(!m_futures_credit || m_futures.empty()) {
-            // the queue of futures is empty or the futures
-            // already in the queue have been created by
-            // previous calls to handleReceivedMessage() that haven't had
-            // a corresponding pull() call from the user.
-            Future<Event> future;
-            std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
-            m_futures.emplace_back(promise, future);
-            m_futures_credit = false;
-        } else {
-            // the queue of futures has futures already
-            // created by pull() calls from the user
-            promise = std::move(m_futures.front().first);
-            m_futures.pop_front();
-            m_futures_credit = true;
-        }
-    }
-
     // Retrieve the headers from the message
     rd_kafka_headers_t *headers = nullptr;
     auto err = rd_kafka_message_headers(msg, &headers);
     if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
         if (err != RD_KAFKA_RESP_ERR__NOENT) {
-            promise.setException(
-                Exception{std::string{"Failed to retrieve message header: "} + rd_kafka_err2str(err)});
+            {
+                std::unique_lock<thallium::mutex> guard{m_events_mtx};
+                m_events.push_back(
+                    Exception{std::string{"Failed to retrieve message header: "} + rd_kafka_err2str(err)});
+            }
+            m_events_cv.notify_one();
             return;
         }
     }
-
     // Check for NoMoreEvents
     const void* value;
     size_t value_size;
     if (headers &&
         rd_kafka_header_get(headers, 0, "NoMoreEvents", &value, &value_size) == RD_KAFKA_RESP_ERR_NO_ERROR) {
-        auto ult = [promise=std::move(promise)]() mutable {
-            promise.setValue(Event{std::make_shared<KafkaEvent>()});
-        };
-        auto completed = ++m_completed_partitions;
-        // FIXME If partitions are completed there is no reason to continue running the polling thread
-        //if(completed == m_partitions.size()) {
-            //m_should_stop = true;
-        //}
-        m_thread_pool.pushWork(std::move(ult), std::numeric_limits<uint64_t>::max()-1);
+        {
+            std::unique_lock<thallium::mutex> guard{m_events_mtx};
+            auto completed = ++m_completed_partitions;
+            if(completed == m_partitions.size()) {
+                m_should_stop = true;
+                m_events_cv.notify_all();
+            }
+        }
         rd_kafka_message_destroy(msg);
         return;
     }
@@ -191,21 +165,20 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
                     std::move(metadata), std::move(data),
                     shared_from_this())};
         // set the promise
-        promise.setValue(std::move(event));
+        std::unique_lock<thallium::mutex> guard{m_events_mtx};
+        m_events.push_back(std::move(event));
     } catch(const Exception& ex) {
-        // something bad happened somewhere,
-        // pass the exception to the promise.
-        promise.setException(ex);
+        std::unique_lock<thallium::mutex> guard{m_events_mtx};
+        m_events.push_back(ex);
     }
+    m_events_cv.notify_one();
     // destroy the message
     rd_kafka_message_destroy(msg);
 }
 
 void KafkaConsumer::unsubscribe() {
-    if(!m_should_stop) {
-        m_should_stop = true;
-        m_poll_ult_stopped.wait();
-    }
+    m_should_stop = true;
+    m_poll_ult_stopped.wait();
     rd_kafka_unsubscribe(m_kafka_consumer.get());
 }
 

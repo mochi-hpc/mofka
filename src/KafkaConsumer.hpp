@@ -46,27 +46,9 @@ class KafkaConsumer : public std::enable_shared_from_this<KafkaConsumer>,
     tl::eventual<void> m_poll_ult_stopped;
 
     std::atomic<size_t> m_completed_partitions = 0;
-
-    /* The futures/promises queue works as follows:
-     *
-     * If m_futures_credit is true, it means the futures in the queue
-     * have been created by the user via pull() operations. Hence if
-     * the consumer needs to issue a new operation, it will use the
-     * promise in m_futures.front() (the oldest created by the user)
-     * and take it off the queue. If the user calls pull(), it simply
-     * append a new promise/future pair at the back of the queue.
-     *
-     * If m_future_credit is false, it means the future in the queue
-     * have been created by the consumer before the user had a chance
-     * to call pull(). Hence if the consumer needs to issue a new
-     * operation, it will push a new promise/future pair at the back
-     * of the queue. If the user calls pull(), it will use the future
-     * at in m_futures.front() (the oldest created by the consumer)
-     * and take it off the queue. This is the symetric of the above.
-     */
-    std::deque<std::pair<Promise<Event>, Future<Event>>> m_futures;
-    bool                                                 m_futures_credit;
-    thallium::mutex                                      m_futures_mtx;
+    std::deque<std::variant<Event,Exception>> m_events;
+    thallium::mutex                           m_events_mtx;
+    thallium::condition_variable              m_events_cv;
 
     KafkaConsumer(std::string_view name,
                   BatchSize batch_size,
