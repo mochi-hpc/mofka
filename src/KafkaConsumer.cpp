@@ -144,62 +144,61 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
         return;
     }
 
-    // create the ULT that handles the payload
-    auto ult = [this, msg, promise=std::move(promise), topic=topic()]() mutable {
-             try {
-                 // deserialize its metadata
-                 size_t metadata_size = 0;
-                 std::memcpy(&metadata_size, msg->payload, sizeof(metadata_size));
-                 size_t data_size = msg->len - sizeof(metadata_size) - metadata_size;
-                 auto metadata = Metadata{};
-                 BufferWrapperInputArchive metadata_archive{
-                     std::string_view{
-                         static_cast<char*>(msg->payload) + sizeof(size_t),
-                         metadata_size}};
-                 topic.serializer().deserialize(metadata_archive, metadata);
-                 // process data associated with the event
-                 auto descriptor_name = std::string{"kafka:"}
-                                      + topic.name() + ":" + std::to_string(msg->partition);
-                 auto descriptor = DataDescriptor::From(descriptor_name, data_size);
-                 // run data selector
-                 DataDescriptor requested_descriptor = m_data_selector
-                     ? m_data_selector(metadata, descriptor)
-                     : DataDescriptor::Null();
-                 // run data broker
-                 auto data = m_data_broker
-                     ? m_data_broker(metadata, requested_descriptor)
-                     : Data{};
-                 // flatten descriptor
-                 auto flattened = requested_descriptor.flatten();
-                 // Copy the data from payload into the data target
-                 char* payload_base_ptr = static_cast<char*>(msg->payload) + sizeof(size_t) + metadata_size;
-                 size_t data_offset = 0;
-                 for(auto& seg : flattened) {
-                    auto payload_ptr = payload_base_ptr + seg.offset;
-                    if(seg.offset + seg.size > data_size)
-                        throw Exception{"Invalid segment in DataDescriptor would read beyond size of data"};
-                    if(seg.size)
-                        data.write(payload_ptr, seg.size, data_offset);
-                    data_offset += seg.size;
-                 }
-                 // create the event
-                 auto event = Event{
-                     std::make_shared<KafkaEvent>(
-                             static_cast<EventID>(msg->offset),
-                             m_partitions[msg->partition],
-                             std::move(metadata), std::move(data),
-                             shared_from_this())};
-                 // set the promise
-                 promise.setValue(std::move(event));
-             } catch(const Exception& ex) {
-                 // something bad happened somewhere,
-                 // pass the exception to the promise.
-                 promise.setException(ex);
-             }
-             // destroy the message
-             rd_kafka_message_destroy(msg);
-         };
-    m_thread_pool.pushWork(std::move(ult), msg->offset);
+    try {
+        auto tpc = topic();
+        // deserialize its metadata
+        size_t metadata_size = 0;
+        std::memcpy(&metadata_size, msg->payload, sizeof(metadata_size));
+        size_t data_size = msg->len - sizeof(metadata_size) - metadata_size;
+        auto metadata = Metadata{};
+        BufferWrapperInputArchive metadata_archive{
+            std::string_view{
+                static_cast<char*>(msg->payload) + sizeof(size_t),
+                    metadata_size}};
+        tpc.serializer().deserialize(metadata_archive, metadata);
+        // process data associated with the event
+        auto descriptor_name = std::string{"kafka:"}
+        + tpc.name() + ":" + std::to_string(msg->partition);
+        auto descriptor = DataDescriptor::From(descriptor_name, data_size);
+        // run data selector
+        DataDescriptor requested_descriptor = m_data_selector
+            ? m_data_selector(metadata, descriptor)
+            : DataDescriptor::Null();
+        // run data broker
+        auto data = m_data_broker
+            ? m_data_broker(metadata, requested_descriptor)
+            : Data{};
+        if (data.size()) {
+            // flatten descriptor
+            auto flattened = requested_descriptor.flatten();
+            // Copy the data from payload into the data target
+            char* payload_base_ptr = static_cast<char*>(msg->payload) + sizeof(size_t) + metadata_size;
+            size_t data_offset = 0;
+            for(auto& seg : flattened) {
+                auto payload_ptr = payload_base_ptr + seg.offset;
+                if(seg.offset + seg.size > data_size)
+                    throw Exception{"Invalid segment in DataDescriptor would read beyond size of data"};
+                if(seg.size)
+                    data.write(payload_ptr, seg.size, data_offset);
+                data_offset += seg.size;
+            }
+        }
+        // create the event
+        auto event = Event{
+            std::make_shared<KafkaEvent>(
+                    static_cast<EventID>(msg->offset),
+                    m_partitions[msg->partition],
+                    std::move(metadata), std::move(data),
+                    shared_from_this())};
+        // set the promise
+        promise.setValue(std::move(event));
+    } catch(const Exception& ex) {
+        // something bad happened somewhere,
+        // pass the exception to the promise.
+        promise.setException(ex);
+    }
+    // destroy the message
+    rd_kafka_message_destroy(msg);
 }
 
 void KafkaConsumer::unsubscribe() {
