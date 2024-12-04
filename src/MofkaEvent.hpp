@@ -27,11 +27,11 @@ class MofkaEvent : public EventInterface {
     {}
 
     MofkaEvent(EventID id,
-              std::shared_ptr<MofkaPartitionInfo> partition,
-              Metadata metadata,
-              Data data,
-              std::string consumer_name,
-              thallium::remote_procedure ack_rpc)
+               std::shared_ptr<MofkaPartitionInfo> partition,
+               Metadata metadata,
+               Data data,
+               std::string consumer_name,
+               thallium::remote_procedure ack_rpc)
     : m_id(std::move(id))
     , m_partition(std::move(partition))
     , m_metadata{std::move(metadata)}

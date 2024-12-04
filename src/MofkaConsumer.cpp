@@ -200,7 +200,7 @@ void MofkaConsumer::recvBatch(const tl::request& req,
                 // create the event
                 auto event = Event{
                     std::make_shared<MofkaEvent>(
-                        eventID, std::move(partition),
+                        eventID, partition,
                         std::move(metadata), std::move(data),
                         m_name, m_consumer_ack_event
                 )};
