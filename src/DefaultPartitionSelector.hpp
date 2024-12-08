@@ -28,9 +28,7 @@ class DefaultPartitionSelector : public PartitionSelectorInterface {
             throw Exception("PartitionSelector has no target to select from");
         if(requested.has_value()) {
             size_t req = requested.value();
-            if(req >= m_targets.size()) {
-                throw Exception("Requested partition is out of range");
-            }
+            return req % m_targets.size();
         }
         auto ret = m_index;
         m_index += 1;

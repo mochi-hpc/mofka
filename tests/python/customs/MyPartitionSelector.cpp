@@ -19,6 +19,7 @@ class MyPartitionSelector : public mofka::PartitionSelectorInterface {
             if(req >= m_targets.size()) {
                 throw mofka::Exception("Requested partition is out of range");
             }
+            return req;
         }
         auto ret = m_index;
         m_index += 1;
