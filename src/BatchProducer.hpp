@@ -67,7 +67,7 @@ class BatchProducer : public ProducerInterface {
         return m_thread_pool;
     }
 
-    Future<EventID> push(Metadata metadata, Data data) override;
+    Future<EventID> push(Metadata metadata, Data data, std::optional<size_t> partition) override;
 
     void flush() override;
 

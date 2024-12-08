@@ -15,6 +15,7 @@
 #include <functional>
 #include <exception>
 #include <stdexcept>
+#include <optional>
 
 namespace mofka {
 
@@ -57,8 +58,10 @@ class PartitionSelectorInterface {
      * size of the array passed to setPartitions().
      *
      * @param metadata Metadata of the event.
+     * @param requested Partition requested by the caller of push() (if provided).
      */
-    virtual size_t selectPartitionFor(const Metadata& metadata) = 0;
+    virtual size_t selectPartitionFor(const Metadata& metadata,
+                                      std::optional<size_t> requested) = 0;
 
     /**
      * @brief Convert the underlying validator implementation into a Metadata
@@ -127,8 +130,10 @@ class PartitionSelector {
      * @brief Selects a partition target to use to store the given event.
      *
      * @param metadata Metadata of the event.
+     * @param requested Partition requested by the caller of push() (if provided).
      */
-    size_t selectPartitionFor(const Metadata& metadata);
+    size_t selectPartitionFor(const Metadata& metadata,
+                              std::optional<size_t> requested = std::nullopt);
 
     /**
      * @brief Convert the underlying validator implementation into a Metadata

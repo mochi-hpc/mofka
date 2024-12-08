@@ -22,13 +22,20 @@ class DefaultPartitionSelector : public PartitionSelectorInterface {
         m_targets = targets;
     }
 
-    size_t selectPartitionFor(const Metadata& metadata) override {
+    size_t selectPartitionFor(const Metadata& metadata, std::optional<size_t> requested) override {
         (void)metadata;
         if(m_targets.size() == 0)
             throw Exception("PartitionSelector has no target to select from");
-        if(m_index >= m_targets.size()) m_index = m_index % m_targets.size();
+        if(requested.has_value()) {
+            size_t req = requested.value();
+            if(req >= m_targets.size()) {
+                throw Exception("Requested partition is out of range");
+            }
+        }
+        auto ret = m_index;
         m_index += 1;
-        return m_index-1;
+        m_index %= m_targets.size();
+        return ret;
     }
 
     Metadata metadata() const override {

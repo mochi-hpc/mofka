@@ -269,31 +269,39 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def("push",
             [](const mofka::Producer& producer,
                std::string metadata,
-               py::buffer b_data) -> mofka::Future<mofka::EventID> {
-                return producer.push(std::move(metadata), data_helper(b_data));
+               py::buffer b_data,
+               std::optional<size_t> part) -> mofka::Future<mofka::EventID> {
+                return producer.push(std::move(metadata), data_helper(b_data), part);
             },
-            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true))
+            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true),
+            "partition"_a=std::nullopt)
         .def("push",
             [](const mofka::Producer& producer,
                nlohmann::json metadata,
-               py::buffer b_data) -> mofka::Future<mofka::EventID> {
-                return producer.push(std::move(metadata), data_helper(b_data));
+               py::buffer b_data,
+               std::optional<size_t> part) -> mofka::Future<mofka::EventID> {
+                return producer.push(std::move(metadata), data_helper(b_data), part);
             },
-            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true))
+            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true),
+            "partition"_a=std::nullopt)
         .def("push",
             [](const mofka::Producer& producer,
                std::string metadata,
-               const py::list& b_data) -> mofka::Future<mofka::EventID> {
-                return producer.push(std::move(metadata), data_helper(b_data));
+               const py::list& b_data,
+               std::optional<size_t> part) -> mofka::Future<mofka::EventID> {
+                return producer.push(std::move(metadata), data_helper(b_data), part);
             },
-            "metadata"_a, "data"_a=std::vector<py::memoryview>{})
+            "metadata"_a, "data"_a=std::vector<py::memoryview>{},
+            "partition"_a=std::nullopt)
         .def("push",
             [](const mofka::Producer& producer,
                nlohmann::json metadata,
-               py::list b_data) -> mofka::Future<mofka::EventID> {
-                return producer.push(std::move(metadata), data_helper(b_data));
+               py::list b_data,
+               std::optional<size_t> part) -> mofka::Future<mofka::EventID> {
+                return producer.push(std::move(metadata), data_helper(b_data), part);
             },
-            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true))
+            "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true),
+            "partition"_a=std::nullopt)
         .def("flush", &mofka::Producer::flush)
         .def("batch_size",
             [](const mofka::Producer& producer) -> std::size_t {

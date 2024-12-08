@@ -78,7 +78,7 @@ struct Message {
     std::function<void(rd_kafka_t*, const rd_kafka_message_t*)> on_delivery;
 };
 
-Future<EventID> KafkaProducer::push(Metadata metadata, Data data) {
+Future<EventID> KafkaProducer::push(Metadata metadata, Data data, std::optional<size_t> partition) {
 
     Future<EventID>  future;
     Promise<EventID> promise;
@@ -91,7 +91,7 @@ Future<EventID> KafkaProducer::push(Metadata metadata, Data data) {
         m_topic->validator().validate(metadata, data);
 
         /* select partition */
-        auto partition_index = m_topic->selector().selectPartitionFor(metadata);
+        auto partition_index = m_topic->selector().selectPartitionFor(metadata, partition);
 
         auto msg = new Message();
         msg->promise = promise;

@@ -18,6 +18,7 @@
 
 #include <thallium.hpp>
 #include <memory>
+#include <optional>
 
 namespace mofka {
 
@@ -62,10 +63,13 @@ class ProducerInterface {
      *
      * @param metadata Metadata of the event.
      * @param data Optional data to attach to the event.
+     * @param partition Suggested partition number (may be ignored
+     *                  by the PartitionSelector).
      *
      * @return a Future<EventID> tracking the asynchronous operation.
      */
-    virtual Future<EventID> push(Metadata metadata, Data data = Data{}) = 0;
+    virtual Future<EventID> push(Metadata metadata, Data data = Data{},
+                                 std::optional<size_t> partition = std::nullopt) = 0;
 
     /**
      * @brief Block until all the pending events have been sent.
@@ -155,11 +159,13 @@ class Producer {
      *
      * @param metadata Metadata of the event.
      * @param data Optional data to attach to the event.
+     * @param partition Optional partition.
      *
      * @return a Future<EventID> tracking the asynchronous operation.
      */
-    Future<EventID> push(Metadata metadata, Data data = Data{}) const {
-        return self->push(metadata, data);
+    Future<EventID> push(Metadata metadata, Data data = Data{},
+                         std::optional<size_t> partition = std::nullopt) const {
+        return self->push(metadata, data, partition);
     }
 
     /**

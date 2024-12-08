@@ -16,7 +16,14 @@ class EnergyPartitionSelector final : public mofka::PartitionSelectorInterface {
         m_targets = targets;
     }
 
-    size_t selectPartitionFor(const mofka::Metadata& metadata) override {
+    size_t selectPartitionFor(const mofka::Metadata& metadata, std::optional<size_t> requested) override {
+        if(requested.has_value()) {
+           if(m_targets.size() >= *requested) {
+               throw mofka::Exception("Invalid requested partition number");
+           } else {
+               return *requested;
+           }
+        }
         auto energy = metadata.json()["energy"].get<size_t>();
         auto i = energy*m_targets.size()/energy_max;
         return i;

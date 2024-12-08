@@ -10,14 +10,20 @@ class MyPartitionSelector : public mofka::PartitionSelectorInterface {
         m_targets = targets;
     }
 
-    size_t selectPartitionFor(const mofka::Metadata& metadata) override {
+    size_t selectPartitionFor(const mofka::Metadata& metadata, std::optional<size_t> requested) override {
         (void)metadata;
         if(m_targets.size() == 0)
             throw mofka::Exception("PartitionSelector has no target to select from");
-        auto result = m_index;
+        if(requested.has_value()) {
+            size_t req = requested.value();
+            if(req >= m_targets.size()) {
+                throw mofka::Exception("Requested partition is out of range");
+            }
+        }
+        auto ret = m_index;
         m_index += 1;
-        if(m_index == m_targets.size()) m_index = 0;
-        return result;
+        m_index %= m_targets.size();
+        return ret;
     }
 
     mofka::Metadata metadata() const override {

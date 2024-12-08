@@ -17,7 +17,7 @@ TopicHandle BatchProducer::topic() const {
     return m_topic;
 }
 
-Future<EventID> BatchProducer::push(Metadata metadata, Data data) {
+Future<EventID> BatchProducer::push(Metadata metadata, Data data, std::optional<size_t> partition) {
     /* Step 1: create a future/promise pair for this operation */
     Future<EventID> future;
     Promise<EventID> promise;
@@ -29,7 +29,7 @@ Future<EventID> BatchProducer::push(Metadata metadata, Data data) {
     /* Validate the metadata */
     m_topic.validator().validate(metadata, data);
     /* Select the partition for this metadata */
-    auto partition_index = m_topic.selector().selectPartitionFor(metadata);
+    auto partition_index = m_topic.selector().selectPartitionFor(metadata, partition);
     /* Find/create the ActiveProducerBatchQueue to send to */
     std::shared_ptr<ActiveProducerBatchQueue> queue;
     {
