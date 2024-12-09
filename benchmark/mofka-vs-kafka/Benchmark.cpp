@@ -15,6 +15,7 @@
 #include <mofka/TopicHandle.hpp>
 #include <librdkafka/rdkafka.h>
 #include <unistd.h>
+#include <mpi.h>
 
 /**
  * @brief Generate a string of random letters of size n.
@@ -116,7 +117,13 @@ static void rdkafka_produce_messages(
         int message_size,
         int warmup_events,
         int flush_every) {
-    rdkafka_create_topic(bootstrap_servers, topic_name, 1, 1);
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if(rank == 0)
+        rdkafka_create_topic(bootstrap_servers, topic_name, 1, 1);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
@@ -132,6 +139,8 @@ static void rdkafka_produce_messages(
     spdlog::info("Producing {} messages...", total_num_events);
 
     double flush_time = 0.0;
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     for (int i = 0; i < total_num_events; ++i) {
         if (i == warmup_events)
@@ -162,6 +171,9 @@ static void rdkafka_produce_messages(
     while(RD_KAFKA_RESP_ERR__TIMED_OUT == rd_kafka_flush(producer, 100)) {};
     auto t_flush_end = std::chrono::high_resolution_clock::now();
     flush_time += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
     auto t_end = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double>(t_end - t_start).count();
     spdlog::info("Successfully produced {} messages in {} seconds (including {} seconds flush time)",
@@ -203,6 +215,9 @@ static void rdkafka_consume_messages(
     decltype(std::chrono::high_resolution_clock::now()) t_start;
 
     spdlog::info("Consuming {} messages...", warmup_events + num_events);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
     int i = 0;
     double commit_time = 0.0;
     while(true) {
@@ -228,6 +243,7 @@ static void rdkafka_consume_messages(
         if (i == warmup_events + num_events) break;
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     auto t_end = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double>(t_end - t_start).count();
     spdlog::info("Successfully consumed {} messages in {} seconds (including {} seconds commit time)",
@@ -238,7 +254,35 @@ static void rdkafka_consume_messages(
     rd_kafka_destroy(consumer);
 }
 
+/**
+ * @brief Create a topic in a Mofka service. The partitions will be
+ * created in a round-robbin manner across its servers.
+ *
+ * @param driver MofkaDriver
+ * @param topic_name Topic name
+ * @param num_partitions Number of partitions
+ */
+static void createMofkaTopic(mofka::MofkaDriver driver,
+                             const std::string& topic_name,
+                             unsigned num_partitions) {
+    driver.createTopic(topic_name);
+    auto num_servers = driver.numServers();
+    for(unsigned i = 0; i < num_partitions; ++i)
+        driver.addMemoryPartition(topic_name, i % num_servers);
+}
 
+/**
+ * @brief Create topic in a Kafka service.
+ *
+ * @param driver KafkaDriver
+ * @param topic_name Topic name
+ * @param num_partitions Number of partitions
+ */
+static void createKafkaTopic(mofka::KafkaDriver driver,
+                             const std::string& topic_name,
+                             unsigned num_partitions) {
+    driver.createTopic(topic_name, num_partitions);
+}
 /**
  * @brief Template produce function that can accept either a MofkaDriver or a KafkaDriver
  * as template parameter. It produces events in a specified topic.
@@ -278,6 +322,8 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     spdlog::info("Creating producer");
     auto producer = topic.producer(batch_size, thread_pool, ordering);
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
     if (warmup_events > 0) {
         spdlog::info("Start producing {} for warmup...", warmup_events);
         for (int i = 0; i < warmup_events; ++i) {
@@ -296,6 +342,8 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
         margo_monitor_dump(engine.value().get_margo_instance(), nullptr, nullptr, true);
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
     spdlog::info("Start producing {} events...", num_events);
     auto t_start = std::chrono::high_resolution_clock::now();
     double t_flush = 0;
@@ -313,6 +361,7 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     producer.flush();
     auto t_flush_end = std::chrono::high_resolution_clock::now();
     t_flush += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
+    MPI_Barrier(MPI_COMM_WORLD);
     auto t_end = std::chrono::high_resolution_clock::now();
     spdlog::info("Marking topic as complete");
     topic.markAsComplete();
@@ -336,13 +385,14 @@ static void produce(int argc, char** argv) {
     TCLAP::ValueArg<std::string> bootstrapArg("b", "bootstrap-file", "Bootstrap file or server",
                                               true, "", "string");
     TCLAP::ValueArg<std::string> topicArg("t", "topic-name", "Topic name", true, "", "string");
-    TCLAP::ValueArg<int> eventsArg("n", "num-events", "Number of events", true, 0, "int");
-    TCLAP::ValueArg<int> threadsArg("p", "threads", "Number of threads", false, 0, "int");
-    TCLAP::ValueArg<int> batchSizeArg("s", "batch-size", "Batch size", false, 0, "int");
-    TCLAP::ValueArg<int> flushEveryArg("f", "flush-every", "Flush every N events", false, 0, "int");
-    TCLAP::ValueArg<int> metadataSizeArg("m", "metadata-size", "Metadata size", false, 8, "int");
-    TCLAP::ValueArg<int> dataSizeArg("d", "data-size", "Data size", false, 16, "int");
-    TCLAP::ValueArg<int> warmupArg("w", "num-warmup-events", "Number of warmup events", false, 0, "int");
+    TCLAP::ValueArg<unsigned> eventsArg("n", "num-events", "Number of events", true, 0, "int");
+    TCLAP::ValueArg<unsigned> threadsArg("p", "threads", "Number of threads", false, 0, "int");
+    TCLAP::ValueArg<unsigned> batchSizeArg("s", "batch-size", "Batch size", false, 0, "int");
+    TCLAP::ValueArg<unsigned> flushEveryArg("f", "flush-every", "Flush every N events", false, 0, "int");
+    TCLAP::ValueArg<unsigned> metadataSizeArg("m", "metadata-size", "Metadata size", false, 8, "int");
+    TCLAP::ValueArg<unsigned> dataSizeArg("d", "data-size", "Data size", false, 16, "int");
+    TCLAP::ValueArg<unsigned> warmupArg("w", "num-warmup-events", "Number of warmup events", false, 0, "int");
+    TCLAP::ValueArg<unsigned> partitionsArgs("q", "num-partitions", "Number of partitions", false, 1, "int");
 
     cmd.add(bootstrapArg);
     cmd.add(topicArg);
@@ -353,12 +403,16 @@ static void produce(int argc, char** argv) {
     cmd.add(metadataSizeArg);
     cmd.add(dataSizeArg);
     cmd.add(warmupArg);
+    cmd.add(partitionsArgs);
     cmd.parse(argc - 1, argv + 1);
 
     auto bootstrap_file = bootstrapArg.getValue();
     mofka::BatchSize batch_size = batchSizeArg.isSet() ?
         mofka::BatchSize{(size_t)batchSizeArg.getValue()}
         : mofka::BatchSize::Adaptive();
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     spdlog::info("=======================================================");
     spdlog::info("Producer will be executed with the following parameters");
@@ -372,13 +426,15 @@ static void produce(int argc, char** argv) {
     spdlog::info("  metadata size: {}", metadataSizeArg.getValue());
     spdlog::info("  data size: {}", dataSizeArg.getValue());
     spdlog::info("  warmup events: {}", warmupArg.getValue());
+    spdlog::info("  partitions: {}", partitionsArgs.getValue());
     spdlog::info("=======================================================");
 
     if(backend_name == "mofka") {
         auto driver = mofka::MofkaDriver{bootstrap_file, true};
         margo_set_progress_when_needed(driver.engine().get_margo_instance(), true);
-        driver.createTopic(topicArg.getValue());
-        driver.addMemoryPartition(topicArg.getValue(), 0);
+        if(rank == 0)
+            createMofkaTopic(driver, topicArg.getValue(), partitionsArgs.getValue());
+        MPI_Barrier(MPI_COMM_WORLD);
         produce(driver,
                 topicArg.getValue(),
                 eventsArg.getValue(),
@@ -391,7 +447,8 @@ static void produce(int argc, char** argv) {
                 driver.engine());
     } else if(backend_name == "kafka") {
         auto driver = mofka::KafkaDriver{bootstrap_file};
-        driver.createTopic(topicArg.getValue(), 1, 1);
+        if(rank == 0)
+            createKafkaTopic(driver, topicArg.getValue(), partitionsArgs.getValue());
         produce(driver,
                 topicArg.getValue(),
                 eventsArg.getValue(),
@@ -441,6 +498,7 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
         return mofka::Data{v.data(), v.size()};
     };
 
+    MPI_Barrier(MPI_COMM_WORLD);
     spdlog::info("Creating consumer");
     auto consumer = topic.consumer(
             consumer_name, thread_pool, batch_size, data_selector, data_broker);
@@ -449,8 +507,6 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     int num_events = 0;
     auto t_start = std::chrono::high_resolution_clock::now();
     double t_ack = 0;
-
-    sleep(1);
 
     while (true) {
         auto event = consumer.pull().wait();
@@ -468,6 +524,7 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
         }
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     auto t_end = std::chrono::high_resolution_clock::now();
     spdlog::info("Consuming {} events took {} seconds (including {} seconds of ack time)",
                  num_events - warmup_events,
@@ -569,6 +626,12 @@ static void consume(int argc, char** argv) {
 int main(int argc, char** argv) {
     spdlog::set_level(spdlog::level::info);
 
+    MPI_Init(&argc, &argv);
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    spdlog::set_level(rank == 0 ? spdlog::level::info : spdlog::level::err);
+
     if(argc < 3)
         throw mofka::Exception{"Invalid number of arguments"};
 
@@ -583,6 +646,8 @@ int main(int argc, char** argv) {
     } else {
         std::cerr << "Invalid command (expected \"produce\" or \"consume\" or \"help\")";
     }
+
+    MPI_Finalize();
 
     return 0;
 }
