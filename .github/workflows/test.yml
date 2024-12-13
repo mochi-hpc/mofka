@@ -52,12 +52,12 @@ jobs:
         make
         ctest --output-on-failure
 
-    - name: Push packages to buildcache and update index
-      if: ${{ !cancelled() }}
-      run: |
-        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-        spack -e tests mirror set --push \
-          --oci-username ${{ github.actor }} \
-          --oci-password-variable GITHUB_TOKEN mochi-buildcache
-        spack -e tests buildcache push --base-image ubuntu:22.04 \
-          --unsigned --update-index mochi-buildcache
+#    - name: Push packages to buildcache and update index
+#      if: ${{ !cancelled() }}
+#      run: |
+#        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+#        spack -e tests mirror set --push \
+#          --oci-username ${{ github.actor }} \
+#          --oci-password-variable GITHUB_TOKEN mochi-buildcache
+#        spack -e tests buildcache push --base-image ubuntu:22.04 \
+#          --unsigned --update-index mochi-buildcache
