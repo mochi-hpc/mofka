@@ -262,13 +262,52 @@ static void rdkafka_consume_messages(
  * @param topic_name Topic name
  * @param num_partitions Number of partitions
  */
-static void createMofkaTopic(mofka::MofkaDriver driver,
-                             const std::string& topic_name,
-                             unsigned num_partitions) {
+static void createMofkaTopic(
+    mofka::MofkaDriver driver, const std::string& topic_name, unsigned num_partitions,
+    const std::string& partition_type,
+    const std::string& database_type,
+    const std::string& database_path_prefix,
+    const std::string& storage_type,
+    const std::string& storage_path_prefix,
+    size_t storage_size) {
     driver.createTopic(topic_name);
     auto num_servers = driver.numServers();
-    for(unsigned i = 0; i < num_partitions; ++i)
-        driver.addMemoryPartition(topic_name, i % num_servers);
+    for(unsigned i = 0; i < num_partitions; ++i) {
+        auto server_rank = i % num_servers;
+        if(partition_type == "memory") {
+            driver.addMemoryPartition(topic_name, server_rank);
+        } else if(partition_type == "default") {
+            // Create metadata provider
+            auto metadata_config = mofka::Metadata{R"({"database":{"type":"map","config":{}})"};
+            metadata_config.json()["database"]["type"] = database_type;
+            if(database_type != "map" && database_type != "unordered_map") {
+                metadata_config.json()["database"]["config"]["path"]
+                    = database_path_prefix + "/" + topic_name + "_metadata_" + std::to_string(i);
+                metadata_config.json()["database"]["config"]["create_if_missing"] = true;
+            }
+            auto metadata_provider = driver.addDefaultMetadataProvider(
+                server_rank, metadata_config);
+            // Create data provider
+            auto data_config = mofka::Metadata{R"({"target":{"type":"memory","config":{}}})"};
+            data_config.json()["target"]["type"] = storage_type;
+            if(storage_type != "memory") {
+                data_config.json()["target"]["config"]["path"]
+                    = storage_path_prefix + "/" + topic_name + "_data_" + std::to_string(i);
+                data_config.json()["target"]["config"]["override_if_exists"] = true;
+            }
+            if(storage_type == "pmdk") {
+                data_config.json()["target"]["config"]["create_if_missing_with_size"] = storage_size;
+            }
+            auto data_provider = driver.addDefaultDataProvider(
+                server_rank, metadata_config);
+            // Create the partition
+            driver.addDefaultPartition(
+                topic_name, server_rank,
+                metadata_provider, data_provider);
+        } else {
+            throw mofka::Exception{"Invalid partition type"};
+        }
+    }
 }
 
 /**
@@ -394,6 +433,33 @@ static void produce(int argc, char** argv) {
     TCLAP::ValueArg<unsigned> warmupArg("w", "num-warmup-events", "Number of warmup events", false, 0, "int");
     TCLAP::ValueArg<unsigned> partitionsArgs("q", "num-partitions", "Number of partitions", false, 1, "int");
 
+    // mofka provider
+    TCLAP::ValuesConstraint<std::string> allowedPartitionTypes(
+        {"memory", "default"});
+    TCLAP::ValueArg<std::string> partitionsTypeArgs(
+        "", "mofka-partition-type", "Type of partition", false, "memory", &allowedPartitionTypes);
+
+    // yokan provider
+    TCLAP::ValuesConstraint<std::string> allowedDatabaseTypes(
+        {"map", "berkeleydb", "gdbm", "leveldb", "rocksdb", "null", "tkrzw", "unordered_map", "unqlite"});
+    TCLAP::ValueArg<std::string> databaseTypeArgs(
+        "", "mofka-database-type", "Type of database for Mofka to use", false, "map", &allowedDatabaseTypes);
+    TCLAP::ValueArg<std::string> databasePathPrefixArgs(
+        "", "mofka-database-path-prefix", "Path prefix for Mofka databases",
+        false, "/tmp/mofka/databases", "path");
+
+    // warabi provider
+    TCLAP::ValuesConstraint<std::string> allowedStorageTypes(
+        {"memory", "abtio", "pmdk"});
+    TCLAP::ValueArg<std::string> storageTypeArgs(
+        "", "mofka-storage-type", "Type of storage for Mofka to use", false, "memory", &allowedStorageTypes);
+    TCLAP::ValueArg<std::string> storagePathPrefixArgs(
+        "", "mofka-storage-path-prefix", "Path prefix for Mofka data storage",
+        false, "/tmp/mofka/storage", "path");
+    TCLAP::ValueArg<size_t> storageSizeArgs(
+        "", "mofka-storage-size", "Storage size for Mofka targets (relevant only for pmdk targets)",
+        false, (size_t)(1024*1024*1024), "path");
+
     cmd.add(bootstrapArg);
     cmd.add(topicArg);
     cmd.add(eventsArg);
@@ -404,6 +470,14 @@ static void produce(int argc, char** argv) {
     cmd.add(dataSizeArg);
     cmd.add(warmupArg);
     cmd.add(partitionsArgs);
+
+    cmd.add(partitionsTypeArgs);
+    cmd.add(databaseTypeArgs);
+    cmd.add(databasePathPrefixArgs);
+    cmd.add(storageTypeArgs);
+    cmd.add(storagePathPrefixArgs);
+    cmd.add(storageSizeArgs);
+
     cmd.parse(argc - 1, argv + 1);
 
     auto bootstrap_file = bootstrapArg.getValue();
@@ -427,13 +501,34 @@ static void produce(int argc, char** argv) {
     spdlog::info("  data size: {}", dataSizeArg.getValue());
     spdlog::info("  warmup events: {}", warmupArg.getValue());
     spdlog::info("  partitions: {}", partitionsArgs.getValue());
+    if(backend_name == "mofka") {
+        spdlog::info("  partition type: {}", partitionsTypeArgs.getValue());
+        if(partitionsTypeArgs.getValue() != "memory") {
+            spdlog::info("  database type: {}", databaseTypeArgs.getValue());
+            if(databaseTypeArgs.getValue().find("map") == std::string::npos) {
+                spdlog::info("  database path prefix: {}", databasePathPrefixArgs.getValue());
+            }
+            spdlog::info("  storage type: {}", storageTypeArgs.getValue());
+            if(storageTypeArgs.getValue() != "memory") {
+                spdlog::info("  storage path prefix: {} ", storageTypeArgs.getValue());
+                if(storageTypeArgs.getValue() == "pmdk") {
+                    spdlog::info("  storage size: {}", storageSizeArgs.getValue());
+                }
+            }
+        }
+    }
     spdlog::info("=======================================================");
 
     if(backend_name == "mofka") {
         auto driver = mofka::MofkaDriver{bootstrap_file, true};
         margo_set_progress_when_needed(driver.engine().get_margo_instance(), true);
         if(rank == 0)
-            createMofkaTopic(driver, topicArg.getValue(), partitionsArgs.getValue());
+            createMofkaTopic(
+                driver, topicArg.getValue(), partitionsArgs.getValue(),
+                partitionsTypeArgs.getValue(),
+                databaseTypeArgs.getValue(), databasePathPrefixArgs.getValue(),
+                storageTypeArgs.getValue(), storagePathPrefixArgs.getValue(),
+                storageSizeArgs.getValue());
         MPI_Barrier(MPI_COMM_WORLD);
         produce(driver,
                 topicArg.getValue(),
