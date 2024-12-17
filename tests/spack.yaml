@@ -19,6 +19,7 @@ spack:
   - py-configspace
   - librdkafka
   - kafka
+  - catch2
   concretizer:
     unify: true
     reuse: true
@@ -32,6 +33,8 @@ spack:
         mpi: [mpich]
     argobots:
       require: "@1.2:"
+    catch2:
+      require: "@3.6.0:"
     mochi-margo:
       require:
       - "@0.18.3:"
