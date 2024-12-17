@@ -502,17 +502,17 @@ static void produce(int argc, char** argv) {
     spdlog::info("  warmup events: {}", warmupArg.getValue());
     spdlog::info("  partitions: {}", partitionsArgs.getValue());
     if(backend_name == "mofka") {
-        spdlog::info("  partition type: {}", partitionsTypeArgs.getValue());
+        spdlog::info("  mofka partition type: {}", partitionsTypeArgs.getValue());
         if(partitionsTypeArgs.getValue() != "memory") {
-            spdlog::info("  database type: {}", databaseTypeArgs.getValue());
+            spdlog::info("  mofka database type: {}", databaseTypeArgs.getValue());
             if(databaseTypeArgs.getValue().find("map") == std::string::npos) {
-                spdlog::info("  database path prefix: {}", databasePathPrefixArgs.getValue());
+                spdlog::info("  mofka database path prefix: {}", databasePathPrefixArgs.getValue());
             }
-            spdlog::info("  storage type: {}", storageTypeArgs.getValue());
+            spdlog::info("  mofka storage type: {}", storageTypeArgs.getValue());
             if(storageTypeArgs.getValue() != "memory") {
-                spdlog::info("  storage path prefix: {} ", storageTypeArgs.getValue());
+                spdlog::info("  mofka storage path prefix: {} ", storageTypeArgs.getValue());
                 if(storageTypeArgs.getValue() == "pmdk") {
-                    spdlog::info("  storage size: {}", storageSizeArgs.getValue());
+                    spdlog::info("  mofka storage size: {}", storageSizeArgs.getValue());
                 }
             }
         }
