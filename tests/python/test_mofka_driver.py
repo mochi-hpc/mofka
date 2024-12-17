@@ -38,7 +38,7 @@ class TestMofkaDriver(unittest.TestCase):
         topic = self.service.open_topic(name)
 
     def test_add_memory_partition(self):
-        """Test add partition"""
+        """Test add memory partition"""
         topic_name = "my_topic"
         validator = mofka.Validator.from_metadata("my_validator:libmy_validator.so")
         selector = mofka.PartitionSelector.from_metadata("my_partition_selector:libmy_partition_selector.so")
@@ -46,6 +46,22 @@ class TestMofkaDriver(unittest.TestCase):
         server_rank = 0
         self.service.create_topic(topic_name, validator, selector, serializer)
         self.service.add_memory_partition(topic_name, server_rank)
+        topic = self.service.open_topic(topic_name)
+
+    def test_add_default_partition(self):
+        """Test add default partition"""
+        topic_name = "my_topic"
+        validator = mofka.Validator.from_metadata("my_validator:libmy_validator.so")
+        selector = mofka.PartitionSelector.from_metadata("my_partition_selector:libmy_partition_selector.so")
+        serializer = mofka.Serializer.from_metadata("my_serializer:libmy_serializer.so")
+        server_rank = 0
+        self.service.create_topic(topic_name, validator, selector, serializer)
+        metadata_provider = self.service.add_default_metadata_provider(server_rank)
+        data_provider = self.service.add_default_data_provider(server_rank)
+        self.service.add_default_partition(topic_name, server_rank,
+                                           metadata_provider=metadata_provider,
+                                           data_provider=data_provider)
+        topic = self.service.open_topic(topic_name)
 
 
 if __name__ == '__main__':
