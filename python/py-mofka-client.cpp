@@ -189,6 +189,24 @@ PYBIND11_MODULE(pymofka_client, m) {
                 service.addMemoryPartition(topic_name, server_rank, pool_name);
             },
             "topic_name"_a, "server_rank"_a, "pool_name"_a="")
+        .def("add_default_data_provider",
+            [](mofka::MofkaDriver& service,
+               size_t server_rank,
+               const nlohmann::json& config,
+               const mofka::MofkaDriver::Dependencies& dependencies) {
+                return service.addDefaultDataProvider(server_rank, mofka::Metadata{config}, dependencies);
+            },
+            "server_rank"_a, "config"_a=R"({"target":{"type":"memory","config":{}}})"_json,
+            "dependencies"_a=mofka::MofkaDriver::Dependencies{})
+        .def("add_default_metadata_provider",
+            [](mofka::MofkaDriver& service,
+               size_t server_rank,
+               const nlohmann::json& config,
+               const mofka::MofkaDriver::Dependencies& dependencies) {
+                return service.addDefaultMetadataProvider(server_rank, mofka::Metadata{config}, dependencies);
+            },
+            "server_rank"_a, "config"_a=R"({"database":{"type":"map","config":{}}})"_json,
+            "dependencies"_a=mofka::MofkaDriver::Dependencies{})
     ;
 
     py::class_<mofka::TopicHandle>(m, "TopicHandle")
