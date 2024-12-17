@@ -38,7 +38,7 @@ TEST_CASE("Mofka driver test", "[driver]") {
             REQUIRE_THROWS_AS(driver.createTopic("mytopic"), mofka::Exception);
 
             mofka::Metadata partition_config;
-            mofka::MofkaDriver::PartitionDependencies partition_dependencies;
+            mofka::MofkaDriver::Dependencies partition_dependencies;
             getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
             for(size_t i = 0; i < 4; ++i) {

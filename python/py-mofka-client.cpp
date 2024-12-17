@@ -170,7 +170,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                size_t server_rank,
                const std::string& partition_type,
                const nlohmann::json& partition_config,
-               const mofka::MofkaDriver::PartitionDependencies& dependencies,
+               const mofka::MofkaDriver::Dependencies& dependencies,
                const std::string& pool_name) {
                 service.addCustomPartition(
                     topic_name, server_rank, partition_type,
@@ -179,7 +179,7 @@ PYBIND11_MODULE(pymofka_client, m) {
             },
             "topic_name"_a, "server_rank"_a, "partition_type"_a="memory",
             "partition_config"_a=nlohmann::json::object(),
-            "dependencies"_a=mofka::MofkaDriver::PartitionDependencies{},
+            "dependencies"_a=mofka::MofkaDriver::Dependencies{},
             "pool_name"_a="")
         .def("add_memory_partition",
             [](mofka::MofkaDriver& service,

@@ -34,7 +34,7 @@ TEST_CASE("Consumer test", "[consumer]") {
         REQUIRE_THROWS_AS(driver.createTopic("mytopic"), mofka::Exception);
 
         mofka::Metadata partition_config;
-        mofka::MofkaDriver::PartitionDependencies partition_dependencies;
+        mofka::MofkaDriver::Dependencies partition_dependencies;
         getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
         REQUIRE_NOTHROW(driver.addCustomPartition(

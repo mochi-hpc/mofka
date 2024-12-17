@@ -122,7 +122,74 @@ class MofkaDriver {
      * Please refer to the partition type's documentation for more information
      * on its expected dependencies.
      */
-    typedef bedrock::DependencyMap PartitionDependencies;
+    [[deprecated("Use MofkaDriver::Dependencies instead")]]
+        typedef bedrock::DependencyMap PartitionDependencies;
+    typedef bedrock::DependencyMap Dependencies;
+
+    /**
+     * @brief Create a Yokan provider on the target server, returning the
+     * name an address of the provider in a form that can be passed to
+     * addDefaultPartition.
+     *
+     * If the configuration is not provided, an in-memory map database
+     * will be used. Otherwise, the config parameter should be a Metadata containing
+     * a JSON object acceptable by Yokan, e.g.:
+     *
+     * ```
+     * {
+     *    "database": {
+     *        "type": "leveldb",
+     *        "config": {
+     *            "path": "/tmp/mofka/my-db",
+     *            "create_if_missing": true
+     *        }
+     *    }
+     * }
+     * ```
+     *
+     * @param server_rank Rank of the server in which to add the provider.
+     * @param config Configuration.
+     * @param dependencies Dependencies, if required by the configuration.
+     *
+     * @return provider address in the form <provider-name>@<provider-address>.
+     */
+    std::string addDefaultMetadataProvider(
+        size_t server_rank,
+        const Metadata& config = Metadata{R"({"database":{"type":"map","config":{}}})"},
+        const Dependencies& dependencies = Dependencies{});
+
+    /**
+     * @brief Create a Warabi provider on the target server, returning the
+     * name an address of the provider in a form that can be passed to
+     * addDefaultPartition.
+     *
+     * If the configuration is not provided, an in-memory target
+     * will be used. Otherwise, the config parameter should be a Metadata containing
+     * a JSON object acceptable by Yokan, e.g.:
+     *
+     * ```
+     * {
+     *    "target": {
+     *        "type": "pmdk",
+     *        "config": {
+     *            "path": "/tmp/mofka/my-target",
+     *            "create_if_missing_with_size": 10485760,
+     *            "override_if_exists": true
+     *        }
+     *    }
+     * }
+     * ```
+     *
+     * @param server_rank Rank of the server in which to add the provider.
+     * @param config Configuration.
+     * @param dependencies Dependencies, if required by the configuration.
+     *
+     * @return provider address in the form <provider-name>@<provider-address>.
+     */
+    std::string addDefaultDataProvider(
+        size_t server_rank,
+        const Metadata& config = Metadata{R"({"target":{"type":"memory","config":{}}})"},
+        const Dependencies& dependencies = Dependencies{});
 
     /**
      * @brief Create a new partition at the given server rank and add it to the topic.
@@ -138,7 +205,7 @@ class MofkaDriver {
                             size_t server_rank,
                             std::string_view partition_type = "memory",
                             const Metadata& partition_config = Metadata{"{}"},
-                            const PartitionDependencies& dependencies = {},
+                            const Dependencies& dependencies = {},
                             std::string_view pool_name = "");
 
     /**

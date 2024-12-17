@@ -26,7 +26,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
     auto driver = mofka::MofkaDriver{"mofka.json", engine};
     driver.createTopic("mytopic");
     mofka::Metadata partition_config;
-    mofka::MofkaDriver::PartitionDependencies partition_dependencies;
+    mofka::MofkaDriver::Dependencies partition_dependencies;
     getPartitionArguments(partition_type, partition_dependencies, partition_config);
     driver.addCustomPartition(
             "mytopic", 0, partition_type,
