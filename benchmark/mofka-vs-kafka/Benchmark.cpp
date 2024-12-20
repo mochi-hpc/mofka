@@ -224,7 +224,6 @@ static void rdkafka_consume_messages(
         int warmup_events) {
 
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
-    auto _conf = std::shared_ptr<rd_kafka_conf_t>{conf, rd_kafka_conf_destroy};
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
     rd_kafka_conf_set(conf, "group.id", consumer_name.c_str(), nullptr, 0);
     rd_kafka_conf_set(conf, "enable.auto.commit", "false", nullptr, 0);
@@ -238,13 +237,19 @@ static void rdkafka_consume_messages(
         char errstr[512];
 
         auto tmp_conf = rd_kafka_conf_dup(conf);
-        auto _tmp_conf = std::shared_ptr<rd_kafka_conf_t>{tmp_conf, rd_kafka_conf_destroy};
         rk = rd_kafka_new(RD_KAFKA_CONSUMER, tmp_conf, errstr, sizeof(errstr));
-        if (!rk) throw mofka::Exception{std::string{"Error creating Kafka handle: "} + errstr};
+        if (!rk) {
+            rd_kafka_conf_destroy(tmp_conf);
+            rd_kafka_conf_destroy(conf);
+            throw mofka::Exception{std::string{"Error creating Kafka handle: "} + errstr};
+        }
         auto _rk = std::shared_ptr<rd_kafka_t>{rk, rd_kafka_destroy};
 
         rd_kafka_resp_err_t err = rd_kafka_metadata(rk, 1, NULL, &metadata, 5000);
-        if (err) throw mofka::Exception{std::string{"Error fetching metadata: "} + rd_kafka_err2str(err)};
+        if (err) {
+            rd_kafka_conf_destroy(conf);
+            throw mofka::Exception{std::string{"Error fetching metadata: "} + rd_kafka_err2str(err)};
+        }
         auto _metadata = std::shared_ptr<const rd_kafka_metadata_t>{metadata, rd_kafka_metadata_destroy};
 
         const rd_kafka_metadata_topic_t *topic_metadata = NULL;
@@ -255,8 +260,10 @@ static void rdkafka_consume_messages(
             }
         }
 
-        if (!topic_metadata)
+        if (!topic_metadata) {
+            rd_kafka_conf_destroy(conf);
             throw mofka::Exception{std::string{"Topic \""} + topic_name.data() + "\" does not exist"};
+        }
 
         num_partitions = topic_metadata->partition_cnt;
     }
