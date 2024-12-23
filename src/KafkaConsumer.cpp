@@ -61,9 +61,9 @@ void KafkaConsumer::subscribe() {
     for(size_t i=0; i < n; ++i) {
         rd_kafka_topic_partition_list_add(subscription, m_topic->m_name.c_str(), m_partitions[i]->m_id);
     }
-    auto subscribton_ptr = std::shared_ptr<rd_kafka_topic_partition_list_t>{
+    auto subscription_ptr = std::shared_ptr<rd_kafka_topic_partition_list_t>{
         subscription, rd_kafka_topic_partition_list_destroy};
-    auto err = rd_kafka_subscribe(m_kafka_consumer.get(), subscription);
+    auto err = rd_kafka_assign(m_kafka_consumer.get(), subscription);
     if (err) throw Exception{"Failed to subscribe to topic: " + std::string{rd_kafka_err2str(err)}};
 
     // start the polling loop

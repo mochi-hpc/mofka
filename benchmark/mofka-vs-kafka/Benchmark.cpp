@@ -281,7 +281,7 @@ static void rdkafka_consume_messages(
     for(auto i : my_partitions) {
         rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), i);
     }
-    rd_kafka_subscribe(consumer, topics);
+    rd_kafka_assign(consumer, topics);
 
     decltype(std::chrono::high_resolution_clock::now()) t_start;
 
@@ -705,12 +705,15 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     auto t_start = std::chrono::high_resolution_clock::now();
     double t_ack = 0;
 
-    while (true) {
+    while (num_partitions) {
         auto event = consumer.pull().wait();
         if (num_events == warmup_events) {
             t_start = std::chrono::high_resolution_clock::now();
         }
-        if (event.id() == mofka::NoMoreEvents) break;
+        if (event.id() == mofka::NoMoreEvents) {
+            num_partitions -= 1;
+            continue;
+        }
         ++num_events;
         if (acknowledge_every && num_events % acknowledge_every.value() == 0) {
             auto t1 = std::chrono::high_resolution_clock::now();
