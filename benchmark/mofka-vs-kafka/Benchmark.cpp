@@ -349,7 +349,7 @@ static void createMofkaTopic(
             driver.addMemoryPartition(topic_name, server_rank);
         } else if(partition_type == "default") {
             // Create metadata provider
-            auto metadata_config = mofka::Metadata{R"({"database":{"type":"map","config":{}})"};
+            auto metadata_config = mofka::Metadata{R"({"database":{"type":"map","config":{}}})"};
             metadata_config.json()["database"]["type"] = database_type;
             if(database_type != "map" && database_type != "unordered_map") {
                 metadata_config.json()["database"]["config"]["path"]
