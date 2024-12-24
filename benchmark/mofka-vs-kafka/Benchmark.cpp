@@ -116,6 +116,7 @@ static void rdkafka_create_topic(
         }
     }
 
+    sleep(5); // for some reasons Kafka is really lazy
     spdlog::info("Topic {} created successfully!", topic_name);
 }
 
@@ -392,6 +393,7 @@ static void createKafkaTopic(mofka::KafkaDriver driver,
                              const std::string& topic_name,
                              unsigned num_partitions) {
     driver.createTopic(topic_name, num_partitions);
+    sleep(5);
 }
 /**
  * @brief Template produce function that can accept either a MofkaDriver or a KafkaDriver
