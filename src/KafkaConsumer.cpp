@@ -187,7 +187,7 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
         auto event = Event{
             std::make_shared<KafkaEvent>(
                     static_cast<EventID>(msg->offset),
-                    m_partitions[msg->partition],
+                    m_topic->m_partitions[msg->partition],
                     std::move(metadata), std::move(data),
                     shared_from_this())};
         // set the promise

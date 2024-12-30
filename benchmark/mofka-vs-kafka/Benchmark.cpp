@@ -634,6 +634,7 @@ static void produce(int argc, char** argv) {
         if(rank == 0) {
             createKafkaTopic(driver, topicArg.getValue(), partitionsArgs.getValue());
         }
+        MPI_Barrier(MPI_COMM_WORLD);
         produce(driver,
                 topicArg.getValue(),
                 eventsArg.getValue(),
@@ -650,6 +651,7 @@ static void produce(int argc, char** argv) {
                     topicArg.getValue(),
                     partitionsArgs.getValue(), 1);
         }
+        MPI_Barrier(MPI_COMM_WORLD);
         rdkafka_produce_messages(
             bootstrapArg.getValue(),
             topicArg.getValue(),
@@ -828,7 +830,8 @@ static void consume(int argc, char** argv) {
 int main(int argc, char** argv) {
     spdlog::set_level(spdlog::level::info);
 
-    MPI_Init(&argc, &argv);
+    int provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
 
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
