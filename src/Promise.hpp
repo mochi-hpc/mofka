@@ -41,7 +41,7 @@ struct Promise {
         auto state = std::make_shared<State>();
         auto wait_fn = [state, on_wait=std::move(on_wait)]() mutable -> Type {
             if(on_wait) on_wait();
-            auto v = state->wait();
+            auto v = std::move(*state).wait();
             if(std::holds_alternative<Exception>(v))
                 throw std::get<Exception>(v);
             return std::get<Type>(std::move(v));
