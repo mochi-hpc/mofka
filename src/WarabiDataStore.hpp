@@ -13,6 +13,7 @@
 #include <mofka/Metadata.hpp>
 #include <mofka/DataDescriptor.hpp>
 #include <mofka/BulkRef.hpp>
+#include "Promise.hpp"
 #include <spdlog/spdlog.h>
 #include <cstddef>
 #include <string_view>
@@ -33,61 +34,72 @@ class WarabiDataStore {
 
     public:
 
-    Result<std::vector<DataDescriptor>> store(
+    Future<std::vector<DataDescriptor>> store(
             size_t count,
             const BulkRef& remoteBulk) {
 
-        /* prepare the result array and its content by resizing the location
-         * field to be able to hold a WarabiDataDescriptor. */
-        Result<std::vector<DataDescriptor>> result;
-        result.value().resize(count);
-        for(auto& descriptor : result.value()) {
-            auto& location = descriptor.location();
-            location.resize(sizeof(WarabiDataDescriptor));
-        }
+        Future<std::vector<DataDescriptor>> future;
+        Promise<std::vector<DataDescriptor>> promise;
+        std::tie(future, promise) = Promise<std::vector<DataDescriptor>>::CreateFutureAndPromise();
 
-        /* lookup the sender. */
-        const auto source = m_engine.lookup(remoteBulk.address);
+        auto ult = [promise=std::move(promise), count, remoteBulk, this]() mutable {
+            /* prepare the result array and its content by resizing the location
+             * field to be able to hold a WarabiDataDescriptor. */
+            std::vector<DataDescriptor> result;
+            result.resize(count);
+            for(auto& descriptor : result) {
+                auto& location = descriptor.location();
+                location.resize(sizeof(WarabiDataDescriptor));
+            }
 
-        /* compute the offset at which the data start in the bulk handle
-         * (the first count*sizeof(size_t) bytes hold the data sizes). */
-        const auto dataOffset = count*sizeof(size_t);
+            /* lookup the sender. */
+            const auto source = m_engine.lookup(remoteBulk.address);
 
-        /* create a local buffer to receive the sizes (these sizes are
-         * needed later to make the DataDescriptors). */
-        std::vector<size_t> sizes(count);
-        auto sizesBulk = m_engine.expose(
-            {{sizes.data(), dataOffset}},
-            thallium::bulk_mode::write_only);
+            /* compute the offset at which the data start in the bulk handle
+             * (the first count*sizeof(size_t) bytes hold the data sizes). */
+            const auto dataOffset = count*sizeof(size_t);
 
-        // FIXME: the two following steps could be done in parallel.
+            /* create a local buffer to receive the sizes (these sizes are
+             * needed later to make the DataDescriptors). */
+            std::vector<size_t> sizes(count);
+            auto sizesBulk = m_engine.expose(
+                    {{sizes.data(), dataOffset}},
+                    thallium::bulk_mode::write_only);
 
-        /* transfer size of each region */
-        sizesBulk << remoteBulk.handle.on(source)(remoteBulk.offset, dataOffset);
+            /* forward data as region into Warabi, if size > 0 */
+            warabi::RegionID region_id;
+            warabi::AsyncRequest req;
+            if(remoteBulk.size - dataOffset > 0) {
+                m_target.createAndWrite(
+                        &region_id, remoteBulk.handle, remoteBulk.address,
+                        remoteBulk.offset + dataOffset, remoteBulk.size - dataOffset, true,
+                        &req);
+            } else {
+                memset(region_id.data(), 0, region_id.size());
+            }
 
-        /* forward data as region into Warabi, if size > 0 */
-        warabi::RegionID region_id;
-        if(remoteBulk.size - dataOffset > 0) {
-            m_target.createAndWrite(
-                &region_id, remoteBulk.handle, remoteBulk.address,
-                remoteBulk.offset + dataOffset, remoteBulk.size - dataOffset, true);
-        } else {
-            memset(region_id.data(), 0, region_id.size());
-        }
+            /* transfer size of each region */
+            sizesBulk << remoteBulk.handle.on(source)(remoteBulk.offset, dataOffset);
 
-        /* update the result vector */
-        WarabiDataDescriptor wdescriptor{0, region_id};
-        for(size_t j = 0; j < count; ++j) {
-            result.value()[j] = DataDescriptor::From(
-                std::string_view{
-                    reinterpret_cast<char*>(&wdescriptor),
-                    sizeof(wdescriptor)
-                },
-                sizes[j]);
-            wdescriptor.offset += sizes[j];
-        }
+            if(req) req.wait();
 
-        return result;
+            /* update the result vector */
+            WarabiDataDescriptor wdescriptor{0, region_id};
+            for(size_t j = 0; j < count; ++j) {
+                result[j] = DataDescriptor::From(
+                        std::string_view{
+                        reinterpret_cast<char*>(&wdescriptor),
+                        sizeof(wdescriptor)
+                        },
+                        sizes[j]);
+                wdescriptor.offset += sizes[j];
+            }
+
+            promise.setValue(std::move(result));
+        };
+
+        ult();
+        return future;
     }
 
     std::vector<Result<void>> load(

@@ -44,7 +44,7 @@ struct Promise {
             auto v = state->wait();
             if(std::holds_alternative<Exception>(v))
                 throw std::get<Exception>(v);
-            return std::get<Type>(v);
+            return std::get<Type>(std::move(v));
         };
         auto complete_fn = [state, on_test=std::move(on_test)]() mutable -> bool {
             auto is_ready = state->test();

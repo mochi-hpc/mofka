@@ -31,20 +31,25 @@ Result<EventID> DefaultPartitionManager::receiveBatch(
     (void)sender;
     Result<EventID> first_id;
 
-    // --------- transfer the data to the DataStore
-    auto descriptors = m_data_store->store(num_events, data_bulk);
-    if(!descriptors.success()) {
-        first_id.success() = false;
-        first_id.error() = descriptors.error();
-        return first_id;
-    }
+    // --------- asynchronously transfer the data to the DataStore
+    auto future_descriptors = m_data_store->store(num_events, data_bulk);
 
-    // --------- transfer the metadata to the EventStore
+    // --------- meanwhile transfer the metadata to the EventStore
     first_id = m_event_store->appendMetadata(num_events, metadata_bulk);
     if(!first_id.success()) return first_id;
 
+    // --------- wait for the data transfers
+    std::vector<DataDescriptor> descriptors;
+    try {
+        descriptors = future_descriptors.wait();
+    } catch(const std::exception& ex) {
+        first_id.success() = false;
+        first_id.error() = ex.what();
+        return first_id;
+    }
+
     // --------- transfer the descriptors
-    auto ok = m_event_store->storeDataDescriptors(first_id.value(), descriptors.value());
+    auto ok = m_event_store->storeDataDescriptors(first_id.value(), descriptors);
     if(!ok.success()) {
         first_id.success() = false;
         first_id.error() = ok.error();
