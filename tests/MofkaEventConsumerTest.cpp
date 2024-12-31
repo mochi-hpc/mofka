@@ -31,7 +31,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         REQUIRE(!static_cast<bool>(topic));
         REQUIRE_NOTHROW(driver.createTopic("mytopic"));
         mofka::Metadata partition_config;
-        mofka::MofkaDriver::PartitionDependencies partition_dependencies;
+        mofka::MofkaDriver::Dependencies partition_dependencies;
         getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
         REQUIRE_NOTHROW(driver.addCustomPartition(

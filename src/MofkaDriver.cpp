@@ -328,7 +328,7 @@ void MofkaDriver::addDefaultPartition(std::string_view topic_name,
                                         std::string_view data_provider,
                                         const Metadata& config,
                                         std::string_view pool_name) {
-    PartitionDependencies dependencies = {
+    Dependencies dependencies = {
         {"metadata", {std::string{metadata_provider.data(), metadata_provider.size()}}},
         {"data", {std::string{data_provider.data(), data_provider.size()}}}
     };
@@ -401,7 +401,7 @@ void MofkaDriver::addCustomPartition(
     size_t server_rank,
     std::string_view partition_type,
     const Metadata& partition_config,
-    const PartitionDependencies& dependencies,
+    const Dependencies& dependencies,
     std::string_view pool_name) {
 
     auto partition_uuid = UUID::generate();
@@ -412,14 +412,10 @@ void MofkaDriver::addCustomPartition(
     std::string provider_address;
     try {
         auto server = self->m_bsgh[server_rank];
-        auto get_address_script = R"(
-            return $__config__.margo.mercury.address;
-        )";
-        server.queryConfig(get_address_script, &provider_address);
+        provider_address = static_cast<std::string>(server.providerHandle());
         auto provider_desciption = nlohmann::json::object();
         provider_desciption["name"]   = provider_name;
         provider_desciption["type"]   = "mofka";
-        provider_desciption["pool"]   = pool_name.size() ? pool_name : "__primary__";
         provider_desciption["config"] = nlohmann::json::object();
         provider_desciption["config"]["topic"]     = topic_name;
         provider_desciption["config"]["type"]      = partition_type;
@@ -427,11 +423,9 @@ void MofkaDriver::addCustomPartition(
         provider_desciption["config"]["partition"] = nlohmann::json::parse(partition_config.string());
         provider_desciption["tags"] = nlohmann::json::array();
         provider_desciption["tags"].push_back("morka:partition");
-        provider_desciption["dependencies"] = nlohmann::json::object();
-        for(auto& p : dependencies) {
-            provider_desciption["dependencies"][p.first] = nlohmann::json::array();
-            for(auto& dep : p.second)
-                provider_desciption["dependencies"][p.first].push_back(dep);
+        provider_desciption["dependencies"] = dependencies;
+        if(!provider_desciption["dependencies"].contains("pool")) {
+            provider_desciption["dependencies"]["pool"] = pool_name.size() ? pool_name : "__primary__";
         }
 
         server.addProvider(provider_desciption.dump(), &provider_id);
@@ -458,6 +452,60 @@ void MofkaDriver::addCustomPartition(
             fmt::format(
                 "Could not add partition info to master database for topic \"{}\"."
                 "Yokan error: {}", topic_name, ex.what())
+        };
+    }
+}
+
+std::string MofkaDriver::addDefaultMetadataProvider(
+          size_t server_rank,
+          const Metadata& config,
+          const Dependencies& dependencies) {
+    auto uuid = UUID::generate();
+    auto provider_name  = fmt::format("metadata_{}", uuid.to_string().substr(0, 8));
+    try {
+        auto server = self->m_bsgh[server_rank];
+        auto address = static_cast<std::string>(server.providerHandle());
+
+        auto provider_desciption      = nlohmann::json::object();
+        provider_desciption["name"]   = provider_name;
+        provider_desciption["type"]   = "yokan";
+        provider_desciption["config"] = config.json();
+        provider_desciption["tags"]   = nlohmann::json::array();
+        provider_desciption["tags"].push_back("mofka:metadata");
+        provider_desciption["dependencies"] = dependencies;
+        uint16_t provider_id = 0;
+        server.addProvider(provider_desciption.dump(), &provider_id);
+        return fmt::format("{}@{}", provider_name, address);
+    } catch(const bedrock::Exception& ex) {
+        throw Exception{
+            fmt::format("Could not create metadata provider. Bedrock error: {}", ex.what())
+        };
+    }
+}
+
+std::string MofkaDriver::addDefaultDataProvider(
+          size_t server_rank,
+          const Metadata& config,
+          const Dependencies& dependencies) {
+    auto uuid = UUID::generate();
+    auto provider_name  = fmt::format("data_{}", uuid.to_string().substr(0, 8));
+    try {
+        auto server = self->m_bsgh[server_rank];
+        auto address = static_cast<std::string>(server.providerHandle());
+
+        auto provider_desciption      = nlohmann::json::object();
+        provider_desciption["name"]   = provider_name;
+        provider_desciption["type"]   = "warabi";
+        provider_desciption["config"] = config.json();
+        provider_desciption["tags"]   = nlohmann::json::array();
+        provider_desciption["tags"].push_back("mofka:data");
+        provider_desciption["dependencies"] = dependencies;
+        uint16_t provider_id = 0;
+        server.addProvider(provider_desciption.dump(), &provider_id);
+        return fmt::format("{}@{}", provider_name, address);
+    } catch(const bedrock::Exception& ex) {
+        throw Exception{
+            fmt::format("Could not create metadata provider. Bedrock error: {}", ex.what())
         };
     }
 }

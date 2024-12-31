@@ -35,7 +35,7 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
         SECTION("Create partition using addCustomPartition") {
 
             mofka::Metadata partition_config;
-            mofka::MofkaDriver::PartitionDependencies partition_dependencies;
+            mofka::MofkaDriver::Dependencies partition_dependencies;
             getPartitionArguments("default", partition_dependencies, partition_config);
 
             REQUIRE_NOTHROW(driver.addCustomPartition(
@@ -64,6 +64,22 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
             mofka::Metadata partition_config;
 
             REQUIRE_NOTHROW(driver.addDefaultPartition("mytopic", 0));
+
+            REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
+            REQUIRE(static_cast<bool>(topic));
+
+        }
+
+        SECTION("Create metadata and data providers") {
+            std::string metadata_provider_address, data_provider_address;
+            REQUIRE_NOTHROW(metadata_provider_address = driver.addDefaultMetadataProvider(0));
+            REQUIRE_NOTHROW(data_provider_address = driver.addDefaultDataProvider(0));
+            REQUIRE(!metadata_provider_address.empty());
+            REQUIRE(!data_provider_address.empty());
+
+            REQUIRE_NOTHROW(driver.addDefaultPartition(
+                        "mytopic", 0, metadata_provider_address,
+                        data_provider_address));
 
             REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
             REQUIRE(static_cast<bool>(topic));

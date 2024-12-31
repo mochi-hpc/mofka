@@ -58,10 +58,10 @@ static inline const char* config = R"(
 
 static inline void getPartitionArguments(
         std::string_view partition_type,
-        mofka::MofkaDriver::PartitionDependencies& dependencies,
+        mofka::MofkaDriver::Dependencies& dependencies,
         mofka::Metadata& partition_config) {
     if(partition_type == "memory") {
-        dependencies = mofka::MofkaDriver::PartitionDependencies{};
+        dependencies = mofka::MofkaDriver::Dependencies{};
         partition_config = mofka::Metadata{"{}"};
     } else if(partition_type == "default") {
         dependencies = {

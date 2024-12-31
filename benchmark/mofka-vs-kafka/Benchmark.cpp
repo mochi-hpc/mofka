@@ -18,6 +18,25 @@
 #include <mpi.h>
 
 /**
+ * @brief Computes the mapping between processes and partitions.
+ */
+static std::vector<size_t> computeMyPartitions(
+        unsigned num_processes,
+        unsigned my_process_rank,
+        unsigned num_partitions) {
+    if(num_processes < num_partitions) {
+        // each process has multiple partitions
+        std::vector<size_t> myPartitions;
+        for(size_t i = my_process_rank; i < num_partitions; i += num_processes)
+            myPartitions.push_back(i);
+        return myPartitions;
+    } else {
+        // each partition is used by multiple processes
+        return {my_process_rank % num_partitions};
+    }
+}
+
+/**
  * @brief Generate a string of random letters of size n.
  */
 static std::string random_bytes(size_t n) {
@@ -97,6 +116,7 @@ static void rdkafka_create_topic(
         }
     }
 
+    sleep(5); // for some reasons Kafka is really lazy
     spdlog::info("Topic {} created successfully!", topic_name);
 }
 
@@ -105,6 +125,7 @@ static void rdkafka_create_topic(
  *
  * @param bootstrap_servers Comma-separated list of bootstrap server addresses.
  * @param topic_name Name of the topic in which to produce events.
+ * @param num_partitions Number of partitions in the topic.
  * @param num_events Number of events.
  * @param message_size Size of each message.
  * @param warmup_events Number of warmup events to produce before actually measuring performance.
@@ -113,16 +134,17 @@ static void rdkafka_create_topic(
 static void rdkafka_produce_messages(
         const std::string &bootstrap_servers,
         const std::string &topic_name,
+        int num_partitions,
         int num_events,
         int message_size,
         int warmup_events,
         int flush_every) {
 
-    int rank;
+    int rank, num_producers;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_producers);
+    auto my_partitions = computeMyPartitions(num_producers, rank, num_partitions);
 
-    if(rank == 0)
-        rdkafka_create_topic(bootstrap_servers, topic_name, 1, 1);
     MPI_Barrier(MPI_COMM_WORLD);
 
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
@@ -145,6 +167,7 @@ static void rdkafka_produce_messages(
     for (int i = 0; i < total_num_events; ++i) {
         if (i == warmup_events)
             t_start = std::chrono::high_resolution_clock::now();
+        auto partition_index = my_partitions[i % my_partitions.size()];
         /* Note: technically because we have created the messages above and they won't
          * disappear from memory, we could avoid using RD_KAFKA_MSG_F_COPY bellow.
          * However for a more fair comparison with Mofka, which makes a copy, we use
@@ -152,6 +175,7 @@ static void rdkafka_produce_messages(
          * */
         rd_kafka_producev(producer,
                           RD_KAFKA_V_TOPIC(topic_name.c_str()),
+                          RD_KAFKA_V_PARTITION(partition_index),
                           RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
                           RD_KAFKA_V_VALUE(const_cast<char*>(messages[i].data()), messages[i].size()),
                           RD_KAFKA_V_END);
@@ -199,18 +223,66 @@ static void rdkafka_consume_messages(
         int num_events,
         std::optional<int> acknowledge_every,
         int warmup_events) {
+
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
     rd_kafka_conf_set(conf, "group.id", consumer_name.c_str(), nullptr, 0);
     rd_kafka_conf_set(conf, "enable.auto.commit", "false", nullptr, 0);
     rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", nullptr, 0);
 
+    // figure out the number of partitions
+    int num_partitions = 0;
+    {
+        rd_kafka_t* rk;
+        const rd_kafka_metadata_t* metadata;
+        char errstr[512];
+
+        auto tmp_conf = rd_kafka_conf_dup(conf);
+        rk = rd_kafka_new(RD_KAFKA_CONSUMER, tmp_conf, errstr, sizeof(errstr));
+        if (!rk) {
+            rd_kafka_conf_destroy(tmp_conf);
+            rd_kafka_conf_destroy(conf);
+            throw mofka::Exception{std::string{"Error creating Kafka handle: "} + errstr};
+        }
+        auto _rk = std::shared_ptr<rd_kafka_t>{rk, rd_kafka_destroy};
+
+        rd_kafka_resp_err_t err = rd_kafka_metadata(rk, 1, NULL, &metadata, 5000);
+        if (err) {
+            rd_kafka_conf_destroy(conf);
+            throw mofka::Exception{std::string{"Error fetching metadata: "} + rd_kafka_err2str(err)};
+        }
+        auto _metadata = std::shared_ptr<const rd_kafka_metadata_t>{metadata, rd_kafka_metadata_destroy};
+
+        const rd_kafka_metadata_topic_t *topic_metadata = NULL;
+        for (int i = 0; i < metadata->topic_cnt; i++) {
+            if (strcmp(metadata->topics[i].topic, topic_name.data()) == 0) {
+                topic_metadata = &metadata->topics[i];
+                break;
+            }
+        }
+
+        if (!topic_metadata) {
+            rd_kafka_conf_destroy(conf);
+            throw mofka::Exception{std::string{"Topic \""} + topic_name.data() + "\" does not exist"};
+        }
+
+        num_partitions = topic_metadata->partition_cnt;
+    }
+    spdlog::info("Found topic to have {} partitions", num_partitions);
+
+    int rank, num_consumers;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_consumers);
+    auto my_partitions = computeMyPartitions(num_consumers, rank, num_partitions);
+
     rd_kafka_t *consumer = rd_kafka_new(RD_KAFKA_CONSUMER, conf, nullptr, 0);
     rd_kafka_poll_set_consumer(consumer);
 
     rd_kafka_topic_partition_list_t *topics = rd_kafka_topic_partition_list_new(1);
-    rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), 0);
-    rd_kafka_subscribe(consumer, topics);
+    for(auto i : my_partitions) {
+        rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), i);
+    }
+    rd_kafka_assign(consumer, topics);
 
     decltype(std::chrono::high_resolution_clock::now()) t_start;
 
@@ -262,13 +334,52 @@ static void rdkafka_consume_messages(
  * @param topic_name Topic name
  * @param num_partitions Number of partitions
  */
-static void createMofkaTopic(mofka::MofkaDriver driver,
-                             const std::string& topic_name,
-                             unsigned num_partitions) {
+static void createMofkaTopic(
+    mofka::MofkaDriver driver, const std::string& topic_name, unsigned num_partitions,
+    const std::string& partition_type,
+    const std::string& database_type,
+    const std::string& database_path_prefix,
+    const std::string& storage_type,
+    const std::string& storage_path_prefix,
+    size_t storage_size) {
     driver.createTopic(topic_name);
     auto num_servers = driver.numServers();
-    for(unsigned i = 0; i < num_partitions; ++i)
-        driver.addMemoryPartition(topic_name, i % num_servers);
+    for(unsigned i = 0; i < num_partitions; ++i) {
+        auto server_rank = i % num_servers;
+        if(partition_type == "memory") {
+            driver.addMemoryPartition(topic_name, server_rank);
+        } else if(partition_type == "default") {
+            // Create metadata provider
+            auto metadata_config = mofka::Metadata{R"({"database":{"type":"map","config":{}}})"};
+            metadata_config.json()["database"]["type"] = database_type;
+            if(database_type != "map" && database_type != "unordered_map") {
+                metadata_config.json()["database"]["config"]["path"]
+                    = database_path_prefix + "/" + topic_name + "_metadata_" + std::to_string(i);
+                metadata_config.json()["database"]["config"]["create_if_missing"] = true;
+            }
+            auto metadata_provider = driver.addDefaultMetadataProvider(
+                server_rank, metadata_config);
+            // Create data provider
+            auto data_config = mofka::Metadata{R"({"target":{"type":"memory","config":{}}})"};
+            data_config.json()["target"]["type"] = storage_type;
+            if(storage_type != "memory") {
+                data_config.json()["target"]["config"]["path"]
+                    = storage_path_prefix + "/" + topic_name + "_data_" + std::to_string(i);
+                data_config.json()["target"]["config"]["override_if_exists"] = true;
+            }
+            if(storage_type == "pmdk") {
+                data_config.json()["target"]["config"]["create_if_missing_with_size"] = storage_size;
+            }
+            auto data_provider = driver.addDefaultDataProvider(
+                server_rank, metadata_config);
+            // Create the partition
+            driver.addDefaultPartition(
+                topic_name, server_rank,
+                metadata_provider, data_provider);
+        } else {
+            throw mofka::Exception{"Invalid partition type"};
+        }
+    }
 }
 
 /**
@@ -282,6 +393,7 @@ static void createKafkaTopic(mofka::KafkaDriver driver,
                              const std::string& topic_name,
                              unsigned num_partitions) {
     driver.createTopic(topic_name, num_partitions);
+    sleep(5);
 }
 /**
  * @brief Template produce function that can accept either a MofkaDriver or a KafkaDriver
@@ -319,6 +431,12 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
         metadata[i] = "\"" + random_bytes(metadata_size-2) + "\"";
     }
 
+    int rank, num_producers;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_producers);
+    auto num_partitions = topic.partitions().size();
+    auto my_partitions = computeMyPartitions(num_producers, rank, num_partitions);
+
     spdlog::info("Creating producer");
     auto producer = topic.producer(batch_size, thread_pool, ordering);
 
@@ -327,7 +445,10 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     if (warmup_events > 0) {
         spdlog::info("Start producing {} for warmup...", warmup_events);
         for (int i = 0; i < warmup_events; ++i) {
-            producer.push(std::move(metadata[i]), mofka::Data{data[i].data(), data[i].size()});
+            auto partition_index = my_partitions[i % my_partitions.size()];
+            producer.push(std::move(metadata[i]),
+                          mofka::Data{data[i].data(), data[i].size()},
+                          partition_index);
         }
         producer.flush();
     }
@@ -347,14 +468,19 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     spdlog::info("Start producing {} events...", num_events);
     auto t_start = std::chrono::high_resolution_clock::now();
     double t_flush = 0;
-    for (int i = 0; i < num_events; ++i) {
-        int j = i + warmup_events;
-        producer.push(metadata[j],mofka::Data{data[j].data(), data[j].size()});
-        if (flush_every && (j + 1) % flush_every == 0) {
-            auto t_flush_start = std::chrono::high_resolution_clock::now();
-            producer.flush();
-            auto t_flush_end = std::chrono::high_resolution_clock::now();
-            t_flush += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
+    if(!my_partitions.empty()) {
+        for (int i = 0; i < num_events; ++i) {
+            int j = i + warmup_events;
+            auto partition_index = my_partitions[j % my_partitions.size()];
+            producer.push(metadata[j],
+                          mofka::Data{data[j].data(), data[j].size()},
+                          partition_index);
+            if (flush_every && (j + 1) % flush_every == 0) {
+                auto t_flush_start = std::chrono::high_resolution_clock::now();
+                producer.flush();
+                auto t_flush_end = std::chrono::high_resolution_clock::now();
+                t_flush += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
+            }
         }
     }
     auto t_flush_start = std::chrono::high_resolution_clock::now();
@@ -364,7 +490,8 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     MPI_Barrier(MPI_COMM_WORLD);
     auto t_end = std::chrono::high_resolution_clock::now();
     spdlog::info("Marking topic as complete");
-    topic.markAsComplete();
+    if(rank == 0)
+        topic.markAsComplete();
     spdlog::info("Producing {} events took {} seconds (including {} seconds flush time)", num_events,
                  std::chrono::duration<double>(t_end - t_start).count(), t_flush);
 }
@@ -394,6 +521,33 @@ static void produce(int argc, char** argv) {
     TCLAP::ValueArg<unsigned> warmupArg("w", "num-warmup-events", "Number of warmup events", false, 0, "int");
     TCLAP::ValueArg<unsigned> partitionsArgs("q", "num-partitions", "Number of partitions", false, 1, "int");
 
+    // mofka provider
+    TCLAP::ValuesConstraint<std::string> allowedPartitionTypes(
+        {"memory", "default"});
+    TCLAP::ValueArg<std::string> partitionsTypeArgs(
+        "", "mofka-partition-type", "Type of partition", false, "memory", &allowedPartitionTypes);
+
+    // yokan provider
+    TCLAP::ValuesConstraint<std::string> allowedDatabaseTypes(
+        {"map", "berkeleydb", "gdbm", "leveldb", "rocksdb", "null", "tkrzw", "unordered_map", "unqlite"});
+    TCLAP::ValueArg<std::string> databaseTypeArgs(
+        "", "mofka-database-type", "Type of database for Mofka to use", false, "map", &allowedDatabaseTypes);
+    TCLAP::ValueArg<std::string> databasePathPrefixArgs(
+        "", "mofka-database-path-prefix", "Path prefix for Mofka databases",
+        false, "/tmp/mofka/databases", "path");
+
+    // warabi provider
+    TCLAP::ValuesConstraint<std::string> allowedStorageTypes(
+        {"memory", "abtio", "pmdk"});
+    TCLAP::ValueArg<std::string> storageTypeArgs(
+        "", "mofka-storage-type", "Type of storage for Mofka to use", false, "memory", &allowedStorageTypes);
+    TCLAP::ValueArg<std::string> storagePathPrefixArgs(
+        "", "mofka-storage-path-prefix", "Path prefix for Mofka data storage",
+        false, "/tmp/mofka/storage", "path");
+    TCLAP::ValueArg<size_t> storageSizeArgs(
+        "", "mofka-storage-size", "Storage size for Mofka targets (relevant only for pmdk targets)",
+        false, (size_t)(1024*1024*1024), "path");
+
     cmd.add(bootstrapArg);
     cmd.add(topicArg);
     cmd.add(eventsArg);
@@ -404,6 +558,14 @@ static void produce(int argc, char** argv) {
     cmd.add(dataSizeArg);
     cmd.add(warmupArg);
     cmd.add(partitionsArgs);
+
+    cmd.add(partitionsTypeArgs);
+    cmd.add(databaseTypeArgs);
+    cmd.add(databasePathPrefixArgs);
+    cmd.add(storageTypeArgs);
+    cmd.add(storagePathPrefixArgs);
+    cmd.add(storageSizeArgs);
+
     cmd.parse(argc - 1, argv + 1);
 
     auto bootstrap_file = bootstrapArg.getValue();
@@ -427,13 +589,35 @@ static void produce(int argc, char** argv) {
     spdlog::info("  data size: {}", dataSizeArg.getValue());
     spdlog::info("  warmup events: {}", warmupArg.getValue());
     spdlog::info("  partitions: {}", partitionsArgs.getValue());
+    if(backend_name == "mofka") {
+        spdlog::info("  mofka partition type: {}", partitionsTypeArgs.getValue());
+        if(partitionsTypeArgs.getValue() != "memory") {
+            spdlog::info("  mofka database type: {}", databaseTypeArgs.getValue());
+            if(databaseTypeArgs.getValue().find("map") == std::string::npos) {
+                spdlog::info("  mofka database path prefix: {}", databasePathPrefixArgs.getValue());
+            }
+            spdlog::info("  mofka storage type: {}", storageTypeArgs.getValue());
+            if(storageTypeArgs.getValue() != "memory") {
+                spdlog::info("  mofka storage path prefix: {} ", storageTypeArgs.getValue());
+                if(storageTypeArgs.getValue() == "pmdk") {
+                    spdlog::info("  mofka storage size: {}", storageSizeArgs.getValue());
+                }
+            }
+        }
+    }
     spdlog::info("=======================================================");
 
     if(backend_name == "mofka") {
         auto driver = mofka::MofkaDriver{bootstrap_file, true};
         margo_set_progress_when_needed(driver.engine().get_margo_instance(), true);
-        if(rank == 0)
-            createMofkaTopic(driver, topicArg.getValue(), partitionsArgs.getValue());
+        if(rank == 0) {
+            createMofkaTopic(
+                driver, topicArg.getValue(), partitionsArgs.getValue(),
+                partitionsTypeArgs.getValue(),
+                databaseTypeArgs.getValue(), databasePathPrefixArgs.getValue(),
+                storageTypeArgs.getValue(), storagePathPrefixArgs.getValue(),
+                storageSizeArgs.getValue());
+        }
         MPI_Barrier(MPI_COMM_WORLD);
         produce(driver,
                 topicArg.getValue(),
@@ -447,8 +631,10 @@ static void produce(int argc, char** argv) {
                 driver.engine());
     } else if(backend_name == "kafka") {
         auto driver = mofka::KafkaDriver{bootstrap_file};
-        if(rank == 0)
+        if(rank == 0) {
             createKafkaTopic(driver, topicArg.getValue(), partitionsArgs.getValue());
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
         produce(driver,
                 topicArg.getValue(),
                 eventsArg.getValue(),
@@ -459,9 +645,17 @@ static void produce(int argc, char** argv) {
                 dataSizeArg.getValue(),
                 warmupArg.getValue());
     } else { /* rdkafka */
+        if(rank == 0) {
+            rdkafka_create_topic(
+                    bootstrapArg.getValue(),
+                    topicArg.getValue(),
+                    partitionsArgs.getValue(), 1);
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
         rdkafka_produce_messages(
             bootstrapArg.getValue(),
             topicArg.getValue(),
+            partitionsArgs.getValue(),
             eventsArg.getValue(),
             dataSizeArg.getValue() + metadataSizeArg.getValue(),
             warmupArg.getValue(),
@@ -479,6 +673,12 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     if (data_selection < 0 || data_selection > 1) {
         throw std::invalid_argument("data_selection should be in [0,1]");
     }
+
+    int rank, num_consumers;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_consumers);
+    auto num_partitions = topic.partitions().size();
+    auto my_partitions = computeMyPartitions(num_consumers, rank, num_partitions);
 
     auto thread_pool = mofka::ThreadPool{mofka::ThreadCount{(size_t)threads}};
 
@@ -501,19 +701,23 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     MPI_Barrier(MPI_COMM_WORLD);
     spdlog::info("Creating consumer");
     auto consumer = topic.consumer(
-            consumer_name, thread_pool, batch_size, data_selector, data_broker);
+            consumer_name, thread_pool, batch_size,
+            data_selector, data_broker, my_partitions);
 
     spdlog::info("Start consuming events...");
     int num_events = 0;
     auto t_start = std::chrono::high_resolution_clock::now();
     double t_ack = 0;
 
-    while (true) {
+    while (num_partitions) {
         auto event = consumer.pull().wait();
         if (num_events == warmup_events) {
             t_start = std::chrono::high_resolution_clock::now();
         }
-        if (event.id() == mofka::NoMoreEvents) break;
+        if (event.id() == mofka::NoMoreEvents) {
+            num_partitions -= 1;
+            continue;
+        }
         ++num_events;
         if (acknowledge_every && num_events % acknowledge_every.value() == 0) {
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -626,7 +830,8 @@ static void consume(int argc, char** argv) {
 int main(int argc, char** argv) {
     spdlog::set_level(spdlog::level::info);
 
-    MPI_Init(&argc, &argv);
+    int provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
 
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
