@@ -31,6 +31,7 @@ class WarabiDataStore {
     thallium::engine     m_engine;
     warabi::Client       m_warabi_client;
     warabi::TargetHandle m_target;
+    thallium::pool       m_pool;
 
     public:
 
@@ -61,7 +62,7 @@ class WarabiDataStore {
 
             /* create a local buffer to receive the sizes (these sizes are
              * needed later to make the DataDescriptors). */
-            std::vector<size_t> sizes(count);
+            std::vector<size_t> sizes(count, 0);
             auto sizesBulk = m_engine.expose(
                     {{sizes.data(), dataOffset}},
                     thallium::bulk_mode::write_only);
@@ -74,12 +75,11 @@ class WarabiDataStore {
                         &region_id, remoteBulk.handle, remoteBulk.address,
                         remoteBulk.offset + dataOffset, remoteBulk.size - dataOffset, true,
                         &req);
+                /* transfer size of each region */
+                sizesBulk << remoteBulk.handle.on(source)(remoteBulk.offset, dataOffset);
             } else {
                 memset(region_id.data(), 0, region_id.size());
             }
-
-            /* transfer size of each region */
-            sizesBulk << remoteBulk.handle.on(source)(remoteBulk.offset, dataOffset);
 
             if(req) req.wait();
 
@@ -98,7 +98,8 @@ class WarabiDataStore {
             promise.setValue(std::move(result));
         };
 
-        ult();
+        m_pool.make_thread(std::move(ult), thallium::anonymous{});
+
         return future;
     }
 
@@ -157,18 +158,21 @@ class WarabiDataStore {
     WarabiDataStore(
             thallium::engine engine,
             warabi::Client warabi_client,
-            warabi::TargetHandle target)
+            warabi::TargetHandle target,
+            thallium::pool pool)
     : m_engine(std::move(engine))
     , m_warabi_client(std::move(warabi_client))
-    , m_target(std::move(target)) {}
+    , m_target(std::move(target))
+    , m_pool(pool) {}
 
     static std::unique_ptr<WarabiDataStore> create(
             thallium::engine engine,
-            thallium::provider_handle warabi_ph) {
+            thallium::provider_handle warabi_ph,
+            thallium::pool pool) {
         auto warabi_client = warabi::Client{engine};
         auto target = warabi_client.makeTargetHandle(warabi_ph, warabi_ph.provider_id());
         return std::make_unique<WarabiDataStore>(
-                std::move(engine), std::move(warabi_client), std::move(target));
+                std::move(engine), std::move(warabi_client), std::move(target), pool);
     }
 
 };

@@ -138,8 +138,16 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     auto warabi_ph = dependencies.at("data")[0]->getHandle<tl::provider_handle>();
     auto yokan_ph =  dependencies.at("metadata")[0]->getHandle<tl::provider_handle>();
 
+    /* pool is an optional dependency */
+    tl::pool pool;
+    if(dependencies.count("pool")) {
+        pool = dependencies.at("pool")[0]->getHandle<tl::pool>();
+    } else {
+        pool = engine.get_handler_pool();
+    }
+
     /* create data store */
-    auto data_store = WarabiDataStore::create(engine, std::move(warabi_ph));
+    auto data_store = WarabiDataStore::create(engine, std::move(warabi_ph), pool);
 
     /* create event store */
     auto event_store = YokanEventStore::create(engine, topic_name, partition_uuid, std::move(yokan_ph));

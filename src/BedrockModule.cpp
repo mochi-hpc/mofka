@@ -34,11 +34,6 @@ class MofkaComponent : public bedrock::AbstractComponent {
 
     static std::shared_ptr<bedrock::AbstractComponent>
         Register(const bedrock::ComponentArgs& args) {
-            tl::pool pool;
-            auto it = args.dependencies.find("pool");
-            if(it != args.dependencies.end() && !it->second.empty()) {
-                pool = it->second[0]->getHandle<tl::pool>();
-            }
             auto config = mofka::Metadata{args.config, true};
             return std::make_shared<MofkaComponent>(
                 args.engine, args.provider_id, config, args.dependencies);
