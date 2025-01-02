@@ -715,8 +715,9 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
             t_start = std::chrono::high_resolution_clock::now();
         }
         if (event.id() == mofka::NoMoreEvents) {
-            num_partitions -= 1;
-            continue;
+            //num_partitions -= 1;
+            break;
+            //continue;
         }
         ++num_events;
         if (acknowledge_every && num_events % acknowledge_every.value() == 0) {

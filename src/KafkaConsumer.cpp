@@ -131,15 +131,18 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
     size_t value_size;
     if (headers &&
         rd_kafka_header_get(headers, 0, "NoMoreEvents", &value, &value_size) == RD_KAFKA_RESP_ERR_NO_ERROR) {
-        auto ult = [promise=std::move(promise)]() mutable {
-            promise.setValue(Event{std::make_shared<KafkaEvent>()});
-        };
         auto completed = ++m_completed_partitions;
         // FIXME If partitions are completed there is no reason to continue running the polling thread
         //if(completed == m_partitions.size()) {
             //m_should_stop = true;
         //}
-        m_thread_pool.pushWork(std::move(ult), std::numeric_limits<uint64_t>::max()-1);
+        if(completed == m_partitions.size()) {
+            //m_should_stop = true;
+            auto ult = [promise=std::move(promise)]() mutable {
+                promise.setValue(Event{std::make_shared<KafkaEvent>()});
+            };
+            m_thread_pool.pushWork(std::move(ult), std::numeric_limits<uint64_t>::max()-1);
+        }
         rd_kafka_message_destroy(msg);
         return;
     }
