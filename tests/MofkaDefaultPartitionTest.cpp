@@ -51,7 +51,7 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
 
 
             REQUIRE_NOTHROW(driver.addDefaultPartition(
-                        "mytopic", 0, "my_yokan_provider@local",
+                        "mytopic", 0, "my_yokan_metadata_provider@local",
                         "my_warabi_provider@local"));
 
             REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));

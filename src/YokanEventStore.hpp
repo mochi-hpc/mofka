@@ -68,7 +68,7 @@ class YokanEventStore {
                 ex.what());
         }
 
-        result.value() = ids[0];
+        result.value() = ids[0] - 1; // IDs start at 1 in the underlying DB
         {
             auto g = std::unique_lock{m_num_events_mtx};
             m_num_events += count;
@@ -87,7 +87,7 @@ class YokanEventStore {
         const auto count = descriptors.size();
         std::vector<size_t> descriptorSizes(count);
         std::vector<yk_id_t> ids(count);
-        for(size_t i = 0; i < count; ++i) ids[i] = firstID + i;
+        for(size_t i = 0; i < count; ++i) ids[i] = firstID + i + 1;
 
         std::vector<char> serializedDescriptors;
         BufferWrapperOutputArchive outputArchive{serializedDescriptors};
@@ -119,9 +119,12 @@ class YokanEventStore {
     Result<void> markAsComplete() {
         Result<void> result;
         result.success() = true;
+        /*
         std::string marked_as_complete_key = "#";
         marked_as_complete_key += m_topic_name + "#completed";
         m_database.put(marked_as_complete_key.c_str(), marked_as_complete_key.size(), nullptr, 0);
+        */
+        m_metadata_coll.update(0, "T", 1);
         m_is_marked_complete = true;
         m_num_events_cv.notify_all();
         return result;
@@ -213,7 +216,7 @@ class YokanEventStore {
 
             // list metadata documents
             m_metadata_coll.listBulk(
-                    firstID, 0, local_metadata_bulk.get_bulk(),
+                    firstID+1, 0, local_metadata_bulk.get_bulk(),
                     0, metadata_buffer.size(), true, batchSize.value);
 
             // check how many we actually pulled
@@ -278,24 +281,29 @@ class YokanEventStore {
         auto yokan_client = yokan::Client{engine};
         auto database = yokan_client.makeDatabaseHandle(yokan_ph.get_addr(), yokan_ph.provider_id());
 
-        std::string marked_as_complete_key = "#";
-        marked_as_complete_key += topic_name + "#completed";
-
-        bool marked_as_complete = database.exists(
-            marked_as_complete_key.c_str(),
-            marked_as_complete_key.size());
-
-        auto metadataCollName = topic_name + "/" + partition_uuid.to_string() + "/md";
-        auto descriptorsCollName = topic_name + "/" + partition_uuid.to_string() + "/dd";
+        auto metadataCollName = topic_name + "--" + partition_uuid.to_string() + "--md";
+        auto descriptorsCollName = topic_name + "--" + partition_uuid.to_string() + "--dd";
+        bool init_collection= false;
         if(!database.collectionExists(metadataCollName.c_str())) {
             database.createCollection(metadataCollName.c_str());
+            init_collection = true;
         }
         if(!database.collectionExists(descriptorsCollName.c_str())) {
             database.createCollection(descriptorsCollName.c_str());
         }
         auto metadata_coll = yokan::Collection{metadataCollName.c_str(), database};
         auto descriptors_coll = yokan::Collection{descriptorsCollName.c_str(), database};
-        auto num_events = metadata_coll.size();
+        auto marked_as_complete = false;
+        if(init_collection) {
+            metadata_coll.store("F", 1);    // marked as completed
+            descriptors_coll.store("F", 1); // marked as completed
+        } else {
+            std::string tmp(1, '\0');
+            size_t s = 1;
+            metadata_coll.load(0, tmp.data(), &s);
+            if(tmp == "T") marked_as_complete = true;
+        }
+        auto num_events = metadata_coll.size() - 1;
         return std::make_unique<YokanEventStore>(
             std::move(engine),
             std::move(topic_name),

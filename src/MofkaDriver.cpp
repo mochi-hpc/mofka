@@ -427,7 +427,6 @@ void MofkaDriver::addCustomPartition(
         if(!provider_desciption["dependencies"].contains("pool")) {
             provider_desciption["dependencies"]["pool"] = pool_name.size() ? pool_name : "__primary__";
         }
-
         server.addProvider(provider_desciption.dump(), &provider_id);
     } catch(const bedrock::Exception& ex) {
         throw Exception{

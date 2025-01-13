@@ -41,14 +41,28 @@ static inline const char* config = R"(
             "tags": ["mofka:data"]
         },
         {
-            "name" : "my_yokan_provider",
+            "name" : "my_yokan_master_provider",
             "type" : "yokan",
             "provider_id" : 3,
-            "tags" : [ "mofka:master", "mofka:metadata" ],
+            "tags" : [ "mofka:master" ],
             "config" : {
                 "database" : {
                     "type": "map",
                     "config": {}
+                }
+            }
+        },
+        {
+            "name" : "my_yokan_metadata_provider",
+            "type" : "yokan",
+            "provider_id" : 4,
+            "tags" : [ "mofka:metadata" ],
+            "config" : {
+                "database" : {
+                    "type": "log",
+                    "config": {
+                        "path": "/tmp/mofka-logs/metadata-log"
+                    }
                 }
             }
         }
@@ -66,7 +80,7 @@ static inline void getPartitionArguments(
     } else if(partition_type == "default") {
         dependencies = {
             {"data", {"my_warabi_provider@local"}},
-            {"metadata", {"my_yokan_provider@local"}}
+            {"metadata", {"my_yokan_metadata_provider@local"}}
         };
         partition_config = mofka::Metadata{"{}"};
     }

@@ -40,7 +40,7 @@ spack:
       - "@0.18.3:"
     mochi-yokan:
       require:
-      - "@0.7.0:"
+      - "@0.8.0:"
       - "+bedrock"
       - "+space"
     mochi-warabi:
