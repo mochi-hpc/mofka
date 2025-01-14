@@ -529,7 +529,8 @@ static void produce(int argc, char** argv) {
 
     // yokan provider
     TCLAP::ValuesConstraint<std::string> allowedDatabaseTypes(
-        {"map", "berkeleydb", "gdbm", "leveldb", "rocksdb", "null", "tkrzw", "unordered_map", "unqlite"});
+        {"map", "berkeleydb", "gdbm", "leveldb", "rocksdb", "null",
+         "tkrzw", "unordered_map", "unqlite", "log", "array"});
     TCLAP::ValueArg<std::string> databaseTypeArgs(
         "", "mofka-database-type", "Type of database for Mofka to use", false, "map", &allowedDatabaseTypes);
     TCLAP::ValueArg<std::string> databasePathPrefixArgs(
