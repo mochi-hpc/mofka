@@ -481,11 +481,8 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
                 auto t_flush_end = std::chrono::high_resolution_clock::now();
                 t_flush += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
             }
-            if(i % 10000 == 0)
-                spdlog::info("Produced {} events...", i);
         }
     }
-    spdlog::info("Flushing events...");
     auto t_flush_start = std::chrono::high_resolution_clock::now();
     producer.flush();
     auto t_flush_end = std::chrono::high_resolution_clock::now();
@@ -723,7 +720,6 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
             break;
             //continue;
         }
-        spdlog::info("Consumed {} events", event.id());
         ++num_events;
         if (acknowledge_every && num_events % acknowledge_every.value() == 0) {
             auto t1 = std::chrono::high_resolution_clock::now();
