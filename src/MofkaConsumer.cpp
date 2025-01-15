@@ -187,12 +187,16 @@ void MofkaConsumer::recvBatch(const tl::request& req,
                         batch->m_meta_sizes[i]}};
                 serializer.deserialize(metadata_archive, metadata);
                 // deserialize the data descriptors
-                BufferWrapperInputArchive descriptors_archive{
-                    std::string_view{
-                        batch->m_data_desc_buffer.data() + data_desc_offset,
-                        batch->m_data_desc_sizes[i]}};
                 DataDescriptor descriptor;
-                descriptor.load(descriptors_archive);
+                if(batch->m_data_desc_sizes[i] > 0) {
+                    BufferWrapperInputArchive descriptors_archive{
+                        std::string_view{
+                            batch->m_data_desc_buffer.data() + data_desc_offset,
+                                batch->m_data_desc_sizes[i]}};
+                    descriptor.load(descriptors_archive);
+                } else {
+                    descriptor = DataDescriptor::Null();
+                }
                 // request Data associated with the event
                 auto data = requestData(
                     partition, metadata,
