@@ -86,13 +86,17 @@ class WarabiDataStore {
             /* update the result vector */
             WarabiDataDescriptor wdescriptor{0, region_id};
             for(size_t j = 0; j < count; ++j) {
-                result[j] = DataDescriptor::From(
-                        std::string_view{
-                        reinterpret_cast<char*>(&wdescriptor),
-                        sizeof(wdescriptor)
-                        },
-                        sizes[j]);
-                wdescriptor.offset += sizes[j];
+                if(sizes[j] > 0) {
+                    result[j] = DataDescriptor::From(
+                            std::string_view{
+                            reinterpret_cast<char*>(&wdescriptor),
+                            sizeof(wdescriptor)
+                            },
+                            sizes[j]);
+                    wdescriptor.offset += sizes[j];
+                } else {
+                    result[j] = DataDescriptor::Null();
+                }
             }
 
             promise.setValue(std::move(result));

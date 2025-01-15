@@ -86,31 +86,38 @@ class YokanEventStore {
 
         const auto count = descriptors.size();
         std::vector<size_t> descriptorSizes(count);
-        std::vector<yk_id_t> ids(count);
-        for(size_t i = 0; i < count; ++i) ids[i] = firstID + i + 1;
-
         std::vector<char> serializedDescriptors;
         BufferWrapperOutputArchive outputArchive{serializedDescriptors};
 
         size_t offset = 0;
         for(size_t i = 0; i < count; ++i) {
             auto& descriptor = descriptors[i];
-            descriptor.save(outputArchive);
-            descriptorSizes[i] = serializedDescriptors.size() - offset;
-            offset = serializedDescriptors.size();
+            if(descriptor.size() > 0) {
+                descriptor.save(outputArchive);
+                descriptorSizes[i] = serializedDescriptors.size() - offset;
+                offset = serializedDescriptors.size();
+            } else {
+                descriptorSizes[i] = 0;
+            }
         }
 
-        try {
-            m_descriptors_coll.updatePacked(
-                count, ids.data(),
-                serializedDescriptors.data(),
-                descriptorSizes.data(),
-                YOKAN_MODE_UPDATE_NEW);
-        } catch(const yokan::Exception& ex) {
-            result.success() = false;
-            result.error() = fmt::format(
-                "Yokan Collection::updatePacked failed: {}",
-                ex.what());
+        if(offset > 0) {
+
+            std::vector<yk_id_t> ids(count);
+            for(size_t i = 0; i < count; ++i) ids[i] = firstID + 1 + i;
+
+            try {
+                m_descriptors_coll.updatePacked(
+                        count, ids.data(),
+                        serializedDescriptors.data(),
+                        descriptorSizes.data(),
+                        YOKAN_MODE_UPDATE_NEW);
+            } catch(const yokan::Exception& ex) {
+                result.success() = false;
+                result.error() = fmt::format(
+                        "Yokan Collection::updatePacked failed: {}",
+                        ex.what());
+            }
         }
 
         return result;
@@ -119,11 +126,6 @@ class YokanEventStore {
     Result<void> markAsComplete() {
         Result<void> result;
         result.success() = true;
-        /*
-        std::string marked_as_complete_key = "#";
-        marked_as_complete_key += m_topic_name + "#completed";
-        m_database.put(marked_as_complete_key.c_str(), marked_as_complete_key.size(), nullptr, 0);
-        */
         m_metadata_coll.update(0, "T", 1);
         m_is_marked_complete = true;
         m_num_events_cv.notify_all();
@@ -145,14 +147,14 @@ class YokanEventStore {
         // buffers to hold the metadata and descriptors
         std::vector<yk_id_t> ids(c);
         std::vector<size_t>  metadata_sizes(c);
-        std::vector<char>    metadata_buffer(c * 1024);
+        std::vector<char>    metadata_buffer(c * 1024 * 8);
 
         // note: because we are using docLoad for descriptors, we need
         // the sizes and documents to be contiguous even if the number
         // of items requested varies.
         std::vector<char> descriptors_sizes_and_data(c*(sizeof(size_t)+1024));
 
-        // TODO: change 1024 to an actually good estimation of metadata size
+        // TODO: change 1024*8 to an actually good estimation of metadata size
         // TODO: properly add Adaptive support
 
         // expose these buffers as bulk handles
@@ -236,6 +238,10 @@ class YokanEventStore {
                     0, local_descriptors_bulk.size(), true);
             auto descriptors_sizes = reinterpret_cast<size_t*>(descriptors_sizes_and_data.data());
             descriptors_sizes_bulk_ref.size = num_events*sizeof(size_t);
+            for(size_t i = 0; i < num_events; ++i) {
+                if(descriptors_sizes[i] > YOKAN_LAST_VALID_SIZE)
+                    descriptors_sizes[i] = 0;
+            }
             descriptors_bulk_ref.offset = descriptors_sizes_bulk_ref.size;
             descriptors_bulk_ref.size = std::accumulate(
                 descriptors_sizes, descriptors_sizes + num_events, (size_t)0);
