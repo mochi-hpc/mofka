@@ -5,6 +5,7 @@
  */
 #include "ConsumerHandleImpl.hpp"
 #include "PimplUtil.hpp"
+#include "Promise.hpp"
 #include <spdlog/spdlog.h>
 #include <limits>
 
@@ -23,7 +24,7 @@ bool ConsumerHandle::shouldStop() const {
     return self->m_should_stop;
 }
 
-void ConsumerHandle::feed(
+Future<void> ConsumerHandle::feed(
     size_t count,
     EventID firstID,
     const BulkRef &metadata_sizes,
@@ -32,7 +33,7 @@ void ConsumerHandle::feed(
     const BulkRef &data_desc)
 {
     try {
-        self->m_send_batch.on(self->m_consumer_endpoint)(
+        auto request = self->m_send_batch.on(self->m_consumer_endpoint).async(
             self->m_consumer_ptr,
             self->m_partition_index,
             count,
@@ -41,8 +42,20 @@ void ConsumerHandle::feed(
             metadata,
             data_desc_sizes,
             data_desc);
+        auto req_ptr = std::make_shared<thallium::async_response>(std::move(request));
+        return Future<void>{
+            [req_ptr]() {
+                req_ptr->wait();
+            },
+            [req_ptr]() {
+                return req_ptr->received();
+            }
+        };
     } catch(const std::exception& ex) {
-        spdlog::warn("Exception thrown while sending batch to consumer: {}", ex.what());
+        return Future<void>{
+            [ex](){ throw ex; },
+            [](){ return true; }
+        };
     }
 }
 

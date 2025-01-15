@@ -56,6 +56,13 @@ class Future {
     ~Future() = default;
 
     /**
+     * @brief Check the validity of the Future.
+     */
+    operator bool() const {
+        return static_cast<bool>(m_wait) || static_cast<bool>(m_completed);
+    }
+
+    /**
      * @brief Wait for the request to complete.
      */
     ResultType wait() const {

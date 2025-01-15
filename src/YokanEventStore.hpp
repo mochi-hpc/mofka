@@ -144,55 +144,79 @@ class YokanEventStore {
 
         auto c = batchSize.value;
 
-        // buffers to hold the metadata and descriptors
-        std::vector<yk_id_t> ids(c);
-        std::vector<size_t>  metadata_sizes(c);
-        std::vector<char>    metadata_buffer(c * 1024 * 8);
+        struct BufferSet {
 
-        // note: because we are using docLoad for descriptors, we need
-        // the sizes and documents to be contiguous even if the number
-        // of items requested varies.
-        std::vector<char> descriptors_sizes_and_data(c*(sizeof(size_t)+1024));
+            std::vector<yk_id_t> ids;
+            std::vector<size_t>  metadata_sizes;
+            std::vector<char>    metadata_buffer;
 
-        // TODO: change 1024*8 to an actually good estimation of metadata size
-        // TODO: properly add Adaptive support
+            // buffers to hold the metadata and descriptors
+            // note: because we are using docLoad for descriptors, we need
+            // the sizes and documents to be contiguous even if the number
+            // of items requested varies.
+            std::vector<char> descriptors_sizes_and_data;
 
-        // expose these buffers as bulk handles
-        auto local_metadata_bulk = m_engine.expose(
-            {{metadata_sizes.data(),  c*sizeof(metadata_sizes[0])},
-             {ids.data(),             c*sizeof(ids[0])},
-             {metadata_buffer.data(), metadata_buffer.size()*sizeof(metadata_buffer[0])}},
-            thallium::bulk_mode::read_write);
-        auto local_descriptors_bulk = m_engine.expose(
-            {{descriptors_sizes_and_data.data(),  descriptors_sizes_and_data.size()}},
-            thallium::bulk_mode::read_write);
+            thallium::bulk local_metadata_bulk;
+            thallium::bulk local_descriptors_bulk;
 
-        // create the BulkRef objects
-        auto self_addr = static_cast<std::string>(m_engine.self());
-        auto metadata_sizes_bulk_ref = BulkRef{
-            local_metadata_bulk,
-            0,
-            c*sizeof(size_t),
-            self_addr
+            std::string self_addr;
+
+            BulkRef metadata_sizes_bulk_ref;
+            BulkRef metadata_bulk_ref;
+            BulkRef descriptors_sizes_bulk_ref;
+            BulkRef descriptors_bulk_ref;
+
+            BufferSet(thallium::engine engine, size_t count)
+            : ids(count)
+            , metadata_sizes(count)
+            , metadata_buffer(count * 1024 * 8)
+            , descriptors_sizes_and_data(count * (sizeof(size_t) + 1024))
+            , self_addr(engine.self())
+            {
+
+                // expose these buffers as bulk handles
+                local_metadata_bulk = engine.expose(
+                    {{metadata_sizes.data(), count*sizeof(metadata_sizes[0])},
+                    {ids.data(), count*sizeof(ids[0])},
+                    {metadata_buffer.data(), metadata_buffer.size()*sizeof(metadata_buffer[0])}},
+                    thallium::bulk_mode::read_write);
+                local_descriptors_bulk = engine.expose(
+                    {{descriptors_sizes_and_data.data(),
+                      descriptors_sizes_and_data.size()}},
+                    thallium::bulk_mode::read_write);
+                // create bulk refs
+                metadata_sizes_bulk_ref = BulkRef{
+                    local_metadata_bulk,
+                    0,
+                    count*sizeof(size_t),
+                    self_addr
+                };
+                metadata_bulk_ref = BulkRef{
+                    local_metadata_bulk,
+                    count*(sizeof(size_t) + sizeof(yk_id_t)),
+                    metadata_buffer.size(),
+                    self_addr
+                };
+                descriptors_sizes_bulk_ref = BulkRef{
+                    local_descriptors_bulk,
+                    0,
+                    count*sizeof(size_t),
+                    self_addr
+                };
+                descriptors_bulk_ref = BulkRef{
+                    local_descriptors_bulk,
+                    count*sizeof(size_t),
+                    descriptors_sizes_and_data.size() - count*sizeof(size_t),
+                    self_addr
+                };
+
+            }
+
         };
-        auto metadata_bulk_ref = BulkRef{
-            local_metadata_bulk,
-            c*(sizeof(size_t) + sizeof(yk_id_t)),
-            metadata_buffer.size(),
-            self_addr
-        };
-        auto descriptors_sizes_bulk_ref = BulkRef{
-            local_descriptors_bulk,
-            0,
-            c*sizeof(size_t),
-            self_addr
-        };
-        auto descriptors_bulk_ref = BulkRef{
-            local_descriptors_bulk,
-            c*sizeof(size_t),
-            descriptors_sizes_and_data.size() - c*sizeof(size_t),
-            self_addr
-        };
+
+        auto b1 = std::make_shared<BufferSet>(m_engine, c);
+        auto b2 = std::make_shared<BufferSet>(m_engine, c);
+        Future<void> lastFeed;
 
         while(!consumerHandle.shouldStop()) {
 
@@ -211,51 +235,60 @@ class YokanEventStore {
             if(num_available_events == 0) { // m_is_marked_complete must be true
                                             // feed consumer 0 events with first_id = NoMoreEvents to indicate
                                             // that there are no more events to consume from this partition
-                consumerHandle.feed(
+                if(lastFeed) lastFeed.wait();
+                lastFeed = consumerHandle.feed(
                         0, NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
                 break;
             }
 
             // list metadata documents
             m_metadata_coll.listBulk(
-                    firstID+1, 0, local_metadata_bulk.get_bulk(),
-                    0, metadata_buffer.size(), true, batchSize.value);
+                    firstID+1, 0, b1->local_metadata_bulk.get_bulk(),
+                    0, b1->metadata_buffer.size(), true, batchSize.value);
 
             // check how many we actually pulled
-            auto it = std::find_if(metadata_sizes.begin(),
-                                   metadata_sizes.end(),
+            auto it = std::find_if(b1->metadata_sizes.begin(),
+                                   b1->metadata_sizes.end(),
                                    [](auto size) {
                                         return size > YOKAN_LAST_VALID_SIZE;
                                    });
 
-            size_t num_events = it - metadata_sizes.begin();
-            metadata_bulk_ref.size = std::accumulate(metadata_sizes.begin(), it, (size_t)0);
-            metadata_sizes_bulk_ref.size = num_events*sizeof(size_t);
+            size_t num_events = it - b1->metadata_sizes.begin();
+            b1->metadata_bulk_ref.size = std::accumulate(b1->metadata_sizes.begin(), it, (size_t)0);
+            b1->metadata_sizes_bulk_ref.size = num_events*sizeof(size_t);
 
             // load the corresponding descriptors
             m_descriptors_coll.loadBulk(
-                    num_events, ids.data(), local_descriptors_bulk.get_bulk(),
-                    0, local_descriptors_bulk.size(), true);
-            auto descriptors_sizes = reinterpret_cast<size_t*>(descriptors_sizes_and_data.data());
-            descriptors_sizes_bulk_ref.size = num_events*sizeof(size_t);
+                    num_events, b1->ids.data(), b1->local_descriptors_bulk.get_bulk(),
+                    0, b1->local_descriptors_bulk.size(), true);
+            auto descriptors_sizes = reinterpret_cast<size_t*>(b1->descriptors_sizes_and_data.data());
+            b1->descriptors_sizes_bulk_ref.size = num_events*sizeof(size_t);
             for(size_t i = 0; i < num_events; ++i) {
                 if(descriptors_sizes[i] > YOKAN_LAST_VALID_SIZE)
                     descriptors_sizes[i] = 0;
             }
-            descriptors_bulk_ref.offset = descriptors_sizes_bulk_ref.size;
-            descriptors_bulk_ref.size = std::accumulate(
+            b1->descriptors_bulk_ref.offset = b1->descriptors_sizes_bulk_ref.size;
+            b1->descriptors_bulk_ref.size = std::accumulate(
                 descriptors_sizes, descriptors_sizes + num_events, (size_t)0);
 
+            if(lastFeed)
+                lastFeed.wait();
+
             // feed the consumer handle
-            consumerHandle.feed(
+            lastFeed = consumerHandle.feed(
                     num_events, firstID,
-                    metadata_sizes_bulk_ref,
-                    metadata_bulk_ref,
-                    descriptors_sizes_bulk_ref,
-                    descriptors_bulk_ref);
+                    b1->metadata_sizes_bulk_ref,
+                    b1->metadata_bulk_ref,
+                    b1->descriptors_sizes_bulk_ref,
+                    b1->descriptors_bulk_ref);
 
             firstID += num_events;
+
+            std::swap(b1, b2);
         }
+
+        if(lastFeed)
+            lastFeed.wait();
 
         return result;
     }

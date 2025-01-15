@@ -9,6 +9,7 @@
 #include <mofka/ForwardDcl.hpp>
 #include <mofka/BulkRef.hpp>
 #include <mofka/EventID.hpp>
+#include <mofka/Future.hpp>
 
 #include <thallium.hpp>
 #include <memory>
@@ -72,13 +73,16 @@ class ConsumerHandle {
      * @param metadata Bulk wrapping the metadata.
      * @param data_desc_sizes Bulk wrapping data descriptor sizes (count*size_t).
      * @param data_desc Bulk wrapping data descriptors.
+     *
+     * @returns a Future representing the operation. The BulkRef objects passed
+     * to the function need to remain valid until the future has completed.
      */
-    void feed(size_t count,
-              EventID firstID,
-              const BulkRef& metadata_sizes,
-              const BulkRef& metadata,
-              const BulkRef& data_desc_sizes,
-              const BulkRef& data_desc);
+    Future<void> feed(size_t count,
+                      EventID firstID,
+                      const BulkRef& metadata_sizes,
+                      const BulkRef& metadata,
+                      const BulkRef& data_desc_sizes,
+                      const BulkRef& data_desc);
 
     /**
      * @brief Check if we should stop feeding the ConsumerHandle.
