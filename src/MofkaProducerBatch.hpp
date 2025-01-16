@@ -50,6 +50,12 @@ class MofkaProducerBatch : public ProducerBatchInterface {
 
     std::vector<Entry> m_entries;
 
+    /* buffers for serialization and sending */
+    std::vector<size_t>                   m_meta_sizes;
+    std::vector<char>                     m_meta_buffer;
+    std::vector<size_t>                   m_data_sizes;
+    std::vector<std::pair<void*, size_t>> m_data_segments;
+
     public:
 
     MofkaProducerBatch(
@@ -73,38 +79,34 @@ class MofkaProducerBatch : public ProducerBatchInterface {
 
     void send() override {
 
-        std::vector<size_t>                   meta_sizes;
-        std::vector<char>                     meta_buffer;
-        std::vector<size_t>                   data_sizes;
-        std::vector<std::pair<void*, size_t>> data_segments(1);
-
-        meta_sizes.reserve(m_entries.size());
+        m_meta_sizes.reserve(count());
         bool first_entry = true;
-        BufferWrapperOutputArchive archive(meta_buffer);
+        BufferWrapperOutputArchive archive(m_meta_buffer);
+        m_data_segments.emplace_back(); // first entry changed later
         for(auto& entry : m_entries) {
-            size_t meta_buffer_size = meta_buffer.size();
+            size_t meta_buffer_size = m_meta_buffer.size();
             m_serializer.serialize(archive, entry.metadata);
-            size_t meta_size = meta_buffer.size() - meta_buffer_size;
+            size_t meta_size = m_meta_buffer.size() - meta_buffer_size;
             if(first_entry) {
                 // use the first entry metadata size as an estimate for the total size
                 size_t estimated_total_size = meta_size * m_entries.size() * 1.1;
-                meta_buffer.reserve(estimated_total_size);
+                m_meta_buffer.reserve(estimated_total_size);
                 first_entry = false;
             }
-            meta_sizes.push_back(meta_size);
+            m_meta_sizes.push_back(meta_size);
             size_t data_size = 0;
             for(const auto& seg : entry.data.segments()) {
                 if(seg.size == 0) continue;
-                data_segments.emplace_back(seg.ptr, seg.size);
+                m_data_segments.emplace_back(seg.ptr, seg.size);
                 data_size += seg.size;
             }
-            data_sizes.push_back(data_size);
+            m_data_sizes.push_back(data_size);
         }
-        data_segments[0] = {data_sizes.data(), data_sizes.size()*sizeof(data_sizes[0])};
-        thallium::bulk metadata_content, data_content;
+        m_data_segments[0] = {m_data_sizes.data(), m_data_sizes.size()*sizeof(m_data_sizes[0])};
+        thallium::bulk data_bulk, metadata_bulk;
         try {
-            metadata_content = exposeMetadata(meta_buffer, meta_sizes);
-            data_content = exposeData(data_segments);
+            metadata_bulk = exposeMetadata(m_meta_buffer, m_meta_sizes);
+            data_bulk = exposeData(m_data_segments);
         } catch(const std::exception& ex) {
             setPromises(
                 Exception{fmt::format(
@@ -115,8 +117,8 @@ class MofkaProducerBatch : public ProducerBatchInterface {
             auto self_addr = static_cast<std::string>(m_engine.self());
             Result<EventID> result = m_send_batch_rpc.on(m_partition_ph)(
                 m_producer_name, count(),
-                BulkRef{metadata_content, 0, metadata_content.size(), self_addr},
-                BulkRef{data_content, 0, data_content.size(), self_addr});
+                BulkRef{metadata_bulk, 0, metadata_bulk.size(), self_addr},
+                BulkRef{data_bulk, 0, data_bulk.size(), self_addr});
             if(result.success()) {
                 setPromises(result.value());
             } else {
@@ -127,6 +129,12 @@ class MofkaProducerBatch : public ProducerBatchInterface {
                 Exception{fmt::format(
                     "Unexpected error when sending batch: {}", ex.what())});
         }
+
+        m_entries.clear();
+        m_meta_sizes.clear();
+        m_meta_buffer.clear();
+        m_data_sizes.clear();
+        m_data_segments.clear();
     }
 
     size_t count() const override {
