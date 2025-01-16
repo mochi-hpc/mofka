@@ -59,7 +59,12 @@ class ActiveProducerBatchQueue {
             }
             auto last_batch = m_batch_queue.back();
             if(!adaptive && last_batch->count() == m_batch_size.value) {
-                m_batch_queue.push(m_create_new_batch());
+                if(m_reusable_batches.empty()) {
+                    m_batch_queue.push(m_create_new_batch());
+                } else {
+                    m_batch_queue.push(m_reusable_batches.front());
+                    m_reusable_batches.pop_front();
+                }
                 last_batch = m_batch_queue.back();
                 need_notification = true;
             }
