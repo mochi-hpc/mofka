@@ -56,6 +56,8 @@ class MofkaProducerBatch : public ProducerBatchInterface {
     std::vector<size_t>                   m_data_sizes;
     std::vector<std::pair<void*, size_t>> m_data_segments;
 
+    thallium::bulk m_meta_bulk;
+
     public:
 
     MofkaProducerBatch(
@@ -103,9 +105,9 @@ class MofkaProducerBatch : public ProducerBatchInterface {
             m_data_sizes.push_back(data_size);
         }
         m_data_segments[0] = {m_data_sizes.data(), m_data_sizes.size()*sizeof(m_data_sizes[0])};
-        thallium::bulk data_bulk, metadata_bulk;
+        thallium::bulk data_bulk;
         try {
-            metadata_bulk = exposeMetadata(m_meta_buffer, m_meta_sizes);
+            exposeMetadata();
             data_bulk = exposeData(m_data_segments);
         } catch(const std::exception& ex) {
             setPromises(
@@ -117,7 +119,7 @@ class MofkaProducerBatch : public ProducerBatchInterface {
             auto self_addr = static_cast<std::string>(m_engine.self());
             Result<EventID> result = m_send_batch_rpc.on(m_partition_ph)(
                 m_producer_name, count(),
-                BulkRef{metadata_bulk, 0, metadata_bulk.size(), self_addr},
+                BulkRef{m_meta_bulk, 0, m_meta_bulk.size(), self_addr},
                 BulkRef{data_bulk, 0, data_bulk.size(), self_addr});
             if(result.success()) {
                 setPromises(result.value());
@@ -157,19 +159,39 @@ class MofkaProducerBatch : public ProducerBatchInterface {
         }
     }
 
-    thallium::bulk exposeMetadata(
-            const std::vector<char>& meta_buffer,
-            const std::vector<size_t>& meta_sizes) {
-        if(meta_buffer.size() == 0) return thallium::bulk{};
+    void exposeMetadata() {
+        /* first check if we actually need to change the existing bulk */
+        auto seg_count = m_meta_bulk.segment_count();
+        if(seg_count == 2) {
+            auto bulk = m_meta_bulk.get_bulk();
+            void* ptrs[2];
+            hg_size_t sizes[2];
+            hg_uint32_t actual_count;
+            hg_return_t ret = margo_bulk_access(
+                bulk, 0, m_meta_bulk.size(), HG_BULK_READ_ONLY, 2,
+                ptrs, sizes, &actual_count);
+            if(ret == HG_SUCCESS
+            && ptrs[0] == (void*)m_meta_sizes.data()
+            && sizes[0] == m_meta_sizes.size()*sizeof(m_meta_sizes[0])
+            && ptrs[1] == (void*)m_meta_buffer.data()
+            && sizes[1] == m_meta_buffer.size()*sizeof(m_meta_buffer[0])) {
+                std::cerr << "Reusing already exposed buffer" << std::endl;
+                return;
+            }
+        }
+        if(m_meta_buffer.size() == 0) {
+           m_meta_bulk = thallium::bulk{};
+           return;
+        }
         std::vector<std::pair<void *, size_t>> segments;
         segments.reserve(2);
         segments.emplace_back(
-            const_cast<size_t*>(meta_sizes.data()),
-            meta_sizes.size()*sizeof(meta_sizes[0]));
+            const_cast<size_t*>(m_meta_sizes.data()),
+            m_meta_sizes.size()*sizeof(m_meta_sizes[0]));
         segments.emplace_back(
-            const_cast<char*>(meta_buffer.data()),
-            meta_buffer.size()*sizeof(meta_buffer[0]));
-        return m_engine.expose(segments, thallium::bulk_mode::read_only);
+            const_cast<char*>(m_meta_buffer.data()),
+            m_meta_buffer.size()*sizeof(m_meta_buffer[0]));
+        m_meta_bulk = m_engine.expose(segments, thallium::bulk_mode::read_only);
     }
 
     thallium::bulk exposeData(const std::vector<std::pair<void *, size_t>>& segments) {
