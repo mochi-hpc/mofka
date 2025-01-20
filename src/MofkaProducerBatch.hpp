@@ -175,7 +175,6 @@ class MofkaProducerBatch : public ProducerBatchInterface {
             && sizes[0] == m_meta_sizes.size()*sizeof(m_meta_sizes[0])
             && ptrs[1] == (void*)m_meta_buffer.data()
             && sizes[1] == m_meta_buffer.size()*sizeof(m_meta_buffer[0])) {
-                std::cerr << "Reusing already exposed buffer" << std::endl;
                 return;
             }
         }
