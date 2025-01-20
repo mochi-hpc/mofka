@@ -350,13 +350,24 @@ static void createMofkaTopic(
             driver.addMemoryPartition(topic_name, server_rank);
         } else if(partition_type == "default") {
             // Create metadata provider
-            auto metadata_config = mofka::Metadata{R"({"database":{"type":"map","config":{}}})"};
+            auto metadata_config = mofka::Metadata{R"({
+                "buffer_cache": {
+                    "type": "lru",
+                    "margin": 0.1,
+                    "capacity": 32
+                },
+                "database":{
+                    "type":"map",
+                    "config":{}
+                }
+            })"};
             metadata_config.json()["database"]["type"] = database_type;
             if(database_type != "map" && database_type != "unordered_map") {
                 metadata_config.json()["database"]["config"]["path"]
                     = database_path_prefix + "/" + topic_name + "_metadata_" + std::to_string(i);
                 metadata_config.json()["database"]["config"]["create_if_missing"] = true;
             }
+
             auto metadata_provider = driver.addDefaultMetadataProvider(
                 server_rank, metadata_config);
             // Create data provider
