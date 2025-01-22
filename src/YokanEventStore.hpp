@@ -126,7 +126,7 @@ class YokanEventStore {
     Result<void> markAsComplete() {
         Result<void> result;
         result.success() = true;
-        m_metadata_coll.update(0, "T", 1);
+        m_metadata_coll.update(0, "T", 1, YOKAN_MODE_NO_RDMA);
         m_is_marked_complete = true;
         m_num_events_cv.notify_all();
         return result;
@@ -334,8 +334,8 @@ class YokanEventStore {
         auto descriptors_coll = yokan::Collection{descriptorsCollName.c_str(), database};
         auto marked_as_complete = false;
         if(init_collection) {
-            metadata_coll.store("F", 1);    // marked as completed
-            descriptors_coll.store("F", 1); // marked as completed
+            metadata_coll.store("F", 1, YOKAN_MODE_NO_RDMA);    // marked as completed
+            descriptors_coll.store("F", 1, YOKAN_MODE_NO_RDMA); // marked as completed
         } else {
             std::string tmp(1, '\0');
             size_t s = 1;
