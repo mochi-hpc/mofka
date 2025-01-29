@@ -286,7 +286,8 @@ static void rdkafka_consume_messages(
 
     decltype(std::chrono::high_resolution_clock::now()) t_start;
 
-    spdlog::info("Consuming {} messages...", warmup_events + num_events);
+    spdlog::info("Consuming {} messages (including {} warmup messages)...",
+                 warmup_events + num_events, num_events);
 
     MPI_Barrier(MPI_COMM_WORLD);
 
