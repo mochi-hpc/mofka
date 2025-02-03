@@ -97,7 +97,7 @@ Future<EventID> KafkaProducer::push(Metadata metadata, Data data, std::optional<
         msg->promise = promise;
 
         /* serialize the payload */
-        msg->payload.resize(sizeof(size_t));
+        msg->payload.resize(sizeof(size_t)); // make space for size of metadata
         BufferWrapperOutputArchive archive{msg->payload};
         m_topic->serializer().serialize(archive, metadata);
         size_t metadata_size = msg->payload.size() - sizeof(size_t);

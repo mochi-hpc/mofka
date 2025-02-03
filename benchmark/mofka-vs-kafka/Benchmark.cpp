@@ -152,7 +152,7 @@ static void rdkafka_produce_messages(
     rd_kafka_t *producer = rd_kafka_new(RD_KAFKA_PRODUCER, conf, nullptr, 0);
 
     int total_num_events = warmup_events + num_events;
-    spdlog::info("Preparring {} messages...", total_num_events);
+    spdlog::info("Preparing {} messages...", total_num_events);
     std::vector<std::string> messages(total_num_events);
     for(auto& msg : messages)
         msg = random_bytes(message_size);
@@ -168,16 +168,12 @@ static void rdkafka_produce_messages(
         if (i == warmup_events)
             t_start = std::chrono::high_resolution_clock::now();
         auto partition_index = my_partitions[i % my_partitions.size()];
-        /* Note: technically because we have created the messages above and they won't
-         * disappear from memory, we could avoid using RD_KAFKA_MSG_F_COPY bellow.
-         * However for a more fair comparison with Mofka, which makes a copy, we use
-         * RD_KAFKA_MSG_F_COPY here.
-         * */
+        auto& event = messages[i];
         rd_kafka_producev(producer,
                           RD_KAFKA_V_TOPIC(topic_name.c_str()),
                           RD_KAFKA_V_PARTITION(partition_index),
                           RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
-                          RD_KAFKA_V_VALUE(const_cast<char*>(messages[i].data()), messages[i].size()),
+                          RD_KAFKA_V_VALUE(const_cast<char*>(event.data()), event.size()),
                           RD_KAFKA_V_END);
 
         rd_kafka_poll(producer, 0);
@@ -289,6 +285,8 @@ static void rdkafka_consume_messages(
     spdlog::info("Consuming {} messages (including {} warmup messages)...",
                  warmup_events + num_events, num_events);
 
+    std::vector<std::string> messages;
+
     MPI_Barrier(MPI_COMM_WORLD);
 
     int i = 0;
@@ -300,6 +298,7 @@ static void rdkafka_consume_messages(
         rd_kafka_message_t *msg = rd_kafka_consumer_poll(consumer, 100);
 
         if (msg && !msg->err) {
+            messages.emplace_back((const char*)msg->payload, msg->len);
             if (i >= warmup_events) {
                 if (acknowledge_every.has_value() && (i - warmup_events + 1) % acknowledge_every.value() == 0) {
                     auto t_commit_start = std::chrono::high_resolution_clock::now();
@@ -440,7 +439,7 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     std::vector<std::string> metadata(total_num_events);
     for (int i = 0; i < total_num_events; ++i) {
         data[i] = random_bytes(data_size);
-        metadata[i] = "\"" + random_bytes(metadata_size-2) + "\"";
+        metadata[i] = random_bytes(metadata_size);
     }
 
     int rank, num_producers;
@@ -458,7 +457,7 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
         spdlog::info("Start producing {} for warmup...", warmup_events);
         for (int i = 0; i < warmup_events; ++i) {
             auto partition_index = my_partitions[i % my_partitions.size()];
-            producer.push(std::move(metadata[i]),
+            producer.push(metadata[i],
                           mofka::Data{data[i].data(), data[i].size()},
                           partition_index);
         }
@@ -701,6 +700,7 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     };
 
     std::vector<std::vector<char>> data;
+    std::vector<mofka::Metadata> metadata;
 
     mofka::DataBroker data_broker =
         [&data](const mofka::Metadata&, const mofka::DataDescriptor& desc) {
@@ -724,6 +724,7 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
 
     while (num_partitions) {
         auto event = consumer.pull().wait();
+        metadata.push_back(event.metadata());
         if (num_events == warmup_events) {
             t_start = std::chrono::high_resolution_clock::now();
         }

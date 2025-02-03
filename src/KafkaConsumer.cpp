@@ -70,7 +70,7 @@ void KafkaConsumer::subscribe() {
     m_should_stop = false;
     auto run = [this](){
         while(!m_should_stop) {
-            int timeout = 0; // m_thread_pool.size() > 1 ? 0 : 100;
+            int timeout = 100; // m_thread_pool.size() > 1 ? 0 : 100;
             rd_kafka_message_t* msg = rd_kafka_consumer_poll(
                 m_kafka_consumer.get(), timeout);
             if(!msg) {
@@ -127,6 +127,7 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
     }
 
     // Check for NoMoreEvents
+#if 0
     const void* value;
     size_t value_size;
     if (headers &&
@@ -146,13 +147,31 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
         rd_kafka_message_destroy(msg);
         return;
     }
+#endif
+
+    size_t metadata_size = 0;
+    std::memcpy(&metadata_size, msg->payload, sizeof(metadata_size));
+    size_t data_size = msg->len - sizeof(metadata_size) - metadata_size;
+    if(metadata_size == std::numeric_limits<size_t>::max()) {
+        auto completed = ++m_completed_partitions;
+        // FIXME If partitions are completed there is no reason to continue running the polling thread
+        //if(completed == m_partitions.size()) {
+            //m_should_stop = true;
+        //}
+        if(completed == m_partitions.size()) {
+            //m_should_stop = true;
+            auto ult = [promise=std::move(promise)]() mutable {
+                promise.setValue(Event{std::make_shared<KafkaEvent>()});
+            };
+            m_thread_pool.pushWork(std::move(ult), std::numeric_limits<uint64_t>::max()-1);
+        }
+        rd_kafka_message_destroy(msg);
+        return;
+    }
 
     try {
         auto tpc = topic();
         // deserialize its metadata
-        size_t metadata_size = 0;
-        std::memcpy(&metadata_size, msg->payload, sizeof(metadata_size));
-        size_t data_size = msg->len - sizeof(metadata_size) - metadata_size;
         auto metadata = Metadata{};
         BufferWrapperInputArchive metadata_archive{
             std::string_view{
