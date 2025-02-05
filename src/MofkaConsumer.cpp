@@ -74,8 +74,8 @@ void MofkaConsumer::subscribe() {
             }
         );
     }
-    auto mid = m_engine.get_margo_instance();
-    margo_set_progress_when_needed(mid, false);
+    // auto mid = m_engine.get_margo_instance();
+    // margo_set_progress_when_needed(mid, false);
     // wait for the ULTs to complete
     for(auto& ev : ult_completed)
         ev.wait();
@@ -100,8 +100,8 @@ void MofkaConsumer::unsubscribe() {
     // wait for the ULTs to complete
     for(auto& ev : ult_completed)
         ev.wait();
-    auto mid = m_engine.get_margo_instance();
-    margo_set_progress_when_needed(mid, true);
+    // auto mid = m_engine.get_margo_instance();
+    // margo_set_progress_when_needed(mid, true);
 }
 
 void MofkaConsumer::partitionCompleted() {
