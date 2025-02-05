@@ -283,7 +283,7 @@ static void rdkafka_consume_messages(
     decltype(std::chrono::high_resolution_clock::now()) t_start;
 
     spdlog::info("Consuming {} messages (including {} warmup messages)...",
-                 warmup_events + num_events, num_events);
+                 warmup_events + num_events, warmup_events);
 
     std::vector<std::string> messages;
 
@@ -436,10 +436,10 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
 
     spdlog::info("Preparing metadata and data for {} events", total_num_events);
     std::vector<std::string> data(total_num_events);
-    std::vector<std::string> metadata(total_num_events);
+    std::vector<mofka::Metadata> metadata(total_num_events);
     for (int i = 0; i < total_num_events; ++i) {
         data[i] = random_bytes(data_size);
-        metadata[i] = random_bytes(metadata_size);
+        metadata[i] = mofka::Metadata{random_bytes(metadata_size)};
     }
 
     int rank, num_producers;
@@ -700,7 +700,6 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     };
 
     std::vector<std::vector<char>> data;
-    std::vector<mofka::Metadata> metadata;
 
     mofka::DataBroker data_broker =
         [&data](const mofka::Metadata&, const mofka::DataDescriptor& desc) {
@@ -724,7 +723,9 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
 
     while (num_partitions) {
         auto event = consumer.pull().wait();
-        metadata.push_back(event.metadata());
+        if (num_events == 0) {
+            spdlog::info("First event pulled has metadata size {}", event.metadata().string().size());
+        }
         if (num_events == warmup_events) {
             t_start = std::chrono::high_resolution_clock::now();
         }
