@@ -58,7 +58,28 @@ struct Promise {
 
     private:
 
-    using State = thallium::eventual<std::variant<Type, Exception>>;
+    struct State {
+
+        std::variant<Type, Exception> m_content;
+        ABT_eventual_memory           m_eventual = ABT_EVENTUAL_INITIALIZER;
+
+        bool test() const {
+            ABT_bool flag;
+            ABT_eventual_test(ABT_EVENTUAL_MEMORY_GET_HANDLE(&m_eventual), nullptr, &flag);
+            return flag;
+        }
+
+        std::variant<Type, Exception>&& wait() && {
+            ABT_eventual_wait(ABT_EVENTUAL_MEMORY_GET_HANDLE(&m_eventual), nullptr);
+            return std::move(m_content);
+        }
+
+        template<typename T>
+        void set_value(T&& value) {
+            m_content = std::move(value);
+            ABT_eventual_set(ABT_EVENTUAL_MEMORY_GET_HANDLE(&m_eventual), nullptr, 0);
+        }
+    };
 
     Promise(std::shared_ptr<State> state)
     : m_state(std::move(state)) {}
