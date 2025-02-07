@@ -273,7 +273,6 @@ static void rdkafka_consume_messages(
 
     rd_kafka_t *consumer = rd_kafka_new(RD_KAFKA_CONSUMER, conf, nullptr, 0);
     rd_kafka_poll_set_consumer(consumer);
-
     rd_kafka_topic_partition_list_t *topics = rd_kafka_topic_partition_list_new(1);
     for(auto i : my_partitions) {
         rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), i);
@@ -311,7 +310,15 @@ static void rdkafka_consume_messages(
             }
             i += 1;
         }
-        if(msg) rd_kafka_message_destroy(msg);
+        if(msg && msg->err) {
+            std::cout << "Error from partition " << msg->partition
+                      << " " << rd_kafka_message_errstr(msg) << std::endl;
+        }
+        if(msg) {
+            rd_kafka_message_destroy(msg);
+            if (i % 100000 == 0)
+                std::cout << "Process " << rank << " consumed " << i << " messages" << std::endl;
+        }
         if (i == warmup_events + num_events) break;
     }
 
@@ -692,7 +699,9 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     auto num_partitions = topic.partitions().size();
     auto my_partitions = computeMyPartitions(num_consumers, rank, num_partitions);
 
+#if 0
     auto thread_pool = mofka::ThreadPool{mofka::ThreadCount{(size_t)threads}};
+#endif
 
     mofka::DataSelector data_selector =
         [data_selection](const mofka::Metadata&, const mofka::DataDescriptor& desc) {
@@ -712,8 +721,13 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
 
     MPI_Barrier(MPI_COMM_WORLD);
     spdlog::info("Creating consumer");
+#if 0
     auto consumer = topic.consumer(
             consumer_name, thread_pool, batch_size,
+            data_selector, data_broker, my_partitions);
+#endif
+    auto consumer = topic.consumer(
+            consumer_name, mofka::ThreadCount{(size_t)threads}, batch_size,
             data_selector, data_broker, my_partitions);
 
     spdlog::info("Start consuming events...");
@@ -742,6 +756,8 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
             if(num_events >= warmup_events)
                 t_ack += std::chrono::duration<double>(t2 - t1).count();
         }
+        if (num_events % 100000 == 0)
+            std::cout << "Process " << rank << " consumed " << num_events << " messages" << std::endl;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
