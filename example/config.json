@@ -1,10 +1,10 @@
 {
-    "libraries" : {
-        "mofka" : "./src/libmofka-bedrock-module.so",
-        "yokan" : "libyokan-bedrock-module.so",
-        "warabi": "libwarabi-bedrock-module.so",
-        "flock" : "libflock-bedrock-module.so"
-    },
+    "libraries" : [
+        "./src/libmofka-bedrock-module.so",
+        "libyokan-bedrock-module.so",
+        "libwarabi-bedrock-module.so",
+        "libflock-bedrock-module.so"
+    ],
     "providers" : [
         {
             "name" : "my_flock_provider",

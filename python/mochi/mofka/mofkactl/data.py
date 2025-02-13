@@ -45,11 +45,11 @@ def add(
             # check the rank provided
             if rank >= service.num_servers:
                 print(f"Error: invalid rank {rank} (should be lower than {service.num_servers})")
-            provider = service.add_metadata_provider(
+            provider = service.add_data_provider(
                 server_rank=rank,
                 target_type=type,
-                target_config=partition_config,
-                dependencies=partition_dependencies)
+                target_config=target_config,
+                dependencies=target_dependencies)
             print(f"Metadata provider started: {provider}")
         except ClientException as err:
             print(f"Error: {err}")

@@ -48,8 +48,8 @@ def add(
             provider = service.add_metadata_provider(
                 server_rank=rank,
                 database_type=type,
-                database_config=partition_config,
-                dependencies=partition_dependencies)
+                database_config=database_config,
+                dependencies=database_dependencies)
             print(f"Metadata provider started: {provider}")
         except ClientException as err:
             print(f"Error: {err}")
