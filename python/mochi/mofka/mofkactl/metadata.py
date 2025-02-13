@@ -50,7 +50,7 @@ def add(
                 database_type=type,
                 database_config=database_config,
                 dependencies=database_dependencies)
-            print(f"Metadata provider started: {provider}")
+            print(f"{provider}")
         except ClientException as err:
             print(f"Error: {err}")
             del service

@@ -50,7 +50,7 @@ def add(
                 target_type=type,
                 target_config=target_config,
                 dependencies=target_dependencies)
-            print(f"Metadata provider started: {provider}")
+            print(f"{provider}")
         except ClientException as err:
             print(f"Error: {err}")
             del service
