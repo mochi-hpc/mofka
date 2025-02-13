@@ -164,6 +164,36 @@ PYBIND11_MODULE(pymofka_client, m) {
             "data_provider"_a=std::string_view{},
             "partition_config"_a=nlohmann::json::object(),
             "pool_name"_a="")
+        .def("add_metadata_provider",
+            [](mofka::MofkaDriver& service,
+               size_t server_rank,
+               const std::string database_type,
+               const nlohmann::json& database_config,
+               const mofka::MofkaDriver::Dependencies& dependencies) {
+                mofka::Metadata config;
+                config.json()["database"] = nlohmann::json::object();
+                config.json()["database"]["type"] = database_type;
+                config.json()["database"]["config"] = database_config;
+                return service.addDefaultMetadataProvider(server_rank, config, dependencies);
+            },
+            "server_rank"_a, "database_type"_a="map",
+            "database_config"_a=nlohmann::json::object(),
+            "dependencies"_a=mofka::MofkaDriver::Dependencies{})
+        .def("add_data_provider",
+            [](mofka::MofkaDriver& service,
+               size_t server_rank,
+               const std::string target_type,
+               const nlohmann::json& target_config,
+               const mofka::MofkaDriver::Dependencies& dependencies) {
+                mofka::Metadata config;
+                config.json()["target"] = nlohmann::json::object();
+                config.json()["target"]["type"] = target_type;
+                config.json()["target"]["config"] = target_config;
+                return service.addDefaultDataProvider(server_rank, config, dependencies);
+            },
+            "server_rank"_a, "target_type"_a="memory",
+            "target_config"_a=nlohmann::json::object(),
+            "dependencies"_a=mofka::MofkaDriver::Dependencies{})
         .def("add_custom_partition",
             [](mofka::MofkaDriver& service,
                std::string_view topic_name,
