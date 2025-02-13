@@ -274,3 +274,43 @@ providers on different processes.
    and :code:`mofka:metadata`. This is perfectly valid. However, storing topic information
    in the same database as events is not recommended as it could lead to a bottleneck and
    it could make it difficult later on to delete partitions.
+
+
+Creating Metadata and Data providers
+------------------------------------
+
+In the above programs, our initial configuration already had a Yokan provider and a Warabi
+providers that we could use as metadata and data providers respectively for the default
+partition. In practice, you may want to create such providers at the same time as you
+create your partitions. This can be done as shown in the following code examples.
+
+.. tabs::
+
+   .. group-tab:: mofkactl
+
+      .. literalinclude:: ../_code/energy_topic.sh
+         :language: bash
+         :start-after: START ADD PROVIDERS
+         :end-before: END ADD PROVIDERS
+
+   .. group-tab:: C++
+
+      .. literalinclude:: ../_code/energy_topic.cpp
+         :language: cpp
+         :start-after: START ADD PROVIDERS
+         :end-before: END ADD PROVIDERS
+         :dedent: 8
+
+      Adding a metadata and data providers is done via the :code:`MofkaDriver` instance by calling
+      :code:`addDefaultMetadataProvider()` and :code:`addDefaultDataProvider()`.
+
+   .. group-tab:: Python
+
+      .. literalinclude:: ../_code/energy_topic.py
+         :language: python
+         :start-after: START ADD PROVIDERS
+         :end-before: END ADD PROVIDERS
+         :dedent: 4
+
+      Adding a partition is done via the :code:`MofkaDriver` instance by calling
+      :code:`add_metadata_provider()` or :code:`add_data_provider()`.

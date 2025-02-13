@@ -43,6 +43,28 @@ def main(group_file: str):
         server_rank=0)
     # END ADD PARTITION
 
+    # START ADD PROVIDERS
+    metadata_provider = driver.add_metadata_provider(
+        server_rank=0,
+        database_type="log",
+        database_config={
+            "path": "/tmp/mofka-log",
+            "create_if_missing": True
+        })
+    data_provider = driver.add_data_provider(
+        server_rank=0,
+        target_type="abtio",
+        target_config={
+            "path": "/tmp/mofka-data",
+            "create_if_missing": True
+        })
+    driver.add_default_partition(
+        topic_name="collisions",
+        server_rank=0,
+        metadata_provider=metadata_provider,
+        data_provider=data_provider)
+    # END ADD PROVIDERS
+
     # START PRODUCER
     from mochi.mofka.client import ThreadPool, AdaptiveBatchSize, Ordering
 

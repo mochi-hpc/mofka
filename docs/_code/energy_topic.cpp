@@ -51,6 +51,32 @@ int main(int argc, char** argv) {
         driver.addDefaultPartition("collisions", 0);
         // END ADD PARTITION
 
+        // START ADD PROVIDERS
+        // add a metadata provider
+        auto metadata_config = mofka::Metadata{R"({
+            "database": {
+                "type": "log",
+                "config": {
+                    "path": "/tmp/mofka-log",
+                    "create_if_missing": true
+                }
+            }
+        })"};
+        auto metadata_provider = driver.addDefaultMetadataProvider(0, metadata_config);
+        // add a data provider
+        auto data_config = mofka::Metadata{R"({
+            "target": {
+                "type": "abtio",
+                "config": {
+                    "path": "/tmp/mofka-data",
+                    "create_if_missing": true
+                }
+            }
+        })"};
+        auto data_provider = driver.addDefaultDataProvider(0, data_config);
+        // create a partition that uses these providers
+        driver.addDefaultPartition("collisions", 0, metadata_provider, data_provider);
+        // END ADD PROVIDERS
         {
         // START PRODUCER
         mofka::TopicHandle topic = driver.openTopic("collisions");
