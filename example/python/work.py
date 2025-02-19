@@ -21,21 +21,26 @@ class MofkaSingleton:
         return cls._instance
 
 def consume():
-    topic_name = "my_topic"
-    s = MofkaSingleton()
-    topic = s.driver.open_topic(topic_name)
-    consumer = topic.consumer(
+
+    try:
+        topic_name = "my_topic"
+        s = MofkaSingleton()
+        topic = s.driver.open_topic(topic_name)
+        consumer = topic.consumer(
             name="my_consumer",
+            thread_pool=mofka.ThreadPool(0),
             batch_size=mofka.AdaptiveBatchSize,
             data_broker=mofka.ByteArrayAllocator,
             data_selector=mofka.FullDataSelector)
-    print("Consumer created", flush=True)
+        print("Consumer created", flush=True)
 
-    event_count = 0
-    while event_count < 20:
-        event = consumer.pull().wait()
-        print(f"Received event ID {event.event_id} with metadata {event.metadata}", flush=True)
-        event_count += 1
+        event_count = 0
+        while event_count < 20:
+            event = consumer.pull().wait()
+            print(f"Received event ID {event.event_id} with metadata {event.metadata}", flush=True)
+            event_count += 1
+    except:
+        print(traceback.format_exc(), flush=True)
 
     return "Consumer done!"
 
