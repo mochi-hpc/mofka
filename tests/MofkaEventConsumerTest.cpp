@@ -42,7 +42,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
 
         {
             std::vector<std::string> data(100);
-            auto producer = topic.producer();
+            auto producer = topic.producer(driver.defaultThreadPool());
             REQUIRE(static_cast<bool>(producer));
             for(unsigned i=0; i < 100; ++i) {
                 mofka::Metadata metadata = mofka::Metadata{
@@ -61,7 +61,7 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         SECTION("Consumer without data")
         {
             mofka::Consumer consumer;
-            REQUIRE_NOTHROW(consumer = topic.consumer("myconsumer"));
+            REQUIRE_NOTHROW(consumer = topic.consumer("myconsumer", driver.defaultThreadPool()));
             REQUIRE(static_cast<bool>(consumer));
             for(unsigned i=0; i < 100; ++i) {
                 mofka::Event event;

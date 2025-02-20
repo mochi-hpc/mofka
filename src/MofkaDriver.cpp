@@ -552,4 +552,9 @@ std::string MofkaDriver::addDefaultDataProvider(
     }
 }
 
+ThreadPool MofkaDriver::defaultThreadPool() const {
+    auto pool = self->m_engine.get_progress_pool();
+    return ThreadPool{pool};
+}
+
 }

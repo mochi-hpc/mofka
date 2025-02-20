@@ -118,6 +118,11 @@ class MofkaDriver {
     bool topicExists(std::string_view name);
 
     /**
+     * @brief Get the default ThreadPool.
+     */
+    ThreadPool defaultThreadPool() const;
+
+    /**
      * @brief Map of dependency descriptors for the partition.
      * Please refer to the partition type's documentation for more information
      * on its expected dependencies.
