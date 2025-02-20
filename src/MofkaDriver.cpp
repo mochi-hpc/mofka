@@ -13,8 +13,10 @@
 #include "MofkaDriverImpl.hpp"
 #include "MofkaTopicHandle.hpp"
 #include "MetadataImpl.hpp"
+#include "Logging.hpp"
 
 #include <bedrock/Client.hpp>
+#include <spdlog/spdlog.h>
 
 #include <fstream>
 
@@ -36,6 +38,7 @@ static inline std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
           }
           return $result;
       )";
+    spdlog::trace("[mofka:client] Discovering Mofka service master database");
     bsgh.queryConfig(script, &configs);
     auto doc = Metadata{configs};
     std::vector<std::pair<std::string, uint16_t>> masters;
@@ -45,8 +48,11 @@ static inline std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
             masters.push_back({address, provider_id.get<uint16_t>()});
         }
     }
-    if(masters.empty())
+    if(masters.empty()) {
         throw Exception{"Could not find a Yokan provider with the \"mofka:master\" tag"};
+    }
+    spdlog::trace("[mofka:client] Found master database as {} (provider_id={})",
+                  masters[0].first, masters[0].second);
     // note: if multiple yokan databases have the mofka:master tag,
     // it is assume that they are linked together via RAFT to replicate the same content
     return masters[0];
@@ -54,6 +60,8 @@ static inline std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
 
 MofkaDriver::MofkaDriver(const std::string& groupfile, bool use_progress_thread) {
     // try to infer the address from one of the members
+    spdlog::trace("[mofka:client] Initializing MofkaDriver with group_file={} and use_progress_thread={}",
+                  groupfile, use_progress_thread);
     std::ifstream inputFile(groupfile);
     if(!inputFile.is_open()) {
         throw Exception{"Could not open group file"};
@@ -66,12 +74,16 @@ MofkaDriver::MofkaDriver(const std::string& groupfile, bool use_progress_thread)
         || !content["members"].is_array()
         || !content["members"][0].is_object()
         || !content["members"][0].contains("address")
-        || !content["members"][0]["address"].is_string())
+        || !content["members"][0]["address"].is_string()) {
             throw Exception{"Group file doesn't appear to be a correctly formatted Flock group file"};
+        }
         auto& address = content["members"][0]["address"].get_ref<const std::string&>();
         auto protocol = address.substr(0, address.find(':'));
+        spdlog::trace("[mofka:client] Initializing Thallium engine for MofkaDriver "
+                      "with protocol={} and use_progress_thread={}", protocol, use_progress_thread);
         auto engine = thallium::engine{protocol, THALLIUM_SERVER_MODE, use_progress_thread};
         auto sh = MofkaDriver{groupfile, engine};
+        setupLogging(sh.self->m_engine.get_margo_instance());
         self = std::move(sh.self);
     } catch(const std::exception& ex) {
         throw Exception(ex.what());
@@ -104,7 +116,9 @@ MofkaDriver::MofkaDriver(const std::string& groupfile, thallium::engine engine) 
             if(c < addrSet.size())
                 addresses.push_back(addr);
         }
+        spdlog::trace("[mofka:client] Creating bedrock client");
         auto bedrock_client = bedrock::Client{engine};
+        spdlog::trace("[mofka:client] Creating bedrock service handle");
         auto bsgh = bedrock_client.makeServiceGroupHandle(addresses);
         auto master = discoverMofkaServiceMaster(bsgh);
         self = std::make_shared<MofkaDriverImpl>(engine, std::move(bsgh), master);
@@ -127,6 +141,7 @@ void MofkaDriver::createTopic(
         PartitionSelector selector,
         Serializer serializer) {
     if(name.size() > 256) throw Exception{"Topic names cannot exceed 256 characters"};
+    spdlog::trace("[mofka:client] Creating topic {}", name);
     // A topic's informations are stored in the service' master database
     // with the keys prefixed "MOFKA:GLOBAL:<name>:". The validator is
     // located at key "MOFKA:GLOBAL:<name>:validator", and respectively
@@ -164,12 +179,16 @@ void MofkaDriver::createTopic(
     // put the keys in the database. If any already exists,
     // this call will fail with YOKAN_ERR_KEY_EXISTS.
     try {
+        spdlog::trace("[mofka:client] Storing topic information"
+                      " (validator, selector, serializer) in master database "
+                      " for topic {}", name);
         self->m_yk_master_db.putMulti(3,
             keysPtrs.data(), ksizes.data(),
             valuesPtrs.data(), vsizes.data(),
             YOKAN_MODE_NEW_ONLY|YOKAN_MODE_NO_RDMA);
         auto collectionName = fmt::format("MOFKA:GLOBAL:{}:partitions", name);
         self->m_yk_master_db.createCollection(collectionName.c_str());
+        spdlog::trace("[mofka:client] Creating collection to store partitions for topic {}", name);
     } catch(const yokan::Exception& ex) {
         if(ex.code() == YOKAN_ERR_KEY_EXISTS) {
             throw Exception{"Topic already exists"};
@@ -180,9 +199,11 @@ void MofkaDriver::createTopic(
                 name, ex.what())};
         }
     }
+    spdlog::trace("[mofka:client] Successfully create topic {}", name);
 }
 
 TopicHandle MofkaDriver::openTopic(std::string_view name) {
+    spdlog::trace("[mofka:client] Opening topic {}", name);
     // craft the keys for the topic's validator, selector and serializer
     std::array<std::string, 3> keys = {
         fmt::format("MOFKA:GLOBAL:{}:validator",  name),
@@ -199,14 +220,17 @@ TopicHandle MofkaDriver::openTopic(std::string_view name) {
     // get the length of these keys. These keys are never overwritten
     // so the length is not going to change by the time we call getMulti.
     try {
+        spdlog::trace("[mofka:client] Checking key lengths for validator, selector, and serializer");
         self->m_yk_master_db.lengthMulti(3,
             keysPtrs.data(), ksizes.data(), vsizes.data(), YOKAN_MODE_NO_RDMA);
     } catch(const yokan::Exception& ex) {
+        spdlog::trace("[mofka:client] Yokan lengthMulti failed: {}", ex.what());
         throw Exception{fmt::format(
             "Could not open topic \"{}\". "
             "Yokan lengthMulti error: {}",
             name, ex.what())};
     } catch(const std::exception& ex) {
+        spdlog::trace("[mofka:client] Yokan lengthMulti failed: {}", ex.what());
         throw Exception{fmt::format(
             "Could not open topic \"{}\". "
             "Unexpected error from lengthMulti: {}",
@@ -215,6 +239,7 @@ TopicHandle MofkaDriver::openTopic(std::string_view name) {
     // if any of the keys is not found, this is a problem
     for(size_t i = 0; i < vsizes.size(); ++i) {
         if(vsizes[i] == YOKAN_KEY_NOT_FOUND) {
+            spdlog::trace("[mofka:client] Key \"{}\" not found in master database", keys[i]);
             throw Exception{
                 fmt::format(
                     "Topic \"{}\" not found in master database "
@@ -231,15 +256,18 @@ TopicHandle MofkaDriver::openTopic(std::string_view name) {
         values[0].data(), values[1].data(), values[2].data()
     };
     try {
+        spdlog::trace("[mofka:client] Getting validator, selector, and serializer from master database");
         self->m_yk_master_db.getMulti(3,
             keysPtrs.data(), ksizes.data(),
             valuesPtrs.data(), vsizes.data(), YOKAN_MODE_NO_RDMA);
     } catch(const yokan::Exception& ex) {
+        spdlog::trace("[mofka:client] Yokan getMulti failed: {}", ex.what());
         throw Exception{fmt::format(
             "Could not open topic \"{}\". "
             "Yokan getMulti error: {}",
             name, ex.what())};
     } catch(const std::exception& ex) {
+        spdlog::trace("[mofka:client] Yokan getMulti failed: {}", ex.what());
         throw Exception{fmt::format(
             "Could not open topic \"{}\". "
             "Unexpected error from getMulti: {}",
@@ -247,32 +275,47 @@ TopicHandle MofkaDriver::openTopic(std::string_view name) {
     }
 
     // deserialize the validator, selector, and serializer from their Metadata
+    spdlog::trace("[mofka:client] Instantiating validator");
     auto validator = Validator::FromMetadata(Metadata{values[0]});
+    spdlog::trace("[mofka:client] Instantiating selector");
     auto selector = PartitionSelector::FromMetadata(Metadata{values[1]});
+    spdlog::trace("[mofka:client] Instantiating serializer");
     auto serializer = Serializer::FromMetadata(Metadata{values[2]});
 
     // create a Collection object to access the collection of partitions
+    spdlog::trace("[mofka:client] opening collection of partitions");
     auto partitionCollection = yokan::Collection{
         fmt::format("MOFKA:GLOBAL:{}:partitions", name).c_str(),
         self->m_yk_master_db};
     std::vector<Metadata> partitionsMetadata;
-    size_t oldsize;
-    yk_id_t startID = 0;
 
     // read the partitions from the collection
     try {
-        do {
-            oldsize = partitionsMetadata.size();
-            partitionCollection.iter(startID, nullptr, 0, 32,
-                [&](size_t, yk_id_t id, const void* value, size_t vsize) mutable -> yk_return_t {
-                    startID = id + 1;
-                    auto partitionMetadata = Metadata{
-                        std::string{static_cast<const char*>(value), vsize}
-                    };
-                    partitionsMetadata.push_back(std::move(partitionMetadata));
-                    return YOKAN_SUCCESS;
-                });
-        } while(oldsize != partitionsMetadata.size());
+        yk_id_t startID = 0;
+        std::vector<yk_id_t> ids(32);
+        std::vector<char>    docs(32*1024);
+        std::vector<size_t>  doc_sizes(32);
+        bool done = false;
+        while(!done) {
+            partitionCollection.listPacked(
+                startID, nullptr, 0, 32, ids.data(), docs.size(),
+                docs.data(), doc_sizes.data());
+            size_t offset = 0;
+            for(size_t i = 0; i < 32; ++i) {
+                if(doc_sizes[i] == YOKAN_NO_MORE_DOCS) {
+                    done = true;
+                    break;
+                }
+                if(doc_sizes[i] > YOKAN_LAST_VALID_SIZE)
+                    break;
+                auto partitionMetadata = Metadata{
+                     std::string{static_cast<const char*>(docs.data() + offset), doc_sizes[i]}
+                };
+                partitionsMetadata.push_back(std::move(partitionMetadata));
+                offset += doc_sizes[i];
+                startID += 1;
+            }
+        }
     } catch(const yokan::Exception& ex) {
         throw Exception{fmt::format(
             "Could not lookup partitions for topic \"{}\". Yokan iter error: {}",

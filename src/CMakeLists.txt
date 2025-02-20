@@ -22,7 +22,8 @@ set (client-src-files
      Validator.cpp
      EventbridgeValidator.cpp
      ThreadPool.cpp
-     PrioPool.cpp)
+     PrioPool.cpp
+     Logging.cpp)
 
 set (kafka-src-files
      KafkaDriver.cpp
