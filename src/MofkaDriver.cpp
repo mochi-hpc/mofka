@@ -83,7 +83,7 @@ MofkaDriver::MofkaDriver(const std::string& groupfile, bool use_progress_thread)
                       "with protocol={} and use_progress_thread={}", protocol, use_progress_thread);
         auto engine = thallium::engine{protocol, THALLIUM_SERVER_MODE, use_progress_thread};
         auto sh = MofkaDriver{groupfile, engine};
-        setupLogging(sh.self->m_engine.get_margo_instance());
+        //setupLogging(sh.self->m_engine.get_margo_instance());
         self = std::move(sh.self);
     } catch(const std::exception& ex) {
         throw Exception(ex.what());
@@ -559,6 +559,31 @@ std::string MofkaDriver::addDefaultDataProvider(
 ThreadPool MofkaDriver::defaultThreadPool() const {
     auto pool = self->m_engine.get_progress_pool();
     return ThreadPool{pool};
+}
+
+void MofkaDriver::startProgressThread() const {
+    int ret;
+    constexpr auto pool_config = R"({
+        "name": "__progress__",
+        "type": "fifo_wait",
+        "access": "mpmc"
+    })";
+    constexpr auto xstream_config = R"({
+        "name": "__progress__",
+        "scheduler": {"type": "basic_wait", "pools": ["__progress__"]},
+    })";
+    auto mid = self->m_engine.get_margo_instance();
+    margo_pool_info pool_info;
+    ret = margo_add_pool_from_json(mid, pool_config, &pool_info);
+    if(ret != 0) throw Exception{
+        fmt::format("Could not start progress thread, margo_add_pool_from_json returned {}", ret)};
+    margo_xstream_info xstream_info;
+    ret = margo_add_xstream_from_json(mid, xstream_config, &xstream_info);
+    if(ret != 0) throw Exception{
+        fmt::format("Could not start progress thread, margo_add_xstream_from_json returned {}", ret)};
+    ret = margo_migrate_progress_loop(mid, pool_info.index);
+    if(ret != 0) throw Exception{
+        fmt::format("Could not start progress thread, margo_migrate_progress_loop returned {}", ret)};
 }
 
 }

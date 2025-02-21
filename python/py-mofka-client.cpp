@@ -124,6 +124,7 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def(py::init<const std::string&, bool>(), "group_file"_a, "use_progress_thread"_a=false)
         .def(py::init<const std::string&, py_margo_instance_id>(), "group_file"_a, "mid"_a)
         .def_property_readonly("num_servers", &mofka::MofkaDriver::numServers)
+        .def("start_progress_thread", &mofka::MofkaDriver::startProgressThread)
         .def("create_topic",
              [](mofka::MofkaDriver& service,
                 const std::string& name,

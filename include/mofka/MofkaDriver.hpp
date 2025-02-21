@@ -76,6 +76,11 @@ class MofkaDriver {
     ~MofkaDriver();
 
     /**
+     * @brief Start a progress thread.
+     */
+    void startProgressThread() const;
+
+    /**
      * @brief Checks if the MofkaDriver instance is valid.
      */
     operator bool() const;
