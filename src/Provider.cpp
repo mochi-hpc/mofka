@@ -35,6 +35,7 @@ std::vector<bedrock::Dependency> Provider::getDependencies(const Metadata& metad
         );
     }
     dependencies.push_back({"pool", "pool", false, false, false});
+    dependencies.push_back({"master_database", "yokan", true, false, false});
     return dependencies;
 }
 

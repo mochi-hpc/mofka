@@ -76,6 +76,11 @@ class MofkaDriver {
     ~MofkaDriver();
 
     /**
+     * @brief Start a progress thread.
+     */
+    void startProgressThread() const;
+
+    /**
      * @brief Checks if the MofkaDriver instance is valid.
      */
     operator bool() const;
@@ -116,6 +121,11 @@ class MofkaDriver {
      * @brief Checks if a topic exists.
      */
     bool topicExists(std::string_view name);
+
+    /**
+     * @brief Get the default ThreadPool.
+     */
+    ThreadPool defaultThreadPool() const;
 
     /**
      * @brief Map of dependency descriptors for the partition.

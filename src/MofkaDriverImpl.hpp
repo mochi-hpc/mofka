@@ -27,6 +27,7 @@ class MofkaDriverImpl {
 
     yokan::Client   m_yk_client;
     yokan::Database m_yk_master_db;
+    std::string     m_yk_master_info;
 
     MofkaDriverImpl(
         thallium::engine engine,
@@ -39,6 +40,7 @@ class MofkaDriverImpl {
         m_yk_client.makeDatabaseHandle(
             m_engine.lookup(masterDbInfo.first).get_addr(),
             masterDbInfo.second)}
+    , m_yk_master_info{"yokan:" + std::to_string(masterDbInfo.second) + "@" + masterDbInfo.first}
     {}
 };
 

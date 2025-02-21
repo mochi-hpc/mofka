@@ -51,7 +51,7 @@ static inline std::pair<std::string, uint16_t> discoverMofkaServiceMaster(
     if(masters.empty()) {
         throw Exception{"Could not find a Yokan provider with the \"mofka:master\" tag"};
     }
-    spdlog::trace("[mofka:client] Found master database as {} (provider_id={})",
+    spdlog::trace("[mofka:client] Found master database at address={} with provider_id={}",
                   masters[0].first, masters[0].second);
     // note: if multiple yokan databases have the mofka:master tag,
     // it is assume that they are linked together via RAFT to replicate the same content
@@ -83,7 +83,7 @@ MofkaDriver::MofkaDriver(const std::string& groupfile, bool use_progress_thread)
                       "with protocol={} and use_progress_thread={}", protocol, use_progress_thread);
         auto engine = thallium::engine{protocol, THALLIUM_SERVER_MODE, use_progress_thread};
         auto sh = MofkaDriver{groupfile, engine};
-        setupLogging(sh.self->m_engine.get_margo_instance());
+        //setupLogging(sh.self->m_engine.get_margo_instance());
         self = std::move(sh.self);
     } catch(const std::exception& ex) {
         throw Exception(ex.what());
@@ -470,6 +470,7 @@ void MofkaDriver::addCustomPartition(
         if(!provider_desciption["dependencies"].contains("pool")) {
             provider_desciption["dependencies"]["pool"] = pool_name.size() ? pool_name : "__primary__";
         }
+        provider_desciption["dependencies"]["master_database"] = self->m_yk_master_info;
         server.addProvider(provider_desciption.dump(), &provider_id);
     } catch(const bedrock::Exception& ex) {
         throw Exception{
@@ -503,6 +504,7 @@ std::string MofkaDriver::addDefaultMetadataProvider(
           const Metadata& config,
           const Dependencies& dependencies) {
     auto uuid = UUID::generate();
+    auto deps_copy = dependencies;
     auto provider_name  = fmt::format("metadata_{}", uuid.to_string().substr(0, 8));
     try {
         auto server = self->m_bsgh[server_rank];
@@ -515,6 +517,7 @@ std::string MofkaDriver::addDefaultMetadataProvider(
         provider_desciption["tags"]   = nlohmann::json::array();
         provider_desciption["tags"].push_back("mofka:metadata");
         provider_desciption["dependencies"] = dependencies;
+        provider_desciption["dependencies"]["master_database"] = self->m_yk_master_info;
         uint16_t provider_id = 0;
         server.addProvider(provider_desciption.dump(), &provider_id);
         return fmt::format("{}@{}", provider_name, address);
@@ -542,6 +545,7 @@ std::string MofkaDriver::addDefaultDataProvider(
         provider_desciption["tags"]   = nlohmann::json::array();
         provider_desciption["tags"].push_back("mofka:data");
         provider_desciption["dependencies"] = dependencies;
+        provider_desciption["dependencies"]["master_database"] = self->m_yk_master_info;
         uint16_t provider_id = 0;
         server.addProvider(provider_desciption.dump(), &provider_id);
         return fmt::format("{}@{}", provider_name, address);
@@ -550,6 +554,36 @@ std::string MofkaDriver::addDefaultDataProvider(
             fmt::format("Could not create metadata provider. Bedrock error: {}", ex.what())
         };
     }
+}
+
+ThreadPool MofkaDriver::defaultThreadPool() const {
+    auto pool = self->m_engine.get_progress_pool();
+    return ThreadPool{pool};
+}
+
+void MofkaDriver::startProgressThread() const {
+    int ret;
+    constexpr auto pool_config = R"({
+        "name": "__progress__",
+        "type": "fifo_wait",
+        "access": "mpmc"
+    })";
+    constexpr auto xstream_config = R"({
+        "name": "__progress__",
+        "scheduler": {"type": "basic_wait", "pools": ["__progress__"]},
+    })";
+    auto mid = self->m_engine.get_margo_instance();
+    margo_pool_info pool_info;
+    ret = margo_add_pool_from_json(mid, pool_config, &pool_info);
+    if(ret != 0) throw Exception{
+        fmt::format("Could not start progress thread, margo_add_pool_from_json returned {}", ret)};
+    margo_xstream_info xstream_info;
+    ret = margo_add_xstream_from_json(mid, xstream_config, &xstream_info);
+    if(ret != 0) throw Exception{
+        fmt::format("Could not start progress thread, margo_add_xstream_from_json returned {}", ret)};
+    ret = margo_migrate_progress_loop(mid, pool_info.index);
+    if(ret != 0) throw Exception{
+        fmt::format("Could not start progress thread, margo_migrate_progress_loop returned {}", ret)};
 }
 
 }

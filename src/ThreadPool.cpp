@@ -12,6 +12,9 @@ namespace mofka {
 
 PIMPL_DEFINE_COMMON_FUNCTIONS_NO_CTOR(ThreadPool);
 
+ThreadPool::ThreadPool(thallium::pool pool)
+: self(std::make_shared<ThreadPoolImpl>(pool)) {}
+
 ThreadPool::ThreadPool(mofka::ThreadCount tc)
 : self(std::make_shared<ThreadPoolImpl>(tc)) {}
 

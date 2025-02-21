@@ -17,7 +17,7 @@ class MofkaSingleton:
         if cls._instance is None or os.getpid() != cls._pid:
             cls._instance = super(MofkaSingleton, cls).__new__(cls)
             cls._pid = os.getpid()
-            cls._instance.driver = mofka.MofkaDriver(group_file=group_file, use_progress_thread=True)
+            cls._instance.driver = mofka.MofkaDriver(group_file=group_file, use_progress_thread=False)
         return cls._instance
 
 def consume():
@@ -25,6 +25,7 @@ def consume():
     try:
         topic_name = "my_topic"
         s = MofkaSingleton()
+        s.driver.start_progress_thread()
         topic = s.driver.open_topic(topic_name)
         consumer = topic.consumer(
             name="my_consumer",
@@ -50,6 +51,7 @@ def produce():
         print("Creating MofkaSingleton")
         topic_name = "my_topic"
         s = MofkaSingleton()
+        s.driver.start_progress_thread()
         print(f"Opening topic {topic_name}")
         topic = s.driver.open_topic(topic_name)
         producer = topic.producer(

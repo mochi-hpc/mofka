@@ -33,6 +33,9 @@ class ThreadPoolImpl {
         }
     }
 
+    ThreadPoolImpl(thallium::pool pool)
+    : m_pool{pool} {}
+
     ~ThreadPoolImpl() {
         for(auto& x : m_managed_xstreams) {
             x->join();

@@ -49,6 +49,11 @@ class ThreadPool {
     /**
      * @brief Constructor.
      */
+    ThreadPool(thallium::pool pool);
+
+    /**
+     * @brief Constructor.
+     */
     ThreadPool(ThreadCount count = ThreadCount{1});
 
     /**
