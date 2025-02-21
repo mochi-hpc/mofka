@@ -301,9 +301,11 @@ PYBIND11_MODULE(pymofka_client, m) {
                     }
                 : mofka::DataSelector{};
                 std::vector<size_t> default_targets;
+                if(!thread_pool.has_value())
+                    thread_pool = mofka::ThreadPool{mofka::ThreadCount{0}};
                 return topic.consumer(
                     name, mofka::BatchSize(batch_size),
-                    thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
+                    thread_pool.value(),
                     mofka::DataBroker{cpp_broker},
                     mofka::DataSelector{cpp_selector},
                     targets.value_or(default_targets));
