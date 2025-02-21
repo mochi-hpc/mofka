@@ -256,9 +256,11 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::size_t batch_size,
                std::optional<mofka::ThreadPool> thread_pool,
                mofka::Ordering ordering) -> mofka::Producer {
+                if(!thread_pool.has_value())
+                    thread_pool = mofka::ThreadPool{mofka::ThreadCount{0}};
                 return topic.producer(
                     name, mofka::BatchSize(batch_size),
-                    thread_pool.value_or(mofka::ThreadPool{mofka::ThreadCount{0}}),
+                    thread_pool.value(),
                     ordering);
             },
             "name"_a="", "batch_size"_a=mofka::BatchSize::Adaptive().value,
