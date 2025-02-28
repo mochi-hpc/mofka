@@ -116,7 +116,7 @@ class KafkaConsumer : public std::enable_shared_from_this<KafkaConsumer>,
 
     void subscribe();
 
-    void handleReceivedMessage(rd_kafka_message_t* msg);
+    void handleReceivedMessages(rd_kafka_message_t** msgs, size_t num);
 
 };
 
