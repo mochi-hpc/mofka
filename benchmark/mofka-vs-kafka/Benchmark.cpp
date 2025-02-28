@@ -222,9 +222,8 @@ static void rdkafka_consume_messages(
 
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
-    rd_kafka_conf_set(conf, "group.id", consumer_name.c_str(), nullptr, 0);
-    rd_kafka_conf_set(conf, "enable.auto.commit", "false", nullptr, 0);
-    rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", nullptr, 0);
+    rd_kafka_conf_set(conf, "socket.timeout.ms", "100000", nullptr, 0);
+    rd_kafka_conf_set(conf, "socket.keepalive.enable", "true", nullptr, 0);
 
     // figure out the number of partitions
     int num_partitions = 0;
@@ -234,7 +233,7 @@ static void rdkafka_consume_messages(
         char errstr[512];
 
         auto tmp_conf = rd_kafka_conf_dup(conf);
-        rk = rd_kafka_new(RD_KAFKA_CONSUMER, tmp_conf, errstr, sizeof(errstr));
+        rk = rd_kafka_new(RD_KAFKA_PRODUCER, tmp_conf, errstr, sizeof(errstr));
         if (!rk) {
             rd_kafka_conf_destroy(tmp_conf);
             rd_kafka_conf_destroy(conf);
@@ -242,7 +241,7 @@ static void rdkafka_consume_messages(
         }
         auto _rk = std::shared_ptr<rd_kafka_t>{rk, rd_kafka_destroy};
 
-        rd_kafka_resp_err_t err = rd_kafka_metadata(rk, 1, NULL, &metadata, 5000);
+        rd_kafka_resp_err_t err = rd_kafka_metadata(rk, 1, NULL, &metadata, 10000);
         if (err) {
             rd_kafka_conf_destroy(conf);
             throw mofka::Exception{std::string{"Error fetching metadata: "} + rd_kafka_err2str(err)};
@@ -266,6 +265,10 @@ static void rdkafka_consume_messages(
     }
     spdlog::info("Found topic to have {} partitions", num_partitions);
 
+    rd_kafka_conf_set(conf, "group.id", consumer_name.c_str(), nullptr, 0);
+    rd_kafka_conf_set(conf, "enable.auto.commit", "false", nullptr, 0);
+    rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", nullptr, 0);
+
     int rank, num_consumers;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_consumers);
@@ -275,6 +278,7 @@ static void rdkafka_consume_messages(
     rd_kafka_poll_set_consumer(consumer);
     rd_kafka_topic_partition_list_t *topics = rd_kafka_topic_partition_list_new(1);
     for(auto i : my_partitions) {
+        std::cout << "Process " << rank << " will consume from partition " << i << std::endl;
         rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), i);
     }
     rd_kafka_assign(consumer, topics);
@@ -311,12 +315,11 @@ static void rdkafka_consume_messages(
             i += 1;
         }
         if(msg && msg->err) {
-            std::cout << "Error from partition " << msg->partition
-                      << " " << rd_kafka_message_errstr(msg) << std::endl;
+            std::cout <<  rd_kafka_message_errstr(msg) << std::endl;
         }
         if(msg) {
             rd_kafka_message_destroy(msg);
-            if (i % 100000 == 0)
+            if (i % 100000 == 0 && rank == 0)
                 std::cout << "Process " << rank << " consumed " << i << " messages" << std::endl;
         }
         if (i == warmup_events + num_events) break;
@@ -685,7 +688,7 @@ static void produce(int argc, char** argv) {
 template <typename Driver>
 static void consume(Driver driver, const std::string& consumer_name, const std::string& topic_name,
                     int threads, mofka::BatchSize batch_size, double data_selection,
-                    std::optional<int> acknowledge_every, int warmup_events) {
+                    std::optional<int> acknowledge_every, int warmup_events, int num_events) {
     spdlog::info("Opening topic {}", topic_name);
     auto topic = driver.openTopic(topic_name);
 
@@ -731,16 +734,16 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
             data_selector, data_broker, my_partitions);
 
     spdlog::info("Start consuming events...");
-    int num_events = 0;
+    int i = 0;
     auto t_start = std::chrono::high_resolution_clock::now();
     double t_ack = 0;
 
     while (num_partitions) {
         auto event = consumer.pull().wait();
-        if (num_events == 0) {
+        if (i == 0) {
             spdlog::info("First event pulled has metadata size {}", event.metadata().string().size());
         }
-        if (num_events == warmup_events) {
+        if (i == warmup_events) {
             t_start = std::chrono::high_resolution_clock::now();
         }
         if (event.id() == mofka::NoMoreEvents) {
@@ -748,22 +751,24 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
             break;
             //continue;
         }
-        ++num_events;
-        if (acknowledge_every && num_events % acknowledge_every.value() == 0) {
+        ++i;
+        if (acknowledge_every && i % acknowledge_every.value() == 0) {
             auto t1 = std::chrono::high_resolution_clock::now();
             event.acknowledge();
             auto t2 = std::chrono::high_resolution_clock::now();
             if(num_events >= warmup_events)
                 t_ack += std::chrono::duration<double>(t2 - t1).count();
         }
-        if (num_events % 100000 == 0)
-            std::cout << "Process " << rank << " consumed " << num_events << " messages" << std::endl;
+        if (i % 100000 == 0)
+            std::cout << "Process " << rank << " consumed " << i << " messages" << std::endl;
+        if (i == num_events + warmup_events)
+            break;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
     auto t_end = std::chrono::high_resolution_clock::now();
     spdlog::info("Consuming {} events took {} seconds (including {} seconds of ack time)",
-                 num_events - warmup_events,
+                 i - warmup_events,
                  std::chrono::duration<double>(t_end - t_start).count(),
                  t_ack);
 }
@@ -825,8 +830,8 @@ static void consume(int argc, char** argv) {
     spdlog::info("=======================================================");
 
     if(backend_name == "mofka") {
-        if(eventsArg.isSet())
-            spdlog::warn("-n/--num-events is ignored (all the messages will be consumed");
+        //if(eventsArg.isSet())
+        //    spdlog::warn("-n/--num-events is ignored (all the messages will be consumed");
         auto driver = mofka::MofkaDriver{bootstrap_file, true};
         consume(driver,
                 consumerArg.getValue(),
@@ -835,7 +840,8 @@ static void consume(int argc, char** argv) {
                 batch_size,
                 dataSelectionArg.getValue(),
                 ack_every,
-                warmupArg.getValue());
+                warmupArg.getValue(),
+                eventsArg.getValue());
     } else if(backend_name == "kafka") {
         if(eventsArg.isSet())
             spdlog::warn("-n/--num-events is ignored (all the messages will be consumed");
@@ -847,7 +853,8 @@ static void consume(int argc, char** argv) {
                 batch_size,
                 dataSelectionArg.getValue(),
                 ack_every,
-                warmupArg.getValue());
+                warmupArg.getValue(),
+                eventsArg.getValue());
     } else { /* rdkafka */
         rdkafka_consume_messages(
                 bootstrapArg.getValue(),
