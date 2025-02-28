@@ -216,9 +216,14 @@ static void rdkafka_consume_messages(
         const std::string &bootstrap_servers,
         const std::string &consumer_name,
         const std::string &topic_name,
+        mofka::BatchSize batch_size,
         int num_events,
         std::optional<int> acknowledge_every,
         int warmup_events) {
+
+    auto batch = batch_size.value;
+    if(batch == 0 || batch == mofka::BatchSize::Adaptive().value)
+        batch = 1024;
 
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
@@ -289,8 +294,11 @@ static void rdkafka_consume_messages(
                  warmup_events + num_events, warmup_events);
 
     std::vector<std::string> messages;
+    std::vector<rd_kafka_message_t*> raw_messages(batch);
 
     MPI_Barrier(MPI_COMM_WORLD);
+
+    auto queue = rd_kafka_queue_get_consumer(consumer);
 
     int i = 0;
     double commit_time = 0.0;
@@ -298,32 +306,38 @@ static void rdkafka_consume_messages(
         if (i == warmup_events)
             t_start = std::chrono::high_resolution_clock::now();
 
-        rd_kafka_message_t *msg = rd_kafka_consumer_poll(consumer, 100);
+        auto msg_received = rd_kafka_consume_batch_queue(
+                queue, 100, raw_messages.data(), raw_messages.size());
 
-        if (msg && !msg->err) {
-            messages.emplace_back((const char*)msg->payload, msg->len);
-            if (i >= warmup_events) {
-                if (acknowledge_every.has_value() && (i - warmup_events + 1) % acknowledge_every.value() == 0) {
-                    auto t_commit_start = std::chrono::high_resolution_clock::now();
-                    rd_kafka_commit_message(consumer, msg, 0);
-                    auto t_commit_end = std::chrono::high_resolution_clock::now();
-                    if(i > warmup_events) {
-                        commit_time += std::chrono::duration<double>(t_commit_end - t_commit_start).count();
+        for(ssize_t j = 0; j < msg_received; j++) {
+            auto msg = raw_messages[j];
+            if (msg && !msg->err) {
+                messages.emplace_back((const char*)msg->payload, msg->len);
+                if (i >= warmup_events) {
+                    if (acknowledge_every.has_value()
+                    && (i - warmup_events + 1) % acknowledge_every.value() == 0) {
+                        auto t_commit_start = std::chrono::high_resolution_clock::now();
+                        rd_kafka_commit_message(consumer, msg, 0);
+                        auto t_commit_end = std::chrono::high_resolution_clock::now();
+                        if(i > warmup_events) {
+                            commit_time += std::chrono::duration<double>(t_commit_end - t_commit_start).count();
+                        }
                     }
                 }
+                i += 1;
             }
-            i += 1;
+            if(msg && msg->err) {
+                std::cout <<  rd_kafka_message_errstr(msg) << std::endl;
+            }
+            if(msg) {
+                rd_kafka_message_destroy(msg);
+                if (i % 100000 == 0 && rank == 0)
+                    std::cout << "Process " << rank << " consumed " << i << " messages" << std::endl;
+            }
+            if (i == warmup_events + num_events) goto out;
         }
-        if(msg && msg->err) {
-            std::cout <<  rd_kafka_message_errstr(msg) << std::endl;
-        }
-        if(msg) {
-            rd_kafka_message_destroy(msg);
-            if (i % 100000 == 0 && rank == 0)
-                std::cout << "Process " << rank << " consumed " << i << " messages" << std::endl;
-        }
-        if (i == warmup_events + num_events) break;
     }
+out:
 
     MPI_Barrier(MPI_COMM_WORLD);
     auto t_end = std::chrono::high_resolution_clock::now();
@@ -331,6 +345,7 @@ static void rdkafka_consume_messages(
     spdlog::info("Successfully consumed {} messages in {} seconds (including {} seconds commit time)",
                  num_events, elapsed, commit_time);
 
+    rd_kafka_queue_destroy(queue);
     rd_kafka_topic_partition_list_destroy(topics);
     rd_kafka_consumer_close(consumer);
     rd_kafka_destroy(consumer);
@@ -860,6 +875,7 @@ static void consume(int argc, char** argv) {
                 bootstrapArg.getValue(),
                 consumerArg.getValue(),
                 topicArg.getValue(),
+                batch_size,
                 eventsArg.getValue(),
                 ack_every,
                 warmupArg.getValue());
