@@ -69,22 +69,33 @@ void KafkaConsumer::subscribe() {
     // start the polling loop
     m_should_stop = false;
     auto run = [this](){
+
+        auto queue = rd_kafka_queue_get_consumer(m_kafka_consumer.get());
+        auto queue_ptr = std::shared_ptr<rd_kafka_queue_t>(queue, rd_kafka_queue_destroy);
+        auto batch_size = this->m_batch_size.value;
+        if(batch_size == 0 || batch_size == BatchSize::Adaptive().value)
+            batch_size = 1024;
+
+        std::vector<rd_kafka_message_t*> raw_messages(batch_size);
+
         while(!m_should_stop) {
             int timeout = 100; // m_thread_pool.size() > 1 ? 0 : 100;
-            rd_kafka_message_t* msg = rd_kafka_consumer_poll(
-                m_kafka_consumer.get(), timeout);
-            if(!msg) {
+            auto msg_received = rd_kafka_consume_batch_queue(
+                queue, timeout, raw_messages.data(), raw_messages.size());
+            if(msg_received == 0) {
                 // no message, yield and try again later
                 tl::thread::yield();
                 continue;
             }
-            if(msg && msg->err) {
-                // TODO error happened, handle it
-                rd_kafka_message_destroy(msg);
-                tl::thread::yield();
-                continue;
+            for(ssize_t i = 0; i < msg_received; ++i) {
+                auto msg = raw_messages[i];
+                if(msg->err) {
+                    // TODO error happened, handle it
+                    rd_kafka_message_destroy(msg);
+                    continue;
+                }
+                handleReceivedMessage(msg);
             }
-            handleReceivedMessage(msg);
             tl::thread::yield();
         }
         m_poll_ult_stopped.set_value();
@@ -114,40 +125,6 @@ void KafkaConsumer::handleReceivedMessage(rd_kafka_message_t* msg) {
             m_futures_credit = true;
         }
     }
-
-    // Retrieve the headers from the message
-    rd_kafka_headers_t *headers = nullptr;
-    auto err = rd_kafka_message_headers(msg, &headers);
-    if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
-        if (err != RD_KAFKA_RESP_ERR__NOENT) {
-            promise.setException(
-                Exception{std::string{"Failed to retrieve message header: "} + rd_kafka_err2str(err)});
-            return;
-        }
-    }
-
-    // Check for NoMoreEvents
-#if 0
-    const void* value;
-    size_t value_size;
-    if (headers &&
-        rd_kafka_header_get(headers, 0, "NoMoreEvents", &value, &value_size) == RD_KAFKA_RESP_ERR_NO_ERROR) {
-        auto completed = ++m_completed_partitions;
-        // FIXME If partitions are completed there is no reason to continue running the polling thread
-        //if(completed == m_partitions.size()) {
-            //m_should_stop = true;
-        //}
-        if(completed == m_partitions.size()) {
-            //m_should_stop = true;
-            auto ult = [promise=std::move(promise)]() mutable {
-                promise.setValue(Event{std::make_shared<KafkaEvent>()});
-            };
-            m_thread_pool.pushWork(std::move(ult), std::numeric_limits<uint64_t>::max()-1);
-        }
-        rd_kafka_message_destroy(msg);
-        return;
-    }
-#endif
 
     size_t metadata_size = 0;
     std::memcpy(&metadata_size, msg->payload, sizeof(metadata_size));
