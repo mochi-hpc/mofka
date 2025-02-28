@@ -50,21 +50,21 @@ class ActiveProducerBatchQueue {
             need_notification = adaptive;
             std::unique_lock<thallium::mutex> guard{m_mutex};
             if(m_batch_queue.empty()) {
-                if(m_reusable_batches.empty()) {
+                //if(m_reusable_batches.empty()) {
                     m_batch_queue.push(m_create_new_batch());
-                } else {
-                    m_batch_queue.push(m_reusable_batches.front());
-                    m_reusable_batches.pop_front();
-                }
+                //} else {
+                //    m_batch_queue.push(m_reusable_batches.front());
+                //    m_reusable_batches.pop_front();
+                //}
             }
             auto last_batch = m_batch_queue.back();
             if(!adaptive && last_batch->count() == m_batch_size.value) {
-                if(m_reusable_batches.empty()) {
+                //if(m_reusable_batches.empty()) {
                     m_batch_queue.push(m_create_new_batch());
-                } else {
-                    m_batch_queue.push(m_reusable_batches.front());
-                    m_reusable_batches.pop_front();
-                }
+                //} else {
+                //    m_batch_queue.push(m_reusable_batches.front());
+                //    m_reusable_batches.pop_front();
+                //}
                 last_batch = m_batch_queue.back();
                 need_notification = true;
             }
@@ -127,7 +127,7 @@ class ActiveProducerBatchQueue {
             guard.unlock();
             batch->send();
             guard.lock();
-            m_reusable_batches.push_back(batch);
+            //m_reusable_batches.push_back(batch);
         }
         m_running = false;
         m_terminated.set_value();
@@ -137,7 +137,7 @@ class ActiveProducerBatchQueue {
     ThreadPool                             m_thread_pool;
     BatchSize                              m_batch_size;
     std::queue<SP<ProducerBatchInterface>> m_batch_queue;
-    std::list<SP<ProducerBatchInterface>>  m_reusable_batches;
+    //std::list<SP<ProducerBatchInterface>>  m_reusable_batches;
     thallium::managed<thallium::thread>    m_sender_ult;
     bool                                   m_need_stop = false;
     bool                                   m_request_flush = false;
