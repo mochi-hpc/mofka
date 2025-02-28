@@ -230,6 +230,7 @@ static void rdkafka_consume_messages(
     rd_kafka_conf_set(conf, "socket.timeout.ms", "100000", nullptr, 0);
     rd_kafka_conf_set(conf, "socket.keepalive.enable", "true", nullptr, 0);
 
+#if 0
     // figure out the number of partitions
     int num_partitions = 0;
     {
@@ -269,24 +270,52 @@ static void rdkafka_consume_messages(
         num_partitions = topic_metadata->partition_cnt;
     }
     spdlog::info("Found topic to have {} partitions", num_partitions);
+#endif
 
     rd_kafka_conf_set(conf, "group.id", consumer_name.c_str(), nullptr, 0);
     rd_kafka_conf_set(conf, "enable.auto.commit", "false", nullptr, 0);
     rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", nullptr, 0);
 
+    auto rebalance_cb = [](rd_kafka_t* kcons,
+                           rd_kafka_resp_err_t err,
+                           rd_kafka_topic_partition_list_t* list,
+                           void *) -> void {
+        rd_kafka_resp_err_t error;
+        if (err == RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS) {
+            error = rd_kafka_assign(kcons, list);
+        } else if (err == RD_KAFKA_RESP_ERR__REVOKE_PARTITIONS) {
+            error = rd_kafka_assign(kcons, nullptr);
+        } else {
+            error = rd_kafka_assign(kcons, nullptr);
+        }
+        if(error != 0) {
+            std::cerr << "rd_kafka_assign failed with error: "
+                << rd_kafka_err2str(error) << std::endl;
+        }
+    };
+    rd_kafka_conf_set_rebalance_cb(conf, rebalance_cb);
+
     int rank, num_consumers;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_consumers);
+#if 0
     auto my_partitions = computeMyPartitions(num_consumers, rank, num_partitions);
+#endif
 
     rd_kafka_t *consumer = rd_kafka_new(RD_KAFKA_CONSUMER, conf, nullptr, 0);
     rd_kafka_poll_set_consumer(consumer);
+
     rd_kafka_topic_partition_list_t *topics = rd_kafka_topic_partition_list_new(1);
+#if 0
     for(auto i : my_partitions) {
         std::cout << "Process " << rank << " will consume from partition " << i << std::endl;
         rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), i);
     }
     rd_kafka_assign(consumer, topics);
+#else
+    rd_kafka_topic_partition_list_add(topics, topic_name.data(), RD_KAFKA_PARTITION_UA);
+    rd_kafka_subscribe(consumer, topics);
+#endif
 
     decltype(std::chrono::high_resolution_clock::now()) t_start;
 
