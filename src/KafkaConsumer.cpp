@@ -56,6 +56,7 @@ Future<Event> KafkaConsumer::pull() {
 }
 
 void KafkaConsumer::subscribe() {
+#if 0
     auto subscription = rd_kafka_topic_partition_list_new(m_partitions.size());
     auto n = m_partitions.size();
     for(size_t i=0; i < n; ++i) {
@@ -65,6 +66,11 @@ void KafkaConsumer::subscribe() {
         subscription, rd_kafka_topic_partition_list_destroy};
     auto err = rd_kafka_assign(m_kafka_consumer.get(), subscription);
     if (err) throw Exception{"Failed to subscribe to topic: " + std::string{rd_kafka_err2str(err)}};
+#else
+    auto subscription = rd_kafka_topic_partition_list_new(1);
+    rd_kafka_topic_partition_list_add(subscription, m_topic->m_name.c_str(), RD_KAFKA_PARTITION_UA);
+    rd_kafka_subscribe(m_kafka_consumer.get(), subscription);
+#endif
 
     // start the polling loop
     m_should_stop = false;

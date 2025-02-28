@@ -110,9 +110,15 @@ Consumer KafkaTopicHandle::makeConsumer(
 
     checkOptions(options);
 
+    if(targets.size() != 0) {
+        std::cerr << "WARNING: targets argument in KafkaTopic::consumer will be ignored" << std::endl;
+    }
+
     char errstr[512];
 
     std::vector<SP<KafkaPartitionInfo>> partitions;
+    partitions = m_partitions;
+#if 0
     if(targets.empty()) {
         partitions = m_partitions;
     } else {
@@ -123,6 +129,7 @@ Consumer KafkaTopicHandle::makeConsumer(
             partitions.push_back(m_partitions[partition_index]);
         }
     }
+#endif
 
     // Create configuration for consumer
     auto kconf = rd_kafka_conf_dup(m_driver->m_kafka_config);
@@ -136,6 +143,26 @@ Consumer KafkaTopicHandle::makeConsumer(
     ret = rd_kafka_conf_set(kconf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
     if (ret != RD_KAFKA_CONF_OK)
           throw Exception{"Could not set Kafka auto.offset.reset configuration: " + std::string(errstr)};
+
+    auto rebalance_cb = [](rd_kafka_t* kcons,
+                           rd_kafka_resp_err_t err,
+                           rd_kafka_topic_partition_list_t* list,
+                           void *) -> void {
+        rd_kafka_resp_err_t error;
+        if (err == RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS) {
+            error = rd_kafka_assign(kcons, list);
+        } else if (err == RD_KAFKA_RESP_ERR__REVOKE_PARTITIONS) {
+            error = rd_kafka_assign(kcons, nullptr);
+        } else {
+            error = rd_kafka_assign(kcons, nullptr);
+        }
+        if(error != 0) {
+            std::cerr << "rd_kafka_assign failed with error: "
+                << rd_kafka_err2str(error) << std::endl;
+        }
+    };
+
+    rd_kafka_conf_set_rebalance_cb(kconf, rebalance_cb);
 
     // Create Kafka consumer instance
     auto kcons = rd_kafka_new(RD_KAFKA_CONSUMER, kconf, errstr, sizeof(errstr));
