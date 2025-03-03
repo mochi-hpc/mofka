@@ -12,6 +12,7 @@
 #include "KafkaTopicHandle.hpp"
 #include "KafkaPartitionInfo.hpp"
 
+#include <unistd.h>
 #include <fstream>
 
 namespace mofka {
@@ -118,15 +119,19 @@ TopicHandle KafkaDriver::openTopic(std::string_view name) {
     auto kconf = rd_kafka_conf_dup(self->m_kafka_config);
 
     // Create Kafka handle
-    rk = rd_kafka_new(RD_KAFKA_CONSUMER, kconf, errstr, sizeof(errstr));
+    rk = rd_kafka_new(RD_KAFKA_PRODUCER, kconf, errstr, sizeof(errstr));
     if (!rk) {
         rd_kafka_conf_destroy(kconf);
         throw Exception{std::string{"Error creating Kafka handle: "} + errstr};
     }
     auto _rk = std::shared_ptr<rd_kafka_t>{rk, rd_kafka_destroy};
 
+    sleep(5);
     // Get metadata for the topic
-    rd_kafka_resp_err_t err = rd_kafka_metadata(rk, 1, NULL, &metadata, 5000);
+    rd_kafka_resp_err_t err = RD_KAFKA_RESP_ERR__TIMED_OUT;
+    while(err == RD_KAFKA_RESP_ERR__TIMED_OUT) {
+        err = rd_kafka_metadata(rk, 1, NULL, &metadata, 1000);
+    }
     if (err) throw Exception{std::string{"Error fetching metadata: "} + rd_kafka_err2str(err)};
     auto _metadata = std::shared_ptr<const rd_kafka_metadata_t>{metadata, rd_kafka_metadata_destroy};
 

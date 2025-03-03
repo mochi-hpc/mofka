@@ -110,9 +110,15 @@ Consumer KafkaTopicHandle::makeConsumer(
 
     checkOptions(options);
 
+    if(targets.size() != 0) {
+        std::cerr << "WARNING: targets argument in KafkaTopic::consumer will be ignored" << std::endl;
+    }
+
     char errstr[512];
 
     std::vector<SP<KafkaPartitionInfo>> partitions;
+    partitions = m_partitions;
+#if 0
     if(targets.empty()) {
         partitions = m_partitions;
     } else {
@@ -123,6 +129,7 @@ Consumer KafkaTopicHandle::makeConsumer(
             partitions.push_back(m_partitions[partition_index]);
         }
     }
+#endif
 
     // Create configuration for consumer
     auto kconf = rd_kafka_conf_dup(m_driver->m_kafka_config);
@@ -136,6 +143,26 @@ Consumer KafkaTopicHandle::makeConsumer(
     ret = rd_kafka_conf_set(kconf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
     if (ret != RD_KAFKA_CONF_OK)
           throw Exception{"Could not set Kafka auto.offset.reset configuration: " + std::string(errstr)};
+
+    auto rebalance_cb = [](rd_kafka_t* kcons,
+                           rd_kafka_resp_err_t err,
+                           rd_kafka_topic_partition_list_t* list,
+                           void *) -> void {
+        rd_kafka_resp_err_t error;
+        if (err == RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS) {
+            error = rd_kafka_assign(kcons, list);
+        } else if (err == RD_KAFKA_RESP_ERR__REVOKE_PARTITIONS) {
+            error = rd_kafka_assign(kcons, nullptr);
+        } else {
+            error = rd_kafka_assign(kcons, nullptr);
+        }
+        if(error != 0) {
+            std::cerr << "rd_kafka_assign failed with error: "
+                << rd_kafka_err2str(error) << std::endl;
+        }
+    };
+
+    rd_kafka_conf_set_rebalance_cb(kconf, rebalance_cb);
 
     // Create Kafka consumer instance
     auto kcons = rd_kafka_new(RD_KAFKA_CONSUMER, kconf, errstr, sizeof(errstr));
@@ -164,25 +191,12 @@ void KafkaTopicHandle::markAsComplete() const {
 
     // Produce one event per partition
     for (size_t i = 0; i < m_partitions.size(); i++) {
-#if 0
-        // Create headers object
-        rd_kafka_headers_t *headers = rd_kafka_headers_new(1);
-        rd_kafka_header_add(headers, "NoMoreEvents", -1, "", 0);
-#endif
         size_t no_more_events = std::numeric_limits<size_t>::max();
         auto err = rd_kafka_producev(kprod,
                     RD_KAFKA_V_TOPIC(m_name.c_str()),
                     RD_KAFKA_V_PARTITION(m_partitions[i]->m_id),
-#if 0
-                    RD_KAFKA_V_HEADERS(headers),
-#endif
                     RD_KAFKA_V_VALUE((void*)&no_more_events, sizeof(no_more_events)),
                     RD_KAFKA_V_END);
-#if 0
-        // Destroy headers if message production failed
-        if(err != 0)
-            rd_kafka_headers_destroy(headers);
-#endif
     }
 
     // Wait for messages to be delivered
