@@ -423,6 +423,7 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     auto ordering = mofka::Ordering::Strict;
 
     spdlog::info("Preparing metadata and data for {} events", num_events);
+
     std::vector<std::string> data(1024);
     std::vector<mofka::Metadata> metadata(1024);
     for (int i = 0; i < 1024; ++i) {
@@ -460,7 +461,7 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     if(!my_partitions.empty()) {
         for (int i = 0; i < num_events; ++i) {
             auto partition_index = my_partitions[i % my_partitions.size()];
-            producer.push(metadata[i],
+            producer.push(metadata[i % metadata.size()],
                           mofka::Data{data[i % data.size()].data(), data[i % data.size()].size()},
                           partition_index);
             if (flush_every && (i + 1) % flush_every == 0) {
