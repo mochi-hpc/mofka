@@ -707,6 +707,7 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
             continue;
         }
         auto event = future_event.wait();
+        future_event = mofka::Future<mofka::Event>{};
         if (i == 0) {
             spdlog::info("First event pulled has metadata size {}", event.metadata().string().size());
         }
