@@ -12,6 +12,7 @@
 #include "KafkaTopicHandle.hpp"
 #include "KafkaPartitionInfo.hpp"
 
+#include <unistd.h>
 #include <fstream>
 
 namespace mofka {
@@ -125,6 +126,7 @@ TopicHandle KafkaDriver::openTopic(std::string_view name) {
     }
     auto _rk = std::shared_ptr<rd_kafka_t>{rk, rd_kafka_destroy};
 
+    sleep(5);
     // Get metadata for the topic
     rd_kafka_resp_err_t err = RD_KAFKA_RESP_ERR__TIMED_OUT;
     while(err == RD_KAFKA_RESP_ERR__TIMED_OUT) {
