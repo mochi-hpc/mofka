@@ -126,7 +126,10 @@ TopicHandle KafkaDriver::openTopic(std::string_view name) {
     auto _rk = std::shared_ptr<rd_kafka_t>{rk, rd_kafka_destroy};
 
     // Get metadata for the topic
-    rd_kafka_resp_err_t err = rd_kafka_metadata(rk, 1, NULL, &metadata, 10000);
+    rd_kafka_resp_err_t err = RD_KAFKA_RESP_ERR__TIMED_OUT;
+    while(err == RD_KAFKA_RESP_ERR__TIMED_OUT) {
+        err = rd_kafka_metadata(rk, 1, NULL, &metadata, 1000);
+    }
     if (err) throw Exception{std::string{"Error fetching metadata: "} + rd_kafka_err2str(err)};
     auto _metadata = std::shared_ptr<const rd_kafka_metadata_t>{metadata, rd_kafka_metadata_destroy};
 
