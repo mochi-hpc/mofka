@@ -12,6 +12,7 @@
 #include "PimplUtil.hpp"
 #include "MofkaDriverImpl.hpp"
 #include "MofkaTopicHandle.hpp"
+#include "ThreadPoolImpl.hpp"
 #include "MetadataImpl.hpp"
 #include "Logging.hpp"
 
@@ -125,6 +126,7 @@ MofkaDriver::MofkaDriver(const std::string& groupfile, thallium::engine engine) 
     } catch(const std::exception& ex) {
         throw Exception(ex.what());
     }
+    ThreadPoolImpl::SetDefaultPool(engine.get_progress_pool());
 }
 
 size_t MofkaDriver::numServers() const {

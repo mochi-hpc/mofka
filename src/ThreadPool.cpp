@@ -30,4 +30,6 @@ void ThreadPool::pushWork(std::function<void()> func, uint64_t priority) const {
     self->pushWork(std::move(func), priority);
 }
 
+thallium::pool ThreadPoolImpl::s_default_pool = thallium::pool{};
+
 }

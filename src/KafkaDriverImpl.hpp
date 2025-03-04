@@ -7,6 +7,7 @@
 #define MOFKA_KAFKA_DRIVER_IMPL_H
 
 #include "mofka/Exception.hpp"
+#include "ThreadPoolImpl.hpp"
 #include <librdkafka/rdkafka.h>
 #include <unordered_map>
 #include <thallium.hpp>
@@ -35,6 +36,7 @@ class KafkaDriverImpl {
         if (ret != RD_KAFKA_CONF_OK) {
             throw Exception{"Could not set Kafka configuration: " + std::string(errstr)};
         }
+        ThreadPoolImpl::SetDefaultPool(thallium::xstream::self().get_main_pools(1)[0]);
     }
 
     ~KafkaDriverImpl() {

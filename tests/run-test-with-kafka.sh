@@ -18,7 +18,7 @@ KAFKA_PID=$!
 sleep 5
 
 echo "[BASH] Running test command: $@"
-timeout 300s $@
+timeout 120s $@
 RET=$?
 
 echo "[BASH] Stopping kafka server"

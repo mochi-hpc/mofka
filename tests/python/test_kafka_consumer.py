@@ -51,7 +51,10 @@ class TestConsumer(unittest.TestCase):
         self.topic = self.service.open_topic(topic_name)
 
         # Create a producer
-        self.producer = self.topic.producer(ordering=mofka.Ordering.Strict)
+        batchsize = mofka.AdaptiveBatchSize
+        thread_pool = mofka.ThreadPool(0)
+        ordering = mofka.Ordering.Strict
+        self.producer = self.topic.producer(batch_size=batchsize, thread_pool=thread_pool, ordering=ordering)
 
         # Push a single event
         f = self.producer.push(self.metadata, self.data)
