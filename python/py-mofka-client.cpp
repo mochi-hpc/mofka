@@ -64,6 +64,35 @@ static auto data_helper(const py::list& buffers) {
 using PythonDataSelector = std::function<std::optional<mofka::DataDescriptor>(const nlohmann::json&, const mofka::DataDescriptor&)>;
 using PythonDataBroker   = std::function<py::list(const nlohmann::json&, const mofka::DataDescriptor&)>;
 
+struct AbstractDataOwner {
+    virtual py::object toPythonObject() const = 0;
+    virtual ~AbstractDataOwner() = default;
+};
+
+struct PythonDataOwner : public AbstractDataOwner {
+    py::object m_obj;
+
+    PythonDataOwner(py::object obj)
+    : m_obj{std::move(obj)} {}
+
+    py::object toPythonObject() const override {
+        return m_obj;
+    }
+};
+
+struct BufferDataOwner : public AbstractDataOwner {
+    std::vector<char> m_data;
+
+    BufferDataOwner(size_t size)
+    : m_data(size) {}
+
+    py::object toPythonObject() const override {
+        py::list result;
+        result.append(py::memoryview::from_memory(m_data.data(), m_data.size()));
+        return result;
+    }
+};
+
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the Mofka client library";
 
@@ -269,14 +298,15 @@ PYBIND11_MODULE(pymofka_client, m) {
         .def("consumer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,
+               PythonDataSelector selector,
+               PythonDataBroker broker,
                std::size_t batch_size,
                std::optional<mofka::ThreadPool> thread_pool,
-               PythonDataBroker broker,
-               PythonDataSelector selector,
                std::optional<std::vector<size_t>> targets) -> mofka::Consumer {
                 auto cpp_broker = broker ?
                     [broker=std::move(broker)]
-                    (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::Data {
+                    (const mofka::Metadata& metadata,
+                     const mofka::DataDescriptor& descriptor) -> mofka::Data {
                         auto segments = broker(metadata.json(), descriptor);
                         std::vector<mofka::Data::Segment> cpp_segments;
                         cpp_segments.reserve(segments.size());
@@ -286,7 +316,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                             check_buffer_is_contiguous(buf_info);
                             cpp_segments.push_back({buf_info.ptr, (size_t)buf_info.size});
                         }
-                        auto owner = new py::object{std::move(segments)};
+                        auto owner = new PythonDataOwner{std::move(segments)};
                         auto free_cb = [owner](mofka::Data::Context) { delete owner; };
                         auto data = mofka::Data{std::move(cpp_segments), owner, std::move(free_cb)};
                         return data;
@@ -294,7 +324,8 @@ PYBIND11_MODULE(pymofka_client, m) {
                 : mofka::DataBroker{};
                 auto cpp_selector = selector ?
                     [selector=std::move(selector)]
-                    (const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) -> mofka::DataDescriptor {
+                    (const mofka::Metadata& metadata,
+                     const mofka::DataDescriptor& descriptor) -> mofka::DataDescriptor {
                         std::optional<mofka::DataDescriptor> result = selector(metadata.json(), descriptor);
                         if(result) return result.value();
                         else return mofka::DataDescriptor::Null();
@@ -310,9 +341,46 @@ PYBIND11_MODULE(pymofka_client, m) {
                     mofka::DataSelector{cpp_selector},
                     targets.value_or(default_targets));
                },
-            "name"_a, "batch_size"_a=mofka::BatchSize::Adaptive().value,
-            "thread_pool"_a=std::nullopt, "data_broker"_a=PythonDataBroker{},
-            "data_selector"_a=PythonDataSelector{}, "targets"_a=std::optional<std::vector<size_t>>{})
+            "name"_a, "data_selector"_a, "data_broker"_a,
+            "batch_size"_a=mofka::BatchSize::Adaptive().value,
+            "thread_pool"_a=std::nullopt,
+            "targets"_a=std::optional<std::vector<size_t>>{})
+        .def("consumer",
+            [](const mofka::TopicHandle& topic,
+               std::string_view name,
+               std::size_t batch_size,
+               std::optional<mofka::ThreadPool> thread_pool,
+               std::optional<std::vector<size_t>> targets) -> mofka::Consumer {
+                auto cpp_broker = [](const mofka::Metadata& metadata,
+                                     const mofka::DataDescriptor& descriptor) -> mofka::Data {
+                        (void)metadata;
+                        auto owner = new BufferDataOwner{descriptor.size()};
+                        std::vector<mofka::Data::Segment> cpp_segment{
+                            mofka::Data::Segment{owner->m_data.data(), owner->m_data.size()}
+                        };
+                        auto free_cb = [owner](mofka::Data::Context) { delete owner; };
+                        auto data = mofka::Data{std::move(cpp_segment), owner, std::move(free_cb)};
+                        return data;
+                };
+                auto cpp_selector = [](const mofka::Metadata& metadata,
+                                       const mofka::DataDescriptor& descriptor) -> mofka::DataDescriptor {
+                        (void)metadata;
+                        return descriptor;
+                };
+                std::vector<size_t> default_targets;
+                if(!thread_pool.has_value())
+                    thread_pool = mofka::ThreadPool{mofka::ThreadCount{0}};
+                return topic.consumer(
+                    name, mofka::BatchSize(batch_size),
+                    thread_pool.value(),
+                    mofka::DataBroker{cpp_broker},
+                    mofka::DataSelector{cpp_selector},
+                    targets.value_or(default_targets));
+               },
+            "name"_a,
+            "batch_size"_a=mofka::BatchSize::Adaptive().value,
+            "thread_pool"_a=std::nullopt,
+            "targets"_a=std::optional<std::vector<size_t>>{})
     ;
 
     py::class_<mofka::Producer>(m, "Producer")
@@ -422,8 +490,9 @@ PYBIND11_MODULE(pymofka_client, m) {
                 [](mofka::Event& event) { return event.metadata().string(); })
         .def_property_readonly("data",
                 [](mofka::Event& event) {
-                    auto owner = event.data().context();
-                    return *static_cast<py::object*>(owner);
+                    auto owner = static_cast<AbstractDataOwner*>(event.data().context());
+                    return owner->toPythonObject();
+                    //return *static_cast<py::object*>(owner);
                 })
         .def_property_readonly("event_id", [](const mofka::Event& event) -> py::object {
                 if(event.id() == mofka::NoMoreEvents)
