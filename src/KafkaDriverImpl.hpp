@@ -35,6 +35,13 @@ class KafkaDriverImpl {
         if (ret != RD_KAFKA_CONF_OK) {
             throw Exception{"Could not set Kafka configuration: " + std::string(errstr)};
         }
+        rd_kafka_conf_set(m_kafka_config, "socket.timeout.ms", "100000", nullptr, 0);
+        rd_kafka_conf_set(m_kafka_config, "socket.keepalive.enable", "true", nullptr, 0);
+        rd_kafka_conf_set(m_kafka_config, "api.version.request", "false", nullptr, 0);
+        rd_kafka_conf_set(m_kafka_config, "api.version.fallback.ms", "0", nullptr, 0);
+        rd_kafka_conf_set(m_kafka_config, "api.version.request.timeout.ms", "200", nullptr, 0);
+        rd_kafka_conf_set(m_kafka_config, "reconnect.backoff.ms", "0", nullptr, 0);
+        rd_kafka_conf_set(m_kafka_config, "reconnect.backoff.max.ms", "0", nullptr, 0);
     }
 
     ~KafkaDriverImpl() {
