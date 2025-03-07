@@ -203,7 +203,7 @@ static void rdkafka_produce_messages(
     spdlog::info("Successfully produced {} messages in {} seconds (including {} seconds flush time)",
                  num_events, elapsed, flush_time);
 
-    spdlog::info("AGGREGATE PRODUCTION RATE: {} events/sec, {} MB/sec",
+    spdlog::info("AGGREGATE PRODUCTION RATE:\t {0:.2f} events/sec,\t {1:.2f} MB/sec",
                  ((size_t)num_producers)*((size_t)num_events)/elapsed,
                  ((size_t)num_producers)*((size_t)num_events)*message_size/(elapsed*1024*1024));
 
@@ -373,7 +373,7 @@ out:
     spdlog::info("Successfully consumed {} messages in {} seconds (including {} seconds commit time)",
                  num_events + warmup_events, elapsed, commit_time);
 
-    spdlog::info("AGGREGATE CONSUMPTION RATE: {} events/sec, {} MB/sec",
+    spdlog::info("AGGREGATE CONSUMPTION RATE:\t {0:.2f} events/sec,\t {1:.2f} MB/sec",
                  ((size_t)i)*((size_t)num_consumers)/elapsed,
                  ((size_t)i)*((size_t)num_consumers)*message_size/(elapsed*1024*1024));
 
@@ -564,7 +564,7 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     spdlog::info("Producing {} events took {} seconds (including {} seconds flush time)", num_events,
                  elapsed, t_flush);
 
-    spdlog::info("AGGREGATE PRODUCTION RATE: {} events/sec, {} MB/sec",
+    spdlog::info("AGGREGATE PRODUCTION RATE:\t {0:.2f} events/sec,\t {1:.2f} MB/sec",
                  ((size_t)num_events)*((size_t)num_producers)/elapsed,
                  ((size_t)num_events)*((size_t)num_producers)*(metadata_size + data_size)/(elapsed*1024*1024));
 
@@ -826,7 +826,7 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     auto elapsed = std::chrono::duration<double>(t_end - t_start).count();
     spdlog::info("Consuming {} events took {} seconds (including {} seconds of ack time)",
                  i, elapsed, t_ack);
-    spdlog::info("AGGREGATE CONSUMPTION RATE: {} events/sec, {} MB/sec",
+    spdlog::info("AGGREGATE CONSUMPTION RATE:\t {0:.2f} events/sec,\t {1:.2f} MB/sec",
                  ((size_t)i)*((size_t)num_consumers)/elapsed,
                  ((size_t)i)*((size_t)num_consumers)*message_size/(elapsed*1024*1024));
 
