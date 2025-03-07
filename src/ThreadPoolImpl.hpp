@@ -15,11 +15,24 @@ namespace mofka {
 
 class ThreadPoolImpl {
 
+    static thallium::pool s_default_pool;
+
     public:
+
+
+    static inline void SetDefaultPool(thallium::pool pool) {
+        s_default_pool = pool;
+    }
+
+    static inline thallium::pool GetDefaultPool() {
+        if(s_default_pool.is_null())
+            s_default_pool = thallium::xstream::self().get_main_pools(1)[0];
+        return s_default_pool;
+    }
 
     ThreadPoolImpl(ThreadCount tc) {
         if(tc.count == 0) {
-            m_pool = thallium::xstream::self().get_main_pools(1)[0];
+            m_pool = GetDefaultPool();
         } else {
             ABT_pool_prio_wait_def_create(&m_pool_def);
             ABT_pool_config pool_config = ABT_POOL_CONFIG_NULL;

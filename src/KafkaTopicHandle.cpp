@@ -168,25 +168,12 @@ void KafkaTopicHandle::markAsComplete() const {
 
     // Produce one event per partition
     for (size_t i = 0; i < m_partitions.size(); i++) {
-#if 0
-        // Create headers object
-        rd_kafka_headers_t *headers = rd_kafka_headers_new(1);
-        rd_kafka_header_add(headers, "NoMoreEvents", -1, "", 0);
-#endif
         size_t no_more_events = std::numeric_limits<size_t>::max();
         auto err = rd_kafka_producev(kprod,
                     RD_KAFKA_V_TOPIC(m_name.c_str()),
                     RD_KAFKA_V_PARTITION(m_partitions[i]->m_id),
-#if 0
-                    RD_KAFKA_V_HEADERS(headers),
-#endif
                     RD_KAFKA_V_VALUE((void*)&no_more_events, sizeof(no_more_events)),
                     RD_KAFKA_V_END);
-#if 0
-        // Destroy headers if message production failed
-        if(err != 0)
-            rd_kafka_headers_destroy(headers);
-#endif
     }
 
     // Wait for messages to be delivered

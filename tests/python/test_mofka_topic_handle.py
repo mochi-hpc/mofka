@@ -55,12 +55,11 @@ class TestTopicHandle(unittest.TestCase):
         import my_broker_selector
         name = "myconsumer"
         batchsize = random.randint(1,8)
-        thread_pool = mofka.ThreadPool(random.randint(1,8))
         consumer = self.topic.consumer(
-                name, batchsize, thread_pool,
-                my_broker_selector.broker,
-                my_broker_selector.selector,
-                list(range(len(self.topic.partitions))))
+                name=name, batch_size=batchsize,
+                data_broker=my_broker_selector.broker,
+                data_selector=my_broker_selector.selector,
+                targets=list(range(len(self.topic.partitions))))
 
 
 if __name__ == '__main__':

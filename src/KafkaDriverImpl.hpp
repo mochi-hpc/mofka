@@ -7,6 +7,7 @@
 #define MOFKA_KAFKA_DRIVER_IMPL_H
 
 #include "mofka/Exception.hpp"
+#include "ThreadPoolImpl.hpp"
 #include <librdkafka/rdkafka.h>
 #include <unordered_map>
 #include <thallium.hpp>
@@ -42,6 +43,7 @@ class KafkaDriverImpl {
         rd_kafka_conf_set(m_kafka_config, "api.version.request.timeout.ms", "200", nullptr, 0);
         rd_kafka_conf_set(m_kafka_config, "reconnect.backoff.ms", "0", nullptr, 0);
         rd_kafka_conf_set(m_kafka_config, "reconnect.backoff.max.ms", "0", nullptr, 0);
+        ThreadPoolImpl::SetDefaultPool(thallium::xstream::self().get_main_pools(1)[0]);
     }
 
     ~KafkaDriverImpl() {
