@@ -509,14 +509,23 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::Future<std::uint64_t>, std::shared_ptr<mofka::Future<std::uint64_t>>>(m, "FutureUint")
         .def("wait", [](mofka::Future<std::uint64_t>& future) {
-            py::gil_scoped_release unlock{};
-            return future.wait();
+            std::uint64_t result;
+            Py_BEGIN_ALLOW_THREADS
+            result = future.wait();
+            Py_END_ALLOW_THREADS
+            return result;
         })
         .def_property_readonly("completed", &mofka::Future<std::uint64_t>::completed)
     ;
 
     py::class_<mofka::Future<mofka::Event>, std::shared_ptr<mofka::Future<mofka::Event>>>(m, "FutureEvent")
-        .def("wait", &mofka::Future<mofka::Event>::wait)
+        .def("wait", [](mofka::Future<mofka::Event>& future) {
+                mofka::Event result;
+            Py_BEGIN_ALLOW_THREADS
+            result = future.wait();
+            Py_END_ALLOW_THREADS
+            return result;
+        })
         .def("completed", &mofka::Future<mofka::Event>::completed)
     ;
 
