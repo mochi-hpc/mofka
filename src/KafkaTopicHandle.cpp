@@ -14,6 +14,8 @@
 #include "KafkaDriverImpl.hpp"
 #include "KafkaConsumer.hpp"
 
+#include <unistd.h>
+
 namespace mofka {
 
 static inline void checkOptions(const Metadata& options) {
@@ -141,6 +143,8 @@ Consumer KafkaTopicHandle::makeConsumer(
     auto kcons = rd_kafka_new(RD_KAFKA_CONSUMER, kconf, errstr, sizeof(errstr));
     if (!kcons) throw Exception{"Failed to create Kafka consumer: " + std::string{errstr}};
     auto kcons_ptr = std::shared_ptr<rd_kafka_t>{kcons, rd_kafka_destroy};
+
+    sleep(2);
 
     auto consumer = std::make_shared<KafkaConsumer>(
             name, batch_size, std::move(thread_pool),

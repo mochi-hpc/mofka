@@ -163,10 +163,14 @@ static void rdkafka_produce_messages(
     double flush_time = 0.0;
 
     MPI_Barrier(MPI_COMM_WORLD);
+    t_start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < total_num_events; ++i) {
-        if (i == warmup_events)
+        if (i == warmup_events) {
+            while(RD_KAFKA_RESP_ERR__TIMED_OUT == rd_kafka_flush(producer, 100)) {};
+            MPI_Barrier(MPI_COMM_WORLD);
             t_start = std::chrono::high_resolution_clock::now();
+        }
         auto partition_index = my_partitions[i % my_partitions.size()];
         auto& event = messages[i];
         rd_kafka_producev(producer,
@@ -199,6 +203,10 @@ static void rdkafka_produce_messages(
     spdlog::info("Successfully produced {} messages in {} seconds (including {} seconds flush time)",
                  num_events, elapsed, flush_time);
 
+    spdlog::info("AGGREGATE PRODUCTION RATE:\t {0:.2f} events/sec,\t {1:.2f} MB/sec",
+                 ((size_t)num_producers)*((size_t)num_events)/elapsed,
+                 ((size_t)num_producers)*((size_t)num_events)*message_size/(elapsed*1024*1024));
+
     rd_kafka_destroy(producer);
 }
 
@@ -229,6 +237,11 @@ static void rdkafka_consume_messages(
     rd_kafka_conf_set(conf, "bootstrap.servers", bootstrap_servers.c_str(), nullptr, 0);
     rd_kafka_conf_set(conf, "socket.timeout.ms", "100000", nullptr, 0);
     rd_kafka_conf_set(conf, "socket.keepalive.enable", "true", nullptr, 0);
+    rd_kafka_conf_set(conf, "api.version.request", "false", nullptr, 0);
+    rd_kafka_conf_set(conf, "api.version.fallback.ms", "0", nullptr, 0);
+    rd_kafka_conf_set(conf, "api.version.request.timeout.ms", "200", nullptr, 0);
+    rd_kafka_conf_set(conf, "reconnect.backoff.ms", "0", nullptr, 0);
+    rd_kafka_conf_set(conf, "reconnect.backoff.max.ms", "0", nullptr, 0);
 
     // figure out the number of partitions
     int num_partitions = 0;
@@ -245,6 +258,8 @@ static void rdkafka_consume_messages(
             throw mofka::Exception{std::string{"Error creating Kafka handle: "} + errstr};
         }
         auto _rk = std::shared_ptr<rd_kafka_t>{rk, rd_kafka_destroy};
+
+        sleep(5);
 
         rd_kafka_resp_err_t err = rd_kafka_metadata(rk, 1, NULL, &metadata, 10000);
         if (err) {
@@ -279,14 +294,21 @@ static void rdkafka_consume_messages(
     MPI_Comm_size(MPI_COMM_WORLD, &num_consumers);
     auto my_partitions = computeMyPartitions(num_consumers, rank, num_partitions);
 
+    //if(rank == 0) rd_kafka_conf_set(conf, "debug", "all", nullptr, 0);
     rd_kafka_t *consumer = rd_kafka_new(RD_KAFKA_CONSUMER, conf, nullptr, 0);
+    sleep(2);
+
     rd_kafka_poll_set_consumer(consumer);
     rd_kafka_topic_partition_list_t *topics = rd_kafka_topic_partition_list_new(1);
     for(auto i : my_partitions) {
-        std::cout << "Process " << rank << " will consume from partition " << i << std::endl;
         rd_kafka_topic_partition_list_add(topics, topic_name.c_str(), i);
     }
-    rd_kafka_assign(consumer, topics);
+    rd_kafka_resp_err_t assign_err = rd_kafka_assign(consumer, topics);
+    if(assign_err) {
+        std::cout << "Process " << rank << ": rd_kafka_assign error: "
+                  << rd_kafka_err2str(assign_err) << std::endl;
+    }
+    sleep(2);
 
     decltype(std::chrono::high_resolution_clock::now()) t_start;
 
@@ -302,9 +324,10 @@ static void rdkafka_consume_messages(
 
     int i = 0;
     double commit_time = 0.0;
+    t_start = std::chrono::high_resolution_clock::now();
+    size_t message_size = 0;
+
     while(true) {
-        if (i == warmup_events)
-            t_start = std::chrono::high_resolution_clock::now();
 
         auto msg_received = rd_kafka_consume_batch_queue(
                 queue, 100, raw_messages.data(), raw_messages.size());
@@ -312,6 +335,7 @@ static void rdkafka_consume_messages(
         for(ssize_t j = 0; j < msg_received; j++) {
             auto msg = raw_messages[j];
             if (msg && !msg->err) {
+                message_size = message_size == 0 ? msg->len : message_size;
                 messages.emplace_back((const char*)msg->payload, msg->len);
                 if (i >= warmup_events) {
                     if (acknowledge_every.has_value()
@@ -327,12 +351,16 @@ static void rdkafka_consume_messages(
                 i += 1;
             }
             if(msg && msg->err) {
-                std::cout <<  rd_kafka_message_errstr(msg) << std::endl;
+                std::cout << rd_kafka_message_errstr(msg) << std::endl;
             }
             if(msg) {
                 rd_kafka_message_destroy(msg);
-                if (i % 100000 == 0 && rank == 0)
-                    std::cout << "Process " << rank << " consumed " << i << " messages" << std::endl;
+                if (i % 100000 == 0 && rank == 0) {
+                    auto elapsed = std::chrono::duration<double>(
+                            std::chrono::high_resolution_clock::now() - t_start).count();
+                    std::cout << "Process " << rank << " consumed "
+                              << i << " messages in " << elapsed << std::endl;
+                }
             }
             if (i == warmup_events + num_events) goto out;
         }
@@ -343,7 +371,11 @@ out:
     auto t_end = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double>(t_end - t_start).count();
     spdlog::info("Successfully consumed {} messages in {} seconds (including {} seconds commit time)",
-                 num_events, elapsed, commit_time);
+                 num_events + warmup_events, elapsed, commit_time);
+
+    spdlog::info("AGGREGATE CONSUMPTION RATE:\t {0:.2f} events/sec,\t {1:.2f} MB/sec",
+                 ((size_t)i)*((size_t)num_consumers)/elapsed,
+                 ((size_t)i)*((size_t)num_consumers)*message_size/(elapsed*1024*1024));
 
     rd_kafka_queue_destroy(queue);
     rd_kafka_topic_partition_list_destroy(topics);
@@ -525,11 +557,17 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     t_flush += std::chrono::duration<double>(t_flush_end - t_flush_start).count();
     MPI_Barrier(MPI_COMM_WORLD);
     auto t_end = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration<double>(t_end - t_start).count();
     spdlog::info("Marking topic as complete");
     if(rank == 0)
         topic.markAsComplete();
     spdlog::info("Producing {} events took {} seconds (including {} seconds flush time)", num_events,
-                 std::chrono::duration<double>(t_end - t_start).count(), t_flush);
+                 elapsed, t_flush);
+
+    spdlog::info("AGGREGATE PRODUCTION RATE:\t {0:.2f} events/sec,\t {1:.2f} MB/sec",
+                 ((size_t)num_events)*((size_t)num_producers)/elapsed,
+                 ((size_t)num_events)*((size_t)num_producers)*(metadata_size + data_size)/(elapsed*1024*1024));
+
 }
 
 /**
@@ -753,10 +791,13 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
     auto t_start = std::chrono::high_resolution_clock::now();
     double t_ack = 0;
 
+    size_t message_size = 0;
+
     while (num_partitions) {
         auto event = consumer.pull().wait();
         if (i == 0) {
             spdlog::info("First event pulled has metadata size {}", event.metadata().string().size());
+            message_size = event.metadata().string().size() + event.data().size();
         }
         if (i == warmup_events) {
             t_start = std::chrono::high_resolution_clock::now();
@@ -774,7 +815,7 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
             if(num_events >= warmup_events)
                 t_ack += std::chrono::duration<double>(t2 - t1).count();
         }
-        if (i % 100000 == 0)
+        if (i % 100000 == 0 && rank == 0)
             std::cout << "Process " << rank << " consumed " << i << " messages" << std::endl;
         if (i == num_events + warmup_events)
             break;
@@ -782,10 +823,13 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
 
     MPI_Barrier(MPI_COMM_WORLD);
     auto t_end = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration<double>(t_end - t_start).count();
     spdlog::info("Consuming {} events took {} seconds (including {} seconds of ack time)",
-                 i - warmup_events,
-                 std::chrono::duration<double>(t_end - t_start).count(),
-                 t_ack);
+                 i, elapsed, t_ack);
+    spdlog::info("AGGREGATE CONSUMPTION RATE:\t {0:.2f} events/sec,\t {1:.2f} MB/sec",
+                 ((size_t)i)*((size_t)num_consumers)/elapsed,
+                 ((size_t)i)*((size_t)num_consumers)*message_size/(elapsed*1024*1024));
+
 }
 
 /**
