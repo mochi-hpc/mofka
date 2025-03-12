@@ -73,7 +73,6 @@ class YokanEventStore {
             auto g = std::unique_lock{m_num_events_mtx};
             m_num_events += count;
         }
-        m_num_events_cv.notify_all();
 
         return result;
     }
