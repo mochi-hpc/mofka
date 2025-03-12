@@ -38,7 +38,7 @@ struct Promise {
     static inline std::pair<Future<Type>, Promise<Type>> CreateFutureAndPromise(
         std::function<void()> on_wait = std::function<void()>{},
         std::function<void(bool)> on_test = std::function<void(bool)>{}) {
-        auto state = std::make_shared<State>();
+        auto state = newState();
         auto wait_fn = [state, on_wait=std::move(on_wait)]() mutable -> Type {
             if(on_wait) on_wait();
             auto v = std::move(*state).wait();
@@ -80,6 +80,10 @@ struct Promise {
             ABT_eventual_set(ABT_EVENTUAL_MEMORY_GET_HANDLE(&m_eventual), nullptr, 0);
         }
     };
+
+    static std::shared_ptr<State> newState() {
+        return std::make_shared<State>();
+    }
 
     Promise(std::shared_ptr<State> state)
     : m_state(std::move(state)) {}
