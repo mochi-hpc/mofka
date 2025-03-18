@@ -153,7 +153,7 @@ static void rdkafka_produce_messages(
 
     int total_num_events = warmup_events + num_events;
     spdlog::info("Preparing {} messages...", total_num_events);
-    std::vector<std::string> messages(total_num_events);
+    std::vector<std::string> messages(100000);
     for(auto& msg : messages)
         msg = random_bytes(message_size);
 
@@ -172,7 +172,7 @@ static void rdkafka_produce_messages(
             t_start = std::chrono::high_resolution_clock::now();
         }
         auto partition_index = my_partitions[i % my_partitions.size()];
-        auto& event = messages[i];
+        auto& event = messages[i % messages.size()];
         rd_kafka_producev(producer,
                           RD_KAFKA_V_TOPIC(topic_name.c_str()),
                           RD_KAFKA_V_PARTITION(partition_index),
@@ -315,7 +315,7 @@ static void rdkafka_consume_messages(
     spdlog::info("Consuming {} messages (including {} warmup messages)...",
                  warmup_events + num_events, warmup_events);
 
-    std::vector<std::string> messages;
+    //std::vector<std::string> messages;
     std::vector<rd_kafka_message_t*> raw_messages(batch);
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -336,7 +336,8 @@ static void rdkafka_consume_messages(
             auto msg = raw_messages[j];
             if (msg && !msg->err) {
                 message_size = message_size == 0 ? msg->len : message_size;
-                messages.emplace_back((const char*)msg->payload, msg->len);
+                auto message = std::string{(const char*)msg->payload, msg->len};
+                //messages.emplace_back((const char*)msg->payload, msg->len);
                 if (i >= warmup_events) {
                     if (acknowledge_every.has_value()
                     && (i - warmup_events + 1) % acknowledge_every.value() == 0) {
@@ -355,7 +356,7 @@ static void rdkafka_consume_messages(
             }
             if(msg) {
                 rd_kafka_message_destroy(msg);
-                if (i % 100000 == 0 && rank == 0) {
+                if (i % 1000000 == 0 && rank == 0) {
                     auto elapsed = std::chrono::duration<double>(
                             std::chrono::high_resolution_clock::now() - t_start).count();
                     std::cout << "Process " << rank << " consumed "
@@ -492,9 +493,9 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
     int total_num_events = warmup_events + num_events;
 
     spdlog::info("Preparing metadata and data for {} events", total_num_events);
-    std::vector<std::string> data(total_num_events);
-    std::vector<mofka::Metadata> metadata(total_num_events);
-    for (int i = 0; i < total_num_events; ++i) {
+    std::vector<std::string> data(100000);
+    std::vector<mofka::Metadata> metadata(100000);
+    for (int i = 0; i < 100000; ++i) {
         data[i] = random_bytes(data_size);
         metadata[i] = mofka::Metadata{random_bytes(metadata_size)};
     }
@@ -514,8 +515,10 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
         spdlog::info("Start producing {} for warmup...", warmup_events);
         for (int i = 0; i < warmup_events; ++i) {
             auto partition_index = my_partitions[i % my_partitions.size()];
-            producer.push(metadata[i],
-                          mofka::Data{data[i].data(), data[i].size()},
+            auto& md = metadata[i % metadata.size()];
+            auto& dt = data[i % data.size()];
+            producer.push(md,
+                          mofka::Data{dt.data(), dt.size()},
                           partition_index);
         }
         producer.flush();
@@ -540,8 +543,10 @@ static void produce(Driver driver, const std::string& topic_name, int num_events
         for (int i = 0; i < num_events; ++i) {
             int j = i + warmup_events;
             auto partition_index = my_partitions[j % my_partitions.size()];
-            producer.push(metadata[j],
-                          mofka::Data{data[j].data(), data[j].size()},
+            auto& md = metadata[j % metadata.size()];
+            auto& dt = data[j % data.size()];
+            producer.push(md,
+                          mofka::Data{dt.data(), dt.size()},
                           partition_index);
             if (flush_every && (j + 1) % flush_every == 0) {
                 auto t_flush_start = std::chrono::high_resolution_clock::now();
@@ -815,10 +820,11 @@ static void consume(Driver driver, const std::string& consumer_name, const std::
             if(num_events >= warmup_events)
                 t_ack += std::chrono::duration<double>(t2 - t1).count();
         }
-        if (i % 100000 == 0 && rank == 0)
+        if (i % 1000000 == 0 && rank == 0)
             std::cout << "Process " << rank << " consumed " << i << " messages" << std::endl;
-        if (i == num_events + warmup_events)
+        if (i == num_events + warmup_events) {
             break;
+        }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -885,6 +891,7 @@ static void consume(int argc, char** argv) {
         spdlog::info("  acknowledge every: {}", ackEveryArg.getValue());
     else
         spdlog::info("  acknowledge every: never");
+    spdlog::info("  num events: {}", eventsArg.getValue());
     spdlog::info("  warmup events: {}", warmupArg.getValue());
     spdlog::info("=======================================================");
 
