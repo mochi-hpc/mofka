@@ -34,15 +34,16 @@ class YokanEventStore {
     yokan::Database              m_database;
     yokan::Collection            m_metadata_coll;
     yokan::Collection            m_descriptors_coll;
-    size_t                       m_num_events = 0;
-    thallium::mutex              m_num_events_mtx;
-    thallium::condition_variable m_num_events_cv;
+    size_t                       m_metadata_count = 0;
+    size_t                       m_data_count = 0;
+    thallium::mutex              m_count_mtx;
+    thallium::condition_variable m_count_cv;
     std::atomic<bool>            m_is_marked_complete = false;
 
     public:
 
     void wakeUp() {
-        m_num_events_cv.notify_all();
+        m_count_cv.notify_all();
     };
 
     Result<EventID> appendMetadata(
@@ -70,8 +71,8 @@ class YokanEventStore {
 
         result.value() = ids[0] - 1; // IDs start at 1 in the underlying DB
         {
-            auto g = std::unique_lock{m_num_events_mtx};
-            m_num_events += count;
+            auto g = std::unique_lock{m_count_mtx};
+            m_metadata_count += count;
         }
 
         return result;
@@ -119,6 +120,11 @@ class YokanEventStore {
             }
         }
 
+        {
+            auto g = std::unique_lock{m_count_mtx};
+            m_data_count += descriptors.size();
+        }
+
         return result;
     }
 
@@ -127,7 +133,7 @@ class YokanEventStore {
         result.success() = true;
         m_metadata_coll.update(0, "T", 1, YOKAN_MODE_NO_RDMA);
         m_is_marked_complete = true;
-        m_num_events_cv.notify_all();
+        m_count_cv.notify_all();
         return result;
     }
 
@@ -222,12 +228,13 @@ class YokanEventStore {
             bool should_stop = false;
             size_t num_available_events = 0;
             while(true) {
-                auto g = std::unique_lock{m_num_events_mtx};
+                auto g = std::unique_lock{m_count_mtx};
                 // find the number of events we can send
-                num_available_events = m_num_events - firstID;
+                auto num_events = std::min(m_metadata_count, m_data_count);
+                num_available_events = num_events - firstID;
                 should_stop = consumerHandle.shouldStop();
                 if(num_available_events > 0 || should_stop || m_is_marked_complete) break;
-                m_num_events_cv.wait(g);
+                m_count_cv.wait(g);
             }
             if(should_stop) break;
 
@@ -307,7 +314,8 @@ class YokanEventStore {
     , m_database(std::move(db))
     , m_metadata_coll(std::move(metadata_coll))
     , m_descriptors_coll(std::move(descriptors_coll))
-    , m_num_events(num_events)
+    , m_metadata_count(num_events)
+    , m_data_count(num_events)
     , m_is_marked_complete{marked_as_complete} {}
 
     static std::unique_ptr<YokanEventStore> create(
