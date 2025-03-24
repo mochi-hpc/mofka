@@ -54,9 +54,13 @@ Future<EventID> BatchProducer::push(Metadata metadata, Data data, std::optional<
 void BatchProducer::flush() {
     {
         std::lock_guard<thallium::mutex> guard{m_batch_queues_mtx};
+        std::vector<Future<void>> futures;
+        futures.reserve(m_batch_queues.size());
         for(auto& p : m_batch_queues) {
-            if(p) p->flush();
+            if(p) futures.push_back(p->flush());
         }
+        for(auto& f : futures)
+            f.wait();
     }
 }
 

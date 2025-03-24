@@ -92,14 +92,22 @@ class ActiveProducerBatchQueue {
         m_thread_pool.pushWork([this]() { loop(); });
     }
 
-    void flush() {
-        if(!m_running) return;
+    Future<void> flush() {
+        if(!m_running) return Future<void>{[](){}, [](){ return true; }};
         {
             std::unique_lock<thallium::mutex> guard{m_mutex};
             m_request_flush = true;
             m_cv.notify_one();
-            m_cv.wait(guard, [this]() { return m_batch_queue.empty(); });
         }
+        return Future<void>{
+            [this]() {
+                std::unique_lock<thallium::mutex> guard{m_mutex};
+                m_cv.wait(guard, [this]() { return m_batch_queue.empty(); });
+            },
+            [this]() {
+                std::unique_lock<thallium::mutex> guard{m_mutex};
+                return m_batch_queue.empty();
+            }};
     }
 
     private:
