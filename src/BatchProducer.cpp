@@ -59,8 +59,9 @@ void BatchProducer::flush() {
         for(auto& p : m_batch_queues) {
             if(p) futures.push_back(p->flush());
         }
-        for(auto& f : futures)
+        for(auto& f : futures) {
             f.wait();
+        }
     }
 }
 

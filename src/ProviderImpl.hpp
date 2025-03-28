@@ -129,7 +129,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                       size_t count,
                       const BulkRef& metadata,
                       const BulkRef& data) {
-        spdlog::trace("[mofka:{}] Received receiveBatch request", id());
+        spdlog::trace("[mofka:{}] Received receiveBatch request (topic: {}, count:{})", id(), m_topic, count);
         Result<EventID> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
         ENSURE_VALID_PARTITION_MANAGER(result);
@@ -144,7 +144,9 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                        const std::string& consumer_name,
                        size_t count,
                        size_t batch_size) {
-        spdlog::trace("[mofka:{}] Received requestEvents request", id());
+        spdlog::trace("[mofka:{}] Received requestEvents request"
+                      " (topic: {}, partition: {}, count: {}, batchsize: {})",
+                      id(), m_topic, partition_index, count, batch_size);
         SP<ConsumerHandleImpl> consumer_handle_impl;
         auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
 
@@ -175,7 +177,8 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void acknowledge(const tl::request& req,
                      const std::string& consumer_name,
                      EventID eventID) {
-        spdlog::trace("[mofka:{}] Received acknoweldge request", id());
+        spdlog::trace("[mofka:{}] Received acknoweldge request (topic: {}, consumer: {}, event_id: {})",
+                      id(), m_topic, consumer_name, eventID);
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
         ENSURE_VALID_PARTITION_MANAGER(result);
@@ -186,7 +189,8 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void removeConsumer(const tl::request& req,
                         intptr_t consumer_ctx,
                         size_t partition_index) {
-        spdlog::trace("[mofka:{}] Received removeConsumer request", id());
+        spdlog::trace("[mofka:{}] Received removeConsumer request (topic: {}, partition: {})",
+                      id(), m_topic, partition_index);
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
         auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
@@ -206,7 +210,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void requestData(const tl::request& req,
                      const Cerealized<DataDescriptor>& descriptor,
                      const BulkRef& remote_bulk) {
-        spdlog::trace("[mofka:{}] Received requestData request", id());
+        spdlog::trace("[mofka:{}] Received requestData request (topic: {})", id(), m_topic);
         Result<std::vector<Result<void>>> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
         ENSURE_VALID_PARTITION_MANAGER(result);
@@ -215,7 +219,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     }
 
     void markAsComplete(const tl::request& req) {
-        spdlog::trace("[mofka:{}] Received markAsComplete request", id());
+        spdlog::trace("[mofka:{}] Received markAsComplete request (topic: {})", id(), m_topic);
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
         ENSURE_VALID_PARTITION_MANAGER(result);

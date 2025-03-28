@@ -102,11 +102,13 @@ class ActiveProducerBatchQueue {
         return Future<void>{
             [this]() {
                 std::unique_lock<thallium::mutex> guard{m_mutex};
-                m_cv.wait(guard, [this]() { return m_batch_queue.empty(); });
+                m_cv.wait(guard, [this]() {
+                    return m_batch_queue.empty() && m_request_flush == false;
+                });
             },
             [this]() {
                 std::unique_lock<thallium::mutex> guard{m_mutex};
-                return m_batch_queue.empty();
+                return m_batch_queue.empty() && m_request_flush == false;
             }};
     }
 
