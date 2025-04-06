@@ -37,6 +37,8 @@ class ActiveProducerBatchQueue {
     , m_batch_size{batch_size}
     , m_max_batch{max_batch}
     {
+        if(m_max_batch.value == 0)
+            m_max_batch.value = 1;
         start();
     }
 
@@ -63,7 +65,10 @@ class ActiveProducerBatchQueue {
             auto last_batch = m_batch_queue.back();
             if(!adaptive && last_batch->count() == m_batch_size.value) {
                 //if(m_reusable_batches.empty()) {
-                    m_batch_queue.push(m_create_new_batch());
+                m_cv.wait(guard, [this]() {
+                    return m_batch_queue.size() < m_max_batch.value;
+                });
+                m_batch_queue.push(m_create_new_batch());
                 //} else {
                 //    m_batch_queue.push(m_reusable_batches.front());
                 //    m_reusable_batches.pop_front();
@@ -139,6 +144,7 @@ class ActiveProducerBatchQueue {
             m_batch_queue.pop();
             guard.unlock();
             batch->send();
+            m_cv.notify_one();
             guard.lock();
             //m_reusable_batches.push_back(batch);
         }

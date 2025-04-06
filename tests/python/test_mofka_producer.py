@@ -44,7 +44,12 @@ class TestProducer(unittest.TestCase):
         batchsize = mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(0)
         ordering = mofka.Ordering.Strict
-        self.producer = self.topic.producer(name, batchsize, thread_pool, ordering)
+        self.producer = self.topic.producer(
+            name=name,
+            batch_size=batchsize,
+            max_batch=2,
+            thread_pool=thread_pool,
+            ordering=ordering)
 
     def tearDown(self):
         del self.metadata
