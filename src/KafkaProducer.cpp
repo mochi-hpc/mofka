@@ -23,6 +23,7 @@ namespace mofka {
 KafkaProducer::KafkaProducer(
         std::string_view name,
         BatchSize batch_size,
+        MaxBatch max_batch,
         ThreadPool thread_pool,
         Ordering ordering,
         std::shared_ptr<KafkaTopicHandle> topic,
@@ -30,6 +31,7 @@ KafkaProducer::KafkaProducer(
         std::shared_ptr<rd_kafka_topic_t> ktopic)
 : m_name(name.data(), name.size())
 , m_batch_size{batch_size}
+, m_max_batch{max_batch}
 , m_thread_pool{thread_pool}
 , m_ordering{ordering}
 , m_topic(std::move(topic))

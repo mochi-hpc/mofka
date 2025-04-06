@@ -44,6 +44,7 @@ class KafkaBatchProducer : public BatchProducer {
 
     KafkaBatchProducer(std::string_view name,
                        BatchSize batch_size,
+                       MaxBatch max_batch,
                        ThreadPool thread_pool,
                        Ordering ordering,
                        std::shared_ptr<KafkaTopicHandle> topic,

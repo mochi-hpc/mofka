@@ -284,17 +284,18 @@ PYBIND11_MODULE(pymofka_client, m) {
             [](const mofka::TopicHandle& topic,
                std::string_view name,
                std::size_t batch_size,
+               std::size_t max_batch,
                std::optional<mofka::ThreadPool> thread_pool,
                mofka::Ordering ordering) -> mofka::Producer {
                 if(!thread_pool.has_value())
                     thread_pool = mofka::ThreadPool{mofka::ThreadCount{0}};
                 return topic.producer(
                     name, mofka::BatchSize(batch_size),
-                    thread_pool.value(),
+                    mofka::MaxBatch{max_batch}, thread_pool.value(),
                     ordering);
             },
             "name"_a="", "batch_size"_a=mofka::BatchSize::Adaptive().value,
-            "thread_pool"_a=std::optional<mofka::ThreadPool>{},
+            "max_batch"_a=2, "thread_pool"_a=std::optional<mofka::ThreadPool>{},
             "ordering"_a=mofka::Ordering::Strict)
         .def("consumer",
             [](const mofka::TopicHandle& topic,
@@ -302,6 +303,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                PythonDataSelector selector,
                PythonDataBroker broker,
                std::size_t batch_size,
+               std::size_t max_batch,
                std::optional<mofka::ThreadPool> thread_pool,
                std::optional<std::vector<size_t>> targets) -> mofka::Consumer {
                 auto cpp_broker = broker ?
@@ -337,6 +339,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                     thread_pool = mofka::ThreadPool{mofka::ThreadCount{0}};
                 return topic.consumer(
                     name, mofka::BatchSize(batch_size),
+                    mofka::MaxBatch{max_batch},
                     thread_pool.value(),
                     mofka::DataBroker{cpp_broker},
                     mofka::DataSelector{cpp_selector},
@@ -344,12 +347,13 @@ PYBIND11_MODULE(pymofka_client, m) {
                },
             "name"_a, "data_selector"_a, "data_broker"_a,
             "batch_size"_a=mofka::BatchSize::Adaptive().value,
-            "thread_pool"_a=std::nullopt,
+            "max_batch"_a=2, "thread_pool"_a=std::nullopt,
             "targets"_a=std::optional<std::vector<size_t>>{})
         .def("consumer",
             [](const mofka::TopicHandle& topic,
                std::string_view name,
                std::size_t batch_size,
+               std::size_t max_batch,
                std::optional<mofka::ThreadPool> thread_pool,
                std::optional<std::vector<size_t>> targets) -> mofka::Consumer {
                 auto cpp_broker = [](const mofka::Metadata& metadata,
@@ -373,14 +377,14 @@ PYBIND11_MODULE(pymofka_client, m) {
                     thread_pool = mofka::ThreadPool{mofka::ThreadCount{0}};
                 return topic.consumer(
                     name, mofka::BatchSize(batch_size),
-                    thread_pool.value(),
+                    mofka::MaxBatch{max_batch}, thread_pool.value(),
                     mofka::DataBroker{cpp_broker},
                     mofka::DataSelector{cpp_selector},
                     targets.value_or(default_targets));
                },
             "name"_a,
             "batch_size"_a=mofka::BatchSize::Adaptive().value,
-            "thread_pool"_a=std::nullopt,
+            "max_batch"_a=2, "thread_pool"_a=std::nullopt,
             "targets"_a=std::optional<std::vector<size_t>>{})
     ;
 

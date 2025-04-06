@@ -24,10 +24,11 @@ MofkaProducer::MofkaProducer(
         tl::engine engine,
         std::string_view name,
         BatchSize batch_size,
+        MaxBatch max_batch,
         ThreadPool thread_pool,
         Ordering ordering,
         std::shared_ptr<MofkaTopicHandle> topic)
-: BatchProducer(name, batch_size, std::move(thread_pool), ordering, TopicHandle(topic))
+: BatchProducer(name, batch_size, max_batch, std::move(thread_pool), ordering, TopicHandle(topic))
 , m_engine{std::move(engine)}
 , m_mofka_topic(std::move(topic))
 , m_producer_send_batch(m_engine.define("mofka_producer_send_batch"))

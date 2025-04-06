@@ -32,6 +32,7 @@ class KafkaProducer : public ProducerInterface {
 
     std::string                       m_name;
     BatchSize                         m_batch_size;
+    MaxBatch                          m_max_batch;
     ThreadPool                        m_thread_pool;
     Ordering                          m_ordering;
     std::shared_ptr<KafkaTopicHandle> m_topic;
@@ -46,6 +47,7 @@ class KafkaProducer : public ProducerInterface {
 
     KafkaProducer(std::string_view name,
                   BatchSize batch_size,
+                  MaxBatch max_batch,
                   ThreadPool thread_pool,
                   Ordering ordering,
                   std::shared_ptr<KafkaTopicHandle> topic,
@@ -62,6 +64,10 @@ class KafkaProducer : public ProducerInterface {
 
     BatchSize batchSize() const override {
         return m_batch_size;
+    }
+
+    MaxBatch maxBatch() const override {
+        return m_max_batch;
     }
 
     ThreadPool threadPool() const override {
