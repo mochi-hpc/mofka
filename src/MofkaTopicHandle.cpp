@@ -20,18 +20,20 @@ namespace mofka {
 Producer MofkaTopicHandle::makeProducer(
         std::string_view name,
         BatchSize batch_size,
+        MaxBatch max_batch,
         ThreadPool thread_pool,
         Ordering ordering,
         Metadata options) const {
     (void)options;
     return Producer{std::make_shared<MofkaProducer>(
-        m_engine, name, batch_size, std::move(thread_pool), ordering,
+        m_engine, name, batch_size, max_batch, std::move(thread_pool), ordering,
         const_cast<MofkaTopicHandle*>(this)->shared_from_this())};
 }
 
 Consumer MofkaTopicHandle::makeConsumer(
         std::string_view name,
         BatchSize batch_size,
+        MaxBatch max_batch,
         ThreadPool thread_pool,
         DataBroker data_broker,
         DataSelector data_selector,
@@ -50,8 +52,8 @@ Consumer MofkaTopicHandle::makeConsumer(
         }
     }
     auto consumer = std::make_shared<MofkaConsumer>(
-            m_engine, name, batch_size, std::move(thread_pool),
-            data_broker, data_selector,
+            m_engine, name, batch_size, max_batch,
+            std::move(thread_pool), data_broker, data_selector,
             const_cast<MofkaTopicHandle*>(this)->shared_from_this(),
             std::move(partitions));
     consumer->subscribe();

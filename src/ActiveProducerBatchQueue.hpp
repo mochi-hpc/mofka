@@ -30,10 +30,15 @@ class ActiveProducerBatchQueue {
     ActiveProducerBatchQueue(
         NewBatchFn new_batch,
         ThreadPool thread_pool,
-        BatchSize batch_size)
+        BatchSize batch_size,
+        MaxBatch max_batch)
     : m_create_new_batch{std::move(new_batch)}
     , m_thread_pool{std::move(thread_pool)}
-    , m_batch_size{batch_size} {
+    , m_batch_size{batch_size}
+    , m_max_batch{max_batch}
+    {
+        if(m_max_batch.value == 0)
+            m_max_batch.value = 1;
         start();
     }
 
@@ -60,7 +65,10 @@ class ActiveProducerBatchQueue {
             auto last_batch = m_batch_queue.back();
             if(!adaptive && last_batch->count() == m_batch_size.value) {
                 //if(m_reusable_batches.empty()) {
-                    m_batch_queue.push(m_create_new_batch());
+                m_cv.wait(guard, [this]() {
+                    return m_batch_queue.size() < m_max_batch.value;
+                });
+                m_batch_queue.push(m_create_new_batch());
                 //} else {
                 //    m_batch_queue.push(m_reusable_batches.front());
                 //    m_reusable_batches.pop_front();
@@ -136,6 +144,7 @@ class ActiveProducerBatchQueue {
             m_batch_queue.pop();
             guard.unlock();
             batch->send();
+            m_cv.notify_one();
             guard.lock();
             //m_reusable_batches.push_back(batch);
         }
@@ -146,6 +155,7 @@ class ActiveProducerBatchQueue {
     NewBatchFn                             m_create_new_batch;
     ThreadPool                             m_thread_pool;
     BatchSize                              m_batch_size;
+    MaxBatch                               m_max_batch;
     std::queue<SP<ProducerBatchInterface>> m_batch_queue;
     //std::list<SP<ProducerBatchInterface>>  m_reusable_batches;
     thallium::managed<thallium::thread>    m_sender_ult;

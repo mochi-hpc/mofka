@@ -37,6 +37,7 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
     thallium::engine                    m_engine;
     std::string                         m_name;
     BatchSize                           m_batch_size;
+    MaxBatch                            m_max_batch;
     ThreadPool                          m_thread_pool;
     DataBroker                          m_data_broker;
     DataSelector                        m_data_selector;
@@ -77,6 +78,7 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
     MofkaConsumer(thallium::engine engine,
                   std::string_view name,
                   BatchSize batch_size,
+                  MaxBatch max_batch,
                   ThreadPool thread_pool,
                   DataBroker broker,
                   DataSelector selector,
@@ -85,6 +87,7 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
     : m_engine(std::move(engine))
     , m_name(name)
     , m_batch_size(batch_size)
+    , m_max_batch(max_batch)
     , m_thread_pool(std::move(thread_pool))
     , m_data_broker(std::move(broker))
     , m_data_selector(std::move(selector))
@@ -112,6 +115,10 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
 
     BatchSize batchSize() const override {
         return m_batch_size;
+    }
+
+    MaxBatch maxBatch() const override {
+        return m_max_batch;
     }
 
     ThreadPool threadPool() const override {

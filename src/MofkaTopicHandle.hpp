@@ -66,6 +66,7 @@ class MofkaTopicHandle : public std::enable_shared_from_this<MofkaTopicHandle>,
     Producer makeProducer(
           std::string_view name,
           BatchSize batch_size,
+          MaxBatch max_batch,
           ThreadPool thread_pool,
           Ordering ordering,
           Metadata options) const override;
@@ -73,6 +74,7 @@ class MofkaTopicHandle : public std::enable_shared_from_this<MofkaTopicHandle>,
     Consumer makeConsumer(
           std::string_view name,
           BatchSize batch_size,
+          MaxBatch max_batch,
           ThreadPool thread_pool,
           DataBroker data_broker,
           DataSelector data_selector,

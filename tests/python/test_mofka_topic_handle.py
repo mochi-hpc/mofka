@@ -38,7 +38,8 @@ class TestTopicHandle(unittest.TestCase):
         batchsize = random.randint(1,8)
         thread_pool = mofka.ThreadPool(random.randint(1,8))
         ordering = mofka.Ordering.Strict
-        producer = self.topic.producer(name, batchsize, thread_pool, ordering)
+        maxbatch = 2
+        producer = self.topic.producer(name, batchsize, maxbatch, thread_pool, ordering)
 
     def test_create_producer_default(self):
         """Test create data producer with default params"""

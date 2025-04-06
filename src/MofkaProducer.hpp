@@ -38,6 +38,7 @@ class MofkaProducer : public BatchProducer {
     MofkaProducer(tl::engine engine,
                   std::string_view name,
                   BatchSize batch_size,
+                  MaxBatch max_batch,
                   ThreadPool thread_pool,
                   Ordering ordering,
                   std::shared_ptr<MofkaTopicHandle> topic);

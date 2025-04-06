@@ -63,6 +63,7 @@ class KafkaTopicHandle : public std::enable_shared_from_this<KafkaTopicHandle>,
     Producer makeProducer(
           std::string_view name,
           BatchSize batch_size,
+          MaxBatch max_batch,
           ThreadPool thread_pool,
           Ordering ordering,
           Metadata options) const override;
@@ -70,6 +71,7 @@ class KafkaTopicHandle : public std::enable_shared_from_this<KafkaTopicHandle>,
     Consumer makeConsumer(
           std::string_view name,
           BatchSize batch_size,
+          MaxBatch max_batch,
           ThreadPool thread_pool,
           DataBroker data_broker,
           DataSelector data_selector,

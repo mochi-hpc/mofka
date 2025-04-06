@@ -26,6 +26,7 @@ class BatchProducer : public ProducerInterface {
 
     std::string  m_name;
     BatchSize    m_batch_size;
+    MaxBatch     m_max_batch;
     ThreadPool   m_thread_pool;
     Ordering     m_ordering;
     TopicHandle  m_topic;
@@ -39,11 +40,13 @@ class BatchProducer : public ProducerInterface {
 
     BatchProducer(std::string_view name,
                   BatchSize batch_size,
+                  MaxBatch max_batch,
                   ThreadPool thread_pool,
                   Ordering ordering,
                   TopicHandle topic)
     : m_name(name)
     , m_batch_size(batch_size)
+    , m_max_batch(max_batch)
     , m_thread_pool(std::move(thread_pool))
     , m_ordering(ordering)
     , m_topic(std::move(topic))
@@ -61,6 +64,10 @@ class BatchProducer : public ProducerInterface {
 
     BatchSize batchSize() const override {
         return m_batch_size;
+    }
+
+    MaxBatch maxBatch() const override {
+        return m_max_batch;
     }
 
     ThreadPool threadPool() const override {

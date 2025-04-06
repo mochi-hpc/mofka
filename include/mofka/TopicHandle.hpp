@@ -70,6 +70,7 @@ class TopicHandleInterface {
      *
      * @param name Name of the Producer.
      * @param batch_size Batch size.
+     * @param max_batch Maximum number of batches (must be >= 1).
      * @param thread_pool Thread pool.
      * @param ordering Whether to enforce strict ordering.
      * @param options Extra options.
@@ -78,6 +79,7 @@ class TopicHandleInterface {
      */
     virtual Producer makeProducer(std::string_view name,
                                   BatchSize batch_size,
+                                  MaxBatch max_batch,
                                   ThreadPool thread_pool,
                                   Ordering ordering,
                                   Metadata options) const = 0;
@@ -88,6 +90,7 @@ class TopicHandleInterface {
      *
      * @param name Name of the Consumer.
      * @param batch_size Batch size.
+     * @param max_batch Maximum number of batches (must be >= 1).
      * @param thread_pool Thread pool.
      * @param data_broker Data broker.
      * @param data_selector Data selector.
@@ -98,6 +101,7 @@ class TopicHandleInterface {
      */
     virtual Consumer makeConsumer(std::string_view name,
                                   BatchSize batch_size,
+                                  MaxBatch max_batch,
                                   ThreadPool thread_pool,
                                   DataBroker data_broker,
                                   DataSelector data_selector,
@@ -169,6 +173,7 @@ class TopicHandle {
         return makeProducer(
             GetArgOrDefault(std::string_view{""}, std::forward<Options>(opts)...),
             GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
+            GetArgOrDefault(MaxBatch{2}, std::forward<Options>(opts)...),
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
             GetArgOrDefault(Ordering::Strict, std::forward<Options>(opts)...),
             GetArgOrDefaultExactType(Metadata{}, std::forward<Options>(opts)...));
@@ -187,6 +192,7 @@ class TopicHandle {
     Consumer consumer(std::string_view name, Options&&... opts) const {
         return makeConsumer(name,
             GetArgOrDefault(BatchSize::Adaptive(), std::forward<Options>(opts)...),
+            GetArgOrDefault(MaxBatch{2}, std::forward<Options>(opts)...),
             GetArgOrDefault(ThreadPool{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataBroker{}, std::forward<Options>(opts)...),
             GetArgOrDefault(DataSelector{}, std::forward<Options>(opts)...),
@@ -248,6 +254,7 @@ class TopicHandle {
      *
      * @param name Name of the Producer.
      * @param batch_size Batch size.
+     * @param max_batch Max number of batches.
      * @param thread_pool Thread pool.
      * @param ordering Whether to enforce strict ordering.
      *
@@ -255,11 +262,13 @@ class TopicHandle {
      */
     Producer makeProducer(std::string_view name,
                           BatchSize batch_size,
+                          MaxBatch max_batch,
                           ThreadPool thread_pool,
                           Ordering ordering,
                           Metadata options) const {
         return self->makeProducer(
-            name, batch_size, std::move(thread_pool), ordering, std::move(options));
+            name, batch_size, max_batch,
+            std::move(thread_pool), ordering, std::move(options));
     }
 
     /**
@@ -268,6 +277,7 @@ class TopicHandle {
      *
      * @param name Name of the Consumer.
      * @param batch_size Batch size.
+     * @param max_batch Max number of batches.
      * @param thread_pool Thread pool.
      * @param data_broker Data broker.
      * @param data_selector Data selector.
@@ -277,13 +287,15 @@ class TopicHandle {
      */
     Consumer makeConsumer(std::string_view name,
                           BatchSize batch_size,
+                          MaxBatch max_batch,
                           ThreadPool thread_pool,
                           DataBroker data_broker,
                           DataSelector data_selector,
                           const std::vector<size_t>& targets,
                           Metadata options) const {
         return self->makeConsumer(
-            name, batch_size, std::move(thread_pool), data_broker,
+            name, batch_size, max_batch,
+            std::move(thread_pool), data_broker,
             data_selector, targets, std::move(options));
     }
 

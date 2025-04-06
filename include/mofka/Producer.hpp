@@ -48,6 +48,12 @@ class ProducerInterface {
     virtual BatchSize batchSize() const = 0;
 
     /**
+     * @brief Returns the maximum number of batches the
+     * Producer is allowed to hold at any time.
+     */
+    virtual MaxBatch maxBatch() const = 0;
+
+    /**
      * @brief Returns the ThreadPool associated with the Producer.
      */
     virtual ThreadPool threadPool() const = 0;
@@ -132,6 +138,14 @@ class Producer {
      */
     BatchSize batchSize() const {
         return self->batchSize();
+    }
+
+    /**
+     * @brief Returns the maximum number of batches the
+     * Producer is allowed to hold at any time.
+     */
+    MaxBatch maxBatch() const {
+        return self->maxBatch();
     }
 
     /**

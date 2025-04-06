@@ -49,6 +49,12 @@ class ConsumerInterface {
     virtual BatchSize batchSize() const = 0;
 
     /**
+     * @brief Returns the maximum number of batches the
+     * Consumer is allowed to hold at any time.
+     */
+    virtual MaxBatch maxBatch() const = 0;
+
+    /**
      * @brief Returns the ThreadPool associated with the Consumer.
      */
     virtual ThreadPool threadPool() const = 0;
@@ -137,6 +143,14 @@ class Consumer {
      */
     BatchSize batchSize() const {
         return self->batchSize();
+    }
+
+    /**
+     * @brief Returns the maximum number of batches the
+     * Consumer is allowed to hold at any time.
+     */
+    MaxBatch maxBatch() const {
+        return self->maxBatch();
     }
 
     /**

@@ -35,6 +35,7 @@ class KafkaConsumer : public std::enable_shared_from_this<KafkaConsumer>,
     std::shared_ptr<rd_kafka_t>         m_kafka_consumer;
     std::string                         m_name;
     BatchSize                           m_batch_size;
+    MaxBatch                            m_max_batch;
     ThreadPool                          m_thread_pool;
     DataBroker                          m_data_broker;
     DataSelector                        m_data_selector;
@@ -70,6 +71,7 @@ class KafkaConsumer : public std::enable_shared_from_this<KafkaConsumer>,
 
     KafkaConsumer(std::string_view name,
                   BatchSize batch_size,
+                  MaxBatch max_batch,
                   ThreadPool thread_pool,
                   DataBroker broker,
                   DataSelector selector,
@@ -79,6 +81,7 @@ class KafkaConsumer : public std::enable_shared_from_this<KafkaConsumer>,
     : m_kafka_consumer{std::move(kcons)}
     , m_name(name)
     , m_batch_size(batch_size)
+    , m_max_batch{max_batch}
     , m_thread_pool(std::move(thread_pool))
     , m_data_broker(std::move(broker))
     , m_data_selector(std::move(selector))
@@ -92,6 +95,10 @@ class KafkaConsumer : public std::enable_shared_from_this<KafkaConsumer>,
 
     BatchSize batchSize() const override {
         return m_batch_size;
+    }
+
+    MaxBatch maxBatch() const override {
+        return m_max_batch;
     }
 
     ThreadPool threadPool() const override {

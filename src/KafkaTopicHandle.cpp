@@ -46,6 +46,7 @@ static inline void addOptions(const Metadata& options, rd_kafka_conf_t* config) 
 Producer KafkaTopicHandle::makeProducer(
         std::string_view name,
         BatchSize batch_size,
+        MaxBatch max_batch,
         ThreadPool thread_pool,
         Ordering ordering,
         Metadata options) const {
@@ -96,7 +97,7 @@ Producer KafkaTopicHandle::makeProducer(
     }
 #endif
         return Producer{std::make_shared<KafkaProducer>(
-            name, batch_size, std::move(thread_pool), ordering,
+            name, batch_size, max_batch, std::move(thread_pool), ordering,
             const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
             std::move(kprod_ptr), std::move(ktopic_ptr))};
 }
@@ -104,6 +105,7 @@ Producer KafkaTopicHandle::makeProducer(
 Consumer KafkaTopicHandle::makeConsumer(
         std::string_view name,
         BatchSize batch_size,
+        MaxBatch max_batch,
         ThreadPool thread_pool,
         DataBroker data_broker,
         DataSelector data_selector,
@@ -147,7 +149,7 @@ Consumer KafkaTopicHandle::makeConsumer(
     sleep(2);
 
     auto consumer = std::make_shared<KafkaConsumer>(
-            name, batch_size, std::move(thread_pool),
+            name, batch_size, max_batch, std::move(thread_pool),
             data_broker, data_selector,
             const_cast<KafkaTopicHandle*>(this)->shared_from_this(),
             std::move(partitions), kcons_ptr);

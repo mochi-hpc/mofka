@@ -37,6 +37,25 @@ struct BatchSize {
     inline bool operator!=(const BatchSize& other) const { return value != other.value; }
 };
 
+/**
+ * @brief Strongly typped size_t meant to store the maximum number of batches to
+ * use at any time in a producer or a consumer.
+ */
+struct MaxBatch {
+
+    std::size_t value;
+
+    explicit constexpr MaxBatch(std::size_t val)
+    : value(val) {}
+
+    inline bool operator<(const MaxBatch& other) const { return value < other.value; }
+    inline bool operator>(const MaxBatch& other) const { return value > other.value; }
+    inline bool operator<=(const MaxBatch& other) const { return value <= other.value; }
+    inline bool operator>=(const MaxBatch& other) const { return value >= other.value; }
+    inline bool operator==(const MaxBatch& other) const { return value == other.value; }
+    inline bool operator!=(const MaxBatch& other) const { return value != other.value; }
+};
+
 }
 
 #endif
