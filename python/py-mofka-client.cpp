@@ -294,7 +294,8 @@ PYBIND11_MODULE(pymofka_client, m) {
                     mofka::MaxBatch{max_batch}, thread_pool.value(),
                     ordering);
             },
-            "name"_a="", "batch_size"_a=mofka::BatchSize::Adaptive().value,
+            "name"_a="", py::kw_only(),
+            "batch_size"_a=mofka::BatchSize::Adaptive().value,
             "max_batch"_a=2, "thread_pool"_a=std::optional<mofka::ThreadPool>{},
             "ordering"_a=mofka::Ordering::Strict)
         .def("consumer",
@@ -345,7 +346,8 @@ PYBIND11_MODULE(pymofka_client, m) {
                     mofka::DataSelector{cpp_selector},
                     targets.value_or(default_targets));
                },
-            "name"_a, "data_selector"_a, "data_broker"_a,
+            "name"_a, py::kw_only(),
+            "data_selector"_a, "data_broker"_a,
             "batch_size"_a=mofka::BatchSize::Adaptive().value,
             "max_batch"_a=2, "thread_pool"_a=std::nullopt,
             "targets"_a=std::optional<std::vector<size_t>>{})
@@ -382,7 +384,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                     mofka::DataSelector{cpp_selector},
                     targets.value_or(default_targets));
                },
-            "name"_a,
+            "name"_a, py::kw_only(),
             "batch_size"_a=mofka::BatchSize::Adaptive().value,
             "max_batch"_a=2, "thread_pool"_a=std::nullopt,
             "targets"_a=std::optional<std::vector<size_t>>{})
@@ -400,6 +402,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return producer.push(std::move(metadata), data_helper(b_data), part);
             },
             "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true),
+            py::kw_only(),
             "partition"_a=std::nullopt)
         .def("push",
             [](const mofka::Producer& producer,
@@ -409,6 +412,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return producer.push(std::move(metadata), data_helper(b_data), part);
             },
             "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true),
+            py::kw_only(),
             "partition"_a=std::nullopt)
         .def("push",
             [](const mofka::Producer& producer,
@@ -418,6 +422,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return producer.push(std::move(metadata), data_helper(b_data), part);
             },
             "metadata"_a, "data"_a=std::vector<py::memoryview>{},
+            py::kw_only(),
             "partition"_a=std::nullopt)
         .def("push",
             [](const mofka::Producer& producer,
@@ -427,6 +432,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                 return producer.push(std::move(metadata), data_helper(b_data), part);
             },
             "metadata"_a, "data"_a=py::memoryview::from_memory(nullptr, 0, true),
+            py::kw_only(),
             "partition"_a=std::nullopt)
         .def("flush", &mofka::Producer::flush)
         .def("batch_size",
@@ -453,7 +459,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::size_t maxEvents) {
                 return consumer.process(processor, threadPool, mofka::NumEvents{maxEvents});
                },
-            "processor"_a, "threadPoll"_a,
+            "processor"_a, py::kw_only(), "thread_pool"_a,
             "max_events"_a=std::numeric_limits<size_t>::max()
             )
     ;
