@@ -43,7 +43,8 @@ Future<EventID> BatchProducer::push(Metadata metadata, Data data, std::optional<
             queue = std::make_shared<ActiveProducerBatchQueue>(
                     std::move(create_new_batch),
                     m_thread_pool,
-                    batchSize());
+                    batchSize(),
+                    maxBatch());
             m_batch_queues[partition_index] = queue;
         }
     }

@@ -30,10 +30,13 @@ class ActiveProducerBatchQueue {
     ActiveProducerBatchQueue(
         NewBatchFn new_batch,
         ThreadPool thread_pool,
-        BatchSize batch_size)
+        BatchSize batch_size,
+        MaxBatch max_batch)
     : m_create_new_batch{std::move(new_batch)}
     , m_thread_pool{std::move(thread_pool)}
-    , m_batch_size{batch_size} {
+    , m_batch_size{batch_size}
+    , m_max_batch{max_batch}
+    {
         start();
     }
 
@@ -146,6 +149,7 @@ class ActiveProducerBatchQueue {
     NewBatchFn                             m_create_new_batch;
     ThreadPool                             m_thread_pool;
     BatchSize                              m_batch_size;
+    MaxBatch                               m_max_batch;
     std::queue<SP<ProducerBatchInterface>> m_batch_queue;
     //std::list<SP<ProducerBatchInterface>>  m_reusable_batches;
     thallium::managed<thallium::thread>    m_sender_ult;
