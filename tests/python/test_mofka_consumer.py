@@ -118,6 +118,9 @@ class TestConsumer(unittest.TestCase):
         f = self.consumer.pull()
         event = f.wait()
         data = event.data
+        event_id = event.event_id
+        partition = event.partition
+        metadata = event.metadata
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0], self.data)
 

@@ -511,7 +511,10 @@ PYBIND11_MODULE(pymofka_client, m) {
                 else
                     return py::cast(event.id());
                 })
-        .def_property_readonly("partition", &mofka::Event::partition)
+        .def_property_readonly("partition",
+                [](const mofka::Event& event) {
+                    return event.partition().json();
+                })
         .def("acknowledge",
              [](const mofka::Event& event){
                 event.acknowledge();
