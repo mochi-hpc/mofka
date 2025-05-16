@@ -48,8 +48,8 @@ METADATA_PROVIDER=$(
     mofkactl metadata add \
         --rank 0 \
         --groupfile mofka.json \
-        --type log
-        --config.path /tmp/mofka-log
+        --type log \
+        --config.path /tmp/mofka-log \
         --config.create_if_missing true
     )
 
@@ -57,14 +57,14 @@ DATA_PROVIDER=$(
     mofkactl data add \
         --rank 0 \
         --groupfile mofka.json \
-        --type abtio
-        --config.path /tmp/mofka-data
+        --type abtio \
+        --config.path /tmp/mofka-data \
         --config.create_if_missing true
     )
 
 mofkactl partition add collisions \
     --rank 0 \
-    --groupfile mofka.json
+    --groupfile mofka.json \
     --type default \
     --metadata "${METADATA_PROVIDER}" \
     --data "${DATA_PROVIDER}"
