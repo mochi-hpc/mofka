@@ -51,6 +51,7 @@ add_library (mofka-client ${client-src-files})
 add_library (mofka::client ALIAS mofka-client)
 target_link_libraries (mofka-client
     PUBLIC
+    mofka::api
     thallium
     PkgConfig::uuid
     bedrock::client
@@ -76,7 +77,7 @@ if (ENABLE_KAFKA)
     add_library (mofka-kafka-driver ${kafka-src-files})
     add_library (mofka::kafka-driver ALIAS mofka-kafka-driver)
     target_link_libraries (mofka-kafka-driver
-         PUBLIC mofka::client
+         PUBLIC mofka::client mofka::api
          PRIVATE
              nlohmann_json::nlohmann_json
              PkgConfig::kafka
@@ -97,6 +98,7 @@ add_library (mofka-server ${server-src-files})
 add_library (mofka::server ALIAS mofka-server)
 target_link_libraries (mofka-server
     PUBLIC
+    mofka::api
     thallium
     PkgConfig::uuid
     fmt::fmt

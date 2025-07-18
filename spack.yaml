@@ -8,6 +8,7 @@ spack:
   - nlohmann-json-schema-validator
   - spdlog
   - fmt
+  - mofka-api
   - mochi-bedrock
   - mochi-warabi
   - mochi-yokan

@@ -62,6 +62,9 @@ if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo|Debug")
     )
 endif ()
 
+# search for mofka-api
+find_package (mofka-api REQUIRED)
+# search for pkg-config
 find_package (PkgConfig REQUIRED)
 # search fo thallium
 find_package (thallium REQUIRED)
