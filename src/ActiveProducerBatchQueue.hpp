@@ -6,9 +6,9 @@
 #ifndef MOFKA_ACTIVE_PRODUCER_BATCH_QUEUE_H
 #define MOFKA_ACTIVE_PRODUCER_BATCH_QUEUE_H
 
+#include <diaspora/DataView.hpp>
+
 #include "Promise.hpp"
-#include "DataImpl.hpp"
-#include "PimplUtil.hpp"
 #include "ProducerBatchInterface.hpp"
 
 #include <thallium.hpp>
@@ -29,9 +29,9 @@ class ActiveProducerBatchQueue {
 
     ActiveProducerBatchQueue(
         NewBatchFn new_batch,
-        ThreadPool thread_pool,
-        BatchSize batch_size,
-        MaxBatch max_batch)
+        std::shared_ptr<diaspora::ThreadPoolInterface> thread_pool,
+        diaspora::BatchSize batch_size,
+        diaspora::MaxNumBatches max_batch)
     : m_create_new_batch{std::move(new_batch)}
     , m_thread_pool{std::move(thread_pool)}
     , m_batch_size{batch_size}
@@ -46,12 +46,12 @@ class ActiveProducerBatchQueue {
         stop();
     }
 
-    void push(Metadata metadata,
-              Data data,
-              Promise<EventID> promise) {
+    void push(diaspora::Metadata metadata,
+              diaspora::DataView data,
+              Promise<diaspora::EventID> promise) {
         bool need_notification;
         {
-            auto adaptive = m_batch_size == BatchSize::Adaptive();
+            auto adaptive = m_batch_size == diaspora::BatchSize::Adaptive();
             need_notification = adaptive;
             std::unique_lock<thallium::mutex> guard{m_mutex};
             if(m_batch_queue.empty()) {
@@ -97,17 +97,17 @@ class ActiveProducerBatchQueue {
     void start() {
         if(m_running) return;
         m_running = true;
-        m_thread_pool.pushWork([this]() { loop(); });
+        m_thread_pool->pushWork([this]() { loop(); });
     }
 
-    Future<void> flush() {
-        if(!m_running) return Future<void>{[](){}, [](){ return true; }};
+    diaspora::Future<void> flush() {
+        if(!m_running) return diaspora::Future<void>{[](){}, [](){ return true; }};
         {
             std::unique_lock<thallium::mutex> guard{m_mutex};
             m_request_flush = true;
             m_cv.notify_one();
         }
-        return Future<void>{
+        return diaspora::Future<void>{
             [this]() {
                 std::unique_lock<thallium::mutex> guard{m_mutex};
                 m_cv.wait(guard, [this]() {
@@ -128,7 +128,7 @@ class ActiveProducerBatchQueue {
             m_cv.wait(guard, [this]() {
                 if(m_need_stop || m_request_flush)        return true;
                 if(m_batch_queue.empty())                 return false;
-                if(m_batch_size == BatchSize::Adaptive()) return true;
+                if(m_batch_size == diaspora::BatchSize::Adaptive()) return true;
                 auto& batch = m_batch_queue.front();
                 if(batch->count() == m_batch_size.value)  return true;
                 return false;
@@ -152,19 +152,21 @@ class ActiveProducerBatchQueue {
         m_terminated.set_value();
     }
 
-    NewBatchFn                             m_create_new_batch;
-    ThreadPool                             m_thread_pool;
-    BatchSize                              m_batch_size;
-    MaxBatch                               m_max_batch;
-    std::queue<SP<ProducerBatchInterface>> m_batch_queue;
+    NewBatchFn                                     m_create_new_batch;
+    std::shared_ptr<diaspora::ThreadPoolInterface> m_thread_pool;
+    diaspora::BatchSize                            m_batch_size;
+    diaspora::MaxNumBatches                        m_max_batch;
+    std::queue<
+        std::shared_ptr<
+            ProducerBatchInterface>>    m_batch_queue;
     //std::list<SP<ProducerBatchInterface>>  m_reusable_batches;
-    thallium::managed<thallium::thread>    m_sender_ult;
-    bool                                   m_need_stop = false;
-    bool                                   m_request_flush = false;
-    std::atomic<bool>                      m_running = false;
-    thallium::mutex                        m_mutex;
-    thallium::condition_variable           m_cv;
-    thallium::eventual<void>               m_terminated;
+    thallium::managed<thallium::thread> m_sender_ult;
+    bool                                m_need_stop = false;
+    bool                                m_request_flush = false;
+    std::atomic<bool>                   m_running = false;
+    thallium::mutex                     m_mutex;
+    thallium::condition_variable        m_cv;
+    thallium::eventual<void>            m_terminated;
 
 };
 

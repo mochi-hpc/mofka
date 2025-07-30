@@ -6,8 +6,6 @@
 #ifndef MOFKA_PROVIDER_HANDLE_HPP
 #define MOFKA_PROVIDER_HANDLE_HPP
 
-#include <mofka/ForwardDcl.hpp>
-
 #include <thallium.hpp>
 
 namespace mofka {

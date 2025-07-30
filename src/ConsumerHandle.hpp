@@ -6,10 +6,11 @@
 #ifndef MOFKA_CONSUMER_HANDLE_HPP
 #define MOFKA_CONSUMER_HANDLE_HPP
 
-#include <mofka/ForwardDcl.hpp>
-#include <mofka/BulkRef.hpp>
-#include <mofka/EventID.hpp>
-#include <mofka/Future.hpp>
+#include "BulkRef.hpp"
+
+#include <diaspora/ForwardDcl.hpp>
+#include <diaspora/EventID.hpp>
+#include <diaspora/Future.hpp>
 
 #include <thallium.hpp>
 #include <memory>
@@ -32,32 +33,32 @@ class ConsumerHandle {
     /**
      * @brief Constructor. The resulting ConsumerHandle handle will be invalid.
      */
-    ConsumerHandle();
+    ConsumerHandle() = default;
 
     /**
      * @brief Copy-constructor.
      */
-    ConsumerHandle(const ConsumerHandle&);
+    ConsumerHandle(const ConsumerHandle&) = default;
 
     /**
      * @brief Move-constructor.
      */
-    ConsumerHandle(ConsumerHandle&&);
+    ConsumerHandle(ConsumerHandle&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    ConsumerHandle& operator=(const ConsumerHandle&);
+    ConsumerHandle& operator=(const ConsumerHandle&) = default;
 
     /**
      * @brief Move-assignment operator.
      */
-    ConsumerHandle& operator=(ConsumerHandle&&);
+    ConsumerHandle& operator=(ConsumerHandle&&) = default;
 
     /**
      * @brief Destructor.
      */
-    ~ConsumerHandle();
+    ~ConsumerHandle() = default;
 
     /**
      * @brief Returns the name of the consumer.
@@ -77,12 +78,13 @@ class ConsumerHandle {
      * @returns a Future representing the operation. The BulkRef objects passed
      * to the function need to remain valid until the future has completed.
      */
-    Future<void> feed(size_t count,
-                      EventID firstID,
-                      const BulkRef& metadata_sizes,
-                      const BulkRef& metadata,
-                      const BulkRef& data_desc_sizes,
-                      const BulkRef& data_desc);
+    diaspora::Future<void> feed(
+            size_t count,
+            diaspora::EventID firstID,
+            const BulkRef& metadata_sizes,
+            const BulkRef& metadata,
+            const BulkRef& data_desc_sizes,
+            const BulkRef& data_desc);
 
     /**
      * @brief Check if we should stop feeding the ConsumerHandle.
@@ -102,7 +104,8 @@ class ConsumerHandle {
      *
      * @param impl Pointer to implementation.
      */
-    ConsumerHandle(const std::shared_ptr<ConsumerHandleImpl>& impl);
+    ConsumerHandle(const std::shared_ptr<ConsumerHandleImpl>& impl)
+    : self{impl} {}
 
     std::shared_ptr<ConsumerHandleImpl> self;
 };

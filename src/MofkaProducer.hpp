@@ -6,16 +6,15 @@
 #ifndef MOFKA_PRODUCER_IMPL_H
 #define MOFKA_PRODUCER_IMPL_H
 
-#include "PimplUtil.hpp"
 #include "MofkaTopicHandle.hpp"
 #include "MofkaPartitionInfo.hpp"
 #include "MofkaProducerBatch.hpp"
 #include "BatchProducer.hpp"
+#include "UUID.hpp"
 
-#include "mofka/TopicHandle.hpp"
-#include "mofka/Producer.hpp"
-#include "mofka/UUID.hpp"
-#include "mofka/Ordering.hpp"
+#include <diaspora/TopicHandle.hpp>
+#include <diaspora/Producer.hpp>
+#include <diaspora/Ordering.hpp>
 
 #include <thallium.hpp>
 #include <string_view>
@@ -37,10 +36,10 @@ class MofkaProducer : public BatchProducer {
 
     MofkaProducer(tl::engine engine,
                   std::string_view name,
-                  BatchSize batch_size,
-                  MaxBatch max_batch,
-                  ThreadPool thread_pool,
-                  Ordering ordering,
+                  diaspora::BatchSize batch_size,
+                  diaspora::MaxNumBatches max_batch,
+                  diaspora::Ordering ordering,
+                  std::shared_ptr<diaspora::ThreadPoolInterface> thread_pool,
                   std::shared_ptr<MofkaTopicHandle> topic);
 
     std::shared_ptr<ProducerBatchInterface> newBatchForPartition(size_t index) const override;

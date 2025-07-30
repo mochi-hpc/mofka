@@ -6,8 +6,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_all.hpp>
 #include <bedrock/Server.hpp>
-#include <mofka/MofkaDriver.hpp>
-#include <mofka/TopicHandle.hpp>
+#include <diaspora/Driver.hpp>
+#include <diaspora/TopicHandle.hpp>
+#include "../src/MofkaDriver.hpp"
 #include "Configs.hpp"
 #include "Ensure.hpp"
 
@@ -22,25 +23,30 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
     auto engine = server.getMargoManager().getThalliumEngine();
 
     SECTION("Initialize a client and service handle, and create topic") {
-        mofka::MofkaDriver driver;
+        diaspora::Driver driver;
         REQUIRE(!static_cast<bool>(driver));
-        REQUIRE_NOTHROW(driver = mofka::MofkaDriver{"mofka.json", engine});
+        diaspora::Metadata options;
+        options.json()["group_file"] = "mofka.json";
+        options.json()["margo"] = nlohmann::json::object();
+        options.json()["margo"]["use_progress_thread"] = true;
+        driver = diaspora::Driver::New("mofka", options);
         REQUIRE(static_cast<bool>(driver));
 
-        mofka::TopicHandle topic;
+        diaspora::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
         REQUIRE_NOTHROW(driver.createTopic("mytopic"));
-        REQUIRE_THROWS_AS(driver.createTopic("mytopic"), mofka::Exception);
+        REQUIRE_THROWS_AS(driver.createTopic("mytopic"), diaspora::Exception);
 
         SECTION("Create partition using addCustomPartition") {
 
-            mofka::Metadata partition_config;
+            diaspora::Metadata partition_config;
             mofka::MofkaDriver::Dependencies partition_dependencies;
             getPartitionArguments("default", partition_dependencies, partition_config);
 
-            REQUIRE_NOTHROW(driver.addCustomPartition(
-                        "mytopic", 0, "default",
-                        partition_config, partition_dependencies));
+            REQUIRE_NOTHROW(
+                driver.as<mofka::MofkaDriver>().addCustomPartition(
+                    "mytopic", 0, "default",
+                    partition_config, partition_dependencies));
 
             REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
             REQUIRE(static_cast<bool>(topic));
@@ -50,7 +56,7 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
         SECTION("Create partition using addDefaultPartition") {
 
 
-            REQUIRE_NOTHROW(driver.addDefaultPartition(
+            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addDefaultPartition(
                         "mytopic", 0, "my_yokan_metadata_provider@local",
                         "my_warabi_provider@local"));
 
@@ -61,9 +67,9 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
 
         SECTION("Let Mofka figure out the dependencies") {
 
-            mofka::Metadata partition_config;
+            diaspora::Metadata partition_config;
 
-            REQUIRE_NOTHROW(driver.addDefaultPartition("mytopic", 0));
+            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addDefaultPartition("mytopic", 0));
 
             REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
             REQUIRE(static_cast<bool>(topic));
@@ -72,12 +78,14 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
 
         SECTION("Create metadata and data providers") {
             std::string metadata_provider_address, data_provider_address;
-            REQUIRE_NOTHROW(metadata_provider_address = driver.addDefaultMetadataProvider(0));
-            REQUIRE_NOTHROW(data_provider_address = driver.addDefaultDataProvider(0));
+            REQUIRE_NOTHROW(metadata_provider_address =
+                            driver.as<mofka::MofkaDriver>().addDefaultMetadataProvider(0));
+            REQUIRE_NOTHROW(data_provider_address =
+                            driver.as<mofka::MofkaDriver>().addDefaultDataProvider(0));
             REQUIRE(!metadata_provider_address.empty());
             REQUIRE(!data_provider_address.empty());
 
-            REQUIRE_NOTHROW(driver.addDefaultPartition(
+            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addDefaultPartition(
                         "mytopic", 0, metadata_provider_address,
                         data_provider_address));
 

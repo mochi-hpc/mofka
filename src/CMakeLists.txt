@@ -5,23 +5,13 @@ set (server-src-files
      MemoryPartitionManager.cpp)
 
 set (client-src-files
-     Client.cpp
+     MofkaThreadPool.cpp
      MofkaDriver.cpp
      MofkaTopicHandle.cpp
-     Producer.cpp
      BatchProducer.cpp
      MofkaProducer.cpp
-     Consumer.cpp
      MofkaConsumer.cpp
      ConsumerHandle.cpp
-     Data.cpp
-     DataDescriptor.cpp
-     Metadata.cpp
-     Serializer.cpp
-     PartitionSelector.cpp
-     Validator.cpp
-     EventbridgeValidator.cpp
-     ThreadPool.cpp
      PrioPool.cpp
      Logging.cpp)
 
@@ -51,7 +41,7 @@ add_library (mofka-client ${client-src-files})
 add_library (mofka::client ALIAS mofka-client)
 target_link_libraries (mofka-client
     PUBLIC
-    mofka::api
+    diaspora-stream-api
     thallium
     PkgConfig::uuid
     bedrock::client
@@ -77,7 +67,7 @@ if (ENABLE_KAFKA)
     add_library (mofka-kafka-driver ${kafka-src-files})
     add_library (mofka::kafka-driver ALIAS mofka-kafka-driver)
     target_link_libraries (mofka-kafka-driver
-         PUBLIC mofka::client mofka::api
+         PUBLIC mofka::client diaspora-stream-api
          PRIVATE
              nlohmann_json::nlohmann_json
              PkgConfig::kafka
@@ -98,7 +88,7 @@ add_library (mofka-server ${server-src-files})
 add_library (mofka::server ALIAS mofka-server)
 target_link_libraries (mofka-server
     PUBLIC
-    mofka::api
+    diaspora-stream-api
     thallium
     PkgConfig::uuid
     fmt::fmt

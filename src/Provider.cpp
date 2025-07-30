@@ -4,18 +4,32 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "JsonUtil.hpp"
-#include "mofka/Provider.hpp"
+#include "Provider.hpp"
 
+#include "PartitionManager.hpp"
 #include "ProviderImpl.hpp"
 
 #include <thallium/serialization/stl/string.hpp>
 
+DIASPORA_INSTANTIATE_FACTORY(
+    mofka::PartitionManager,
+    const thallium::engine&,
+    const std::string&,
+    const mofka::UUID&,
+    const diaspora::Metadata&,
+    const bedrock::ResolvedDependencyMap&);
+
 namespace mofka {
+
+PartitionManagerDependencyFactory& PartitionManagerDependencyFactory::instance() {
+    static PartitionManagerDependencyFactory factory;
+    return factory;
+}
 
 Provider::Provider(
         const tl::engine& engine,
         uint16_t provider_id,
-        const Metadata& config,
+        const diaspora::Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies) {
     /* the pool argument is optional */
     auto it = dependencies.find("pool");
@@ -26,7 +40,7 @@ Provider::Provider(
     self->get_engine().push_finalize_callback(this, [p=this]() { p->self.reset(); });
 }
 
-std::vector<bedrock::Dependency> Provider::getDependencies(const Metadata& metadata) {
+std::vector<bedrock::Dependency> Provider::getDependencies(const diaspora::Metadata& metadata) {
     std::vector<bedrock::Dependency> dependencies;
     auto& json = metadata.json();
     if(json.is_object() && json.contains("type") && json["type"].is_string()) {
@@ -51,7 +65,7 @@ Provider::~Provider() {
     }
 }
 
-const Metadata& Provider::getConfig() const {
+const diaspora::Metadata& Provider::getConfig() const {
     return self->m_config;
 }
 

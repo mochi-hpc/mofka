@@ -6,8 +6,6 @@
 #ifndef MOFKA_RESULT_HPP
 #define MOFKA_RESULT_HPP
 
-#include <mofka/ForwardDcl.hpp>
-
 #include <string>
 
 namespace mofka {

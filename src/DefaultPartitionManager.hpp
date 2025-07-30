@@ -6,8 +6,8 @@
 #ifndef DEFAULT_TOPIC_MANAGER_HPP
 #define DEFAULT_TOPIC_MANAGER_HPP
 
-#include <mofka/UUID.hpp>
-#include <mofka/PartitionManager.hpp>
+#include "UUID.hpp"
+#include "PartitionManager.hpp"
 #include "WarabiDataStore.hpp"
 #include "YokanEventStore.hpp"
 
@@ -18,15 +18,15 @@ namespace mofka {
  */
 class DefaultPartitionManager : public mofka::PartitionManager {
 
-    Metadata m_config;
+    diaspora::Metadata m_config;
 
     std::unique_ptr<WarabiDataStore> m_data_store;
     std::unique_ptr<YokanEventStore> m_event_store;
 
     thallium::engine m_engine;
 
-    std::unordered_map<std::string, EventID> m_consumer_cursor;
-    thallium::mutex                          m_consumer_cursor_mtx;
+    std::unordered_map<std::string, diaspora::EventID> m_consumer_cursor;
+    thallium::mutex                                    m_consumer_cursor_mtx;
 
     public:
 
@@ -34,7 +34,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
      * @brief Constructor.
      */
     DefaultPartitionManager(
-        const Metadata& config,
+        const diaspora::Metadata& config,
         std::unique_ptr<WarabiDataStore> data_store,
         std::unique_ptr<YokanEventStore> event_store,
         thallium::engine engine)
@@ -71,7 +71,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     /**
      * @brief Receives a batch.
      */
-    Result<EventID> receiveBatch(
+    Result<diaspora::EventID> receiveBatch(
             const thallium::endpoint& sender,
             const std::string& producer_name,
             size_t num_events,
@@ -88,20 +88,20 @@ class DefaultPartitionManager : public mofka::PartitionManager {
      */
     Result<void> feedConsumer(
             ConsumerHandle consumerHandle,
-            BatchSize batchSize) override;
+            diaspora::BatchSize batchSize) override;
 
     /**
      * @see PartitionManager::acknowledge.
      */
     Result<void> acknowledge(
           std::string_view consumer_name,
-          EventID event_id) override;
+          diaspora::EventID event_id) override;
 
     /**
      * @see PartitionManager::getData.
      */
     Result<std::vector<Result<void>>> getData(
-          const std::vector<DataDescriptor>& descriptors,
+          const std::vector<diaspora::DataDescriptor>& descriptors,
           const BulkRef& bulk) override;
 
     /**
@@ -133,7 +133,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         const thallium::engine& engine,
         const std::string& topic_name,
         const UUID& partition_uuid,
-        const Metadata& config,
+        const diaspora::Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies);
 
 };

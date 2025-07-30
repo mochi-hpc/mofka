@@ -6,8 +6,6 @@
 #ifndef MOFKA_BULK_REF_HPP
 #define MOFKA_BULK_REF_HPP
 
-#include <mofka/ForwardDcl.hpp>
-
 #include <thallium.hpp>
 #include <thallium/serialization/stl/string.hpp>
 #include <memory>

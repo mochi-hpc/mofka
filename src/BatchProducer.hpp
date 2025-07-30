@@ -7,10 +7,12 @@
 #define MOFKA_BATCH_PRODUCER_IMPL_H
 
 #include "ProducerBatchInterface.hpp"
+#include "ActiveProducerBatchQueue.hpp"
 
-#include "mofka/TopicHandle.hpp"
-#include "mofka/Producer.hpp"
-#include "mofka/Ordering.hpp"
+#include <diaspora/TopicHandle.hpp>
+#include <diaspora/Producer.hpp>
+#include <diaspora/Ordering.hpp>
+#include <diaspora/Driver.hpp>
 
 #include <thallium.hpp>
 #include <string_view>
@@ -20,16 +22,16 @@ namespace mofka {
 
 namespace tl = thallium;
 
-class BatchProducer : public ProducerInterface {
+class BatchProducer : public diaspora::ProducerInterface {
 
     public:
 
-    std::string  m_name;
-    BatchSize    m_batch_size;
-    MaxBatch     m_max_batch;
-    ThreadPool   m_thread_pool;
-    Ordering     m_ordering;
-    TopicHandle  m_topic;
+    std::string                                     m_name;
+    diaspora::BatchSize                             m_batch_size;
+    diaspora::MaxNumBatches                         m_max_batch;
+    diaspora::Ordering                              m_ordering;
+    std::shared_ptr<diaspora::ThreadPoolInterface>  m_thread_pool;
+    std::shared_ptr<diaspora::TopicHandleInterface> m_topic;
 
     std::vector<std::shared_ptr<ActiveProducerBatchQueue>>
                                  m_batch_queues;
@@ -39,19 +41,19 @@ class BatchProducer : public ProducerInterface {
     std::atomic<size_t> m_num_pushed_events = 0;
 
     BatchProducer(std::string_view name,
-                  BatchSize batch_size,
-                  MaxBatch max_batch,
-                  ThreadPool thread_pool,
-                  Ordering ordering,
-                  TopicHandle topic)
+                  diaspora::BatchSize batch_size,
+                  diaspora::MaxNumBatches max_batch,
+                  diaspora::Ordering ordering,
+                  std::shared_ptr<diaspora::ThreadPoolInterface> thread_pool,
+                  std::shared_ptr<diaspora::TopicHandleInterface> topic)
     : m_name(name)
     , m_batch_size(batch_size)
     , m_max_batch(max_batch)
-    , m_thread_pool(std::move(thread_pool))
     , m_ordering(ordering)
+    , m_thread_pool(thread_pool ? std::move(thread_pool) : topic->driver()->defaultThreadPool())
     , m_topic(std::move(topic))
     {
-        m_batch_queues.resize(m_topic.partitions().size());
+        m_batch_queues.resize(m_topic->partitions().size());
     }
 
     virtual ~BatchProducer() = default;
@@ -60,21 +62,28 @@ class BatchProducer : public ProducerInterface {
         return m_name;
     }
 
-    TopicHandle topic() const override;
+    std::shared_ptr<diaspora::TopicHandleInterface> topic() const override;
 
-    BatchSize batchSize() const override {
+    diaspora::BatchSize batchSize() const override {
         return m_batch_size;
     }
 
-    MaxBatch maxBatch() const override {
+    diaspora::MaxNumBatches maxNumBatches() const override {
         return m_max_batch;
     }
 
-    ThreadPool threadPool() const override {
+    diaspora::Ordering ordering() const override {
+        return m_ordering;
+    }
+
+    std::shared_ptr<diaspora::ThreadPoolInterface> threadPool() const override {
         return m_thread_pool;
     }
 
-    Future<EventID> push(Metadata metadata, Data data, std::optional<size_t> partition) override;
+    diaspora::Future<diaspora::EventID> push(
+            diaspora::Metadata metadata,
+            diaspora::DataView data,
+            std::optional<size_t> partition) override;
 
     void flush() override;
 

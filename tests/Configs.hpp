@@ -5,7 +5,7 @@
  */
 #include <string>
 #include <cstdio>
-#include "mofka/MofkaDriver.hpp"
+#include "../src/MofkaDriver.hpp"
 
 static inline const char* config = R"(
 {
@@ -73,15 +73,15 @@ static inline const char* config = R"(
 static inline void getPartitionArguments(
         std::string_view partition_type,
         mofka::MofkaDriver::Dependencies& dependencies,
-        mofka::Metadata& partition_config) {
+        diaspora::Metadata& partition_config) {
     if(partition_type == "memory") {
         dependencies = mofka::MofkaDriver::Dependencies{};
-        partition_config = mofka::Metadata{"{}"};
+        partition_config = diaspora::Metadata{"{}"};
     } else if(partition_type == "default") {
         dependencies = {
             {"data", {"my_warabi_provider@local"}},
             {"metadata", {"my_yokan_metadata_provider@local"}}
         };
-        partition_config = mofka::Metadata{"{}"};
+        partition_config = diaspora::Metadata{"{}"};
     }
 }

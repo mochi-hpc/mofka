@@ -4,8 +4,8 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "MemoryPartitionManager.hpp"
-#include "mofka/DataDescriptor.hpp"
-#include "mofka/BufferWrapperArchive.hpp"
+#include <diaspora/DataDescriptor.hpp>
+#include <diaspora/BufferWrapperArchive.hpp>
 #include <numeric>
 #include <iostream>
 
@@ -13,7 +13,7 @@ namespace mofka {
 
 MOFKA_REGISTER_PARTITION_MANAGER(memory, MemoryPartitionManager);
 
-Result<EventID> MemoryPartitionManager::receiveBatch(
+Result<diaspora::EventID> MemoryPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -21,8 +21,8 @@ Result<EventID> MemoryPartitionManager::receiveBatch(
           const BulkRef& data_bulk)
 {
     (void)producer_name;
-    Result<EventID> result;
-    EventID first_id;
+    Result<diaspora::EventID> result;
+    diaspora::EventID first_id;
     {
         auto g = std::unique_lock<thallium::mutex>{m_events_metadata_mtx};
         first_id = m_events_metadata_sizes.size();
@@ -93,10 +93,10 @@ Result<EventID> MemoryPartitionManager::receiveBatch(
             data_desc_offset = m_events_data_desc_offsets.back() + m_events_data_desc_sizes.back();
         m_events_data_desc_sizes.resize(first_id + num_events);
         m_events_data_desc_offsets.resize(first_id + num_events);
-        BufferWrapperOutputArchive output_archive{m_events_data_desc};
+        diaspora::BufferWrapperOutputArchive output_archive{m_events_data_desc};
         for(size_t i = first_id; i < m_events_data_desc_sizes.size(); ++i) {
             auto offset_size = OffsetSize{m_events_data_offsets[i], m_events_data_sizes[i]};
-            auto data_descriptor = DataDescriptor::From(offset_size.toString(), offset_size.size);
+            auto data_descriptor = diaspora::DataDescriptor(offset_size.toString(), offset_size.size);
             size_t m_events_data_desc_size = m_events_data_desc.size();
             data_descriptor.save(output_archive);
             auto data_descriptor_size = m_events_data_desc.size() - m_events_data_desc_size;
@@ -116,12 +116,12 @@ void MemoryPartitionManager::wakeUp() {
 
 Result<void> MemoryPartitionManager::feedConsumer(
     ConsumerHandle consumerHandle,
-    BatchSize batchSize) {
+    diaspora::BatchSize batchSize) {
     Result<void> result;
 
     if(batchSize.value == 0)
-        batchSize = BatchSize::Adaptive();
-    EventID first_id;
+        batchSize = diaspora::BatchSize::Adaptive();
+    diaspora::EventID first_id;
     {
         auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
         first_id = m_consumer_cursor[consumerHandle.name()];
@@ -147,7 +147,7 @@ Result<void> MemoryPartitionManager::feedConsumer(
                 // feed consumer 0 events with first_id = NoMoreEvents to indicate
                 // that there are no more events to consume from this partition
                 consumerHandle.feed(
-                        0, NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
+                        0, diaspora::NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
                 break;
             }
 
@@ -205,7 +205,7 @@ Result<void> MemoryPartitionManager::feedConsumer(
 
 Result<void> MemoryPartitionManager::acknowledge(
     std::string_view consumer_name,
-    EventID event_id) {
+    diaspora::EventID event_id) {
     Result<void> result;
     auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
     std::string consumer_name_str{consumer_name.data(), consumer_name.size()};
@@ -214,7 +214,7 @@ Result<void> MemoryPartitionManager::acknowledge(
 }
 
 Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
-        const std::vector<DataDescriptor>& descriptors,
+        const std::vector<diaspora::DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     Result<std::vector<Result<void>>> result;
 
@@ -258,7 +258,7 @@ std::unique_ptr<mofka::PartitionManager> MemoryPartitionManager::create(
         const thallium::engine& engine,
         const std::string& topic_name,
         const UUID& partition_uuid,
-        const Metadata& config,
+        const diaspora::Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies) {
     (void)dependencies;
     (void)topic_name;

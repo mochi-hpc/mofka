@@ -6,9 +6,9 @@
 #ifndef MOFKA_PROVIDER_HPP
 #define MOFKA_PROVIDER_HPP
 
-#include <mofka/ForwardDcl.hpp>
-#include <mofka/Metadata.hpp>
-#include <mofka/Json.hpp>
+#include <diaspora/ForwardDcl.hpp>
+#include <diaspora/Metadata.hpp>
+#include <diaspora/Json.hpp>
 
 #include <bedrock/AbstractComponent.hpp>
 #include <thallium.hpp>
@@ -37,13 +37,13 @@ class Provider {
      */
     Provider(const thallium::engine& engine,
              uint16_t provider_id = 0,
-             const Metadata& config = Metadata{"{}"},
+             const diaspora::Metadata& config = diaspora::Metadata{"{}"},
              const bedrock::ResolvedDependencyMap& dependencies = {});
 
     /**
      * @brief Get the dependencies mandated by the provided configuration.
      */
-    static std::vector<bedrock::Dependency> getDependencies(const mofka::Metadata& config);
+    static std::vector<bedrock::Dependency> getDependencies(const diaspora::Metadata& config);
 
     /**
      * @brief Copy-constructor is deleted.
@@ -75,7 +75,7 @@ class Provider {
      *
      * @return JSON configuration.
      */
-    const Metadata& getConfig() const;
+    const diaspora::Metadata& getConfig() const;
 
     /**
      * @brief Checks whether the Provider instance is valid.

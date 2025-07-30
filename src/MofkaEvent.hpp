@@ -6,7 +6,8 @@
 #ifndef MOFKA_EVENT_IMPL_H
 #define MOFKA_EVENT_IMPL_H
 
-#include "mofka/Event.hpp"
+#include <diaspora/Event.hpp>
+
 #include "MofkaPartitionInfo.hpp"
 
 #include <thallium.hpp>
@@ -16,20 +17,20 @@
 
 namespace mofka {
 
-class MofkaEvent : public EventInterface {
+class MofkaEvent : public diaspora::EventInterface {
 
     friend class Event;
 
     public:
 
     MofkaEvent()
-    : m_id{NoMoreEvents}
+    : m_id{diaspora::NoMoreEvents}
     {}
 
-    MofkaEvent(EventID id,
+    MofkaEvent(diaspora::EventID id,
                std::shared_ptr<MofkaPartitionInfo> partition,
-               Metadata metadata,
-               Data data,
+               diaspora::Metadata metadata,
+               diaspora::DataView data,
                std::string consumer_name,
                thallium::remote_procedure ack_rpc)
     : m_id(std::move(id))
@@ -42,41 +43,41 @@ class MofkaEvent : public EventInterface {
 
     void acknowledge() const override {
         using namespace std::string_literals;
-        if(m_id == NoMoreEvents)
-            throw Exception{"Cannot acknowledge \"NoMoreEvents\""};
+        if(m_id == diaspora::NoMoreEvents)
+            throw diaspora::Exception{"Cannot acknowledge \"NoMoreEvents\""};
         try {
             auto ph = m_partition->m_ph;
             m_acknowledge_rpc.on(ph)(m_consumer_name, m_id);
         } catch(const std::exception& ex) {
-            throw Exception{"Could not acknowledge event: "s + ex.what()};
+            throw diaspora::Exception{"Could not acknowledge event: "s + ex.what()};
         }
     }
 
-    PartitionInfo partition() const override {
+    diaspora::PartitionInfo partition() const override {
         if(m_partition)
             return m_partition->toPartitionInfo();
         else
-            return PartitionInfo{};
+            return diaspora::PartitionInfo{};
     }
 
-    Metadata metadata() const override {
+    const diaspora::Metadata& metadata() const override {
         return m_metadata;
     }
 
-    Data data() const override {
+    const diaspora::DataView& data() const override {
         return m_data;
     }
 
-    EventID id() const override {
+    diaspora::EventID id() const override {
         return m_id;
     }
 
     private:
 
-    EventID                             m_id;
+    diaspora::EventID                   m_id;
     std::shared_ptr<MofkaPartitionInfo> m_partition;
-    Metadata                            m_metadata;
-    Data                                m_data;
+    diaspora::Metadata                  m_metadata;
+    diaspora::DataView                  m_data;
 
     std::string                m_consumer_name;
     thallium::remote_procedure m_acknowledge_rpc;

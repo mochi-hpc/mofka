@@ -6,8 +6,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_all.hpp>
 #include <bedrock/Server.hpp>
-#include <mofka/MofkaDriver.hpp>
-#include <mofka/TopicHandle.hpp>
+#include <diaspora/Driver.hpp>
+#include <diaspora/TopicHandle.hpp>
+#include "../src/MofkaDriver.hpp"
 #include "Configs.hpp"
 #include "Ensure.hpp"
 
@@ -24,26 +25,28 @@ TEST_CASE("Producer test", "[producer]") {
 
     SECTION("Initialize and a MofkaDriver and create/open a topic") {
 
-        mofka::MofkaDriver driver;
-        REQUIRE(!static_cast<bool>(driver));
-        REQUIRE_NOTHROW(driver = mofka::MofkaDriver{"mofka.json", engine});
+        diaspora::Metadata options;
+        options.json()["group_file"] = "mofka.json";
+        options.json()["margo"] = nlohmann::json::object();
+        options.json()["margo"]["use_progress_thread"] = true;
+        diaspora::Driver driver = diaspora::Driver::New("mofka", options);
         REQUIRE(static_cast<bool>(driver));
 
-        mofka::TopicHandle topic;
+        diaspora::TopicHandle topic;
         REQUIRE(!static_cast<bool>(topic));
         REQUIRE_NOTHROW(driver.createTopic("mytopic"));
-        mofka::Metadata partition_config;
+        diaspora::Metadata partition_config;
         mofka::MofkaDriver::Dependencies partition_dependencies;
         getPartitionArguments(partition_type, partition_dependencies, partition_config);
 
-        REQUIRE_NOTHROW(driver.addCustomPartition(
+        REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addCustomPartition(
                     "mytopic", 0, partition_type,
                     partition_config, partition_dependencies));
         REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
         REQUIRE(static_cast<bool>(topic));
 
         SECTION("Create a producer from the topic") {
-            mofka::Producer producer;
+            diaspora::Producer producer;
             REQUIRE(!static_cast<bool>(producer));
             producer = topic.producer("myproducer");
             REQUIRE(static_cast<bool>(producer));

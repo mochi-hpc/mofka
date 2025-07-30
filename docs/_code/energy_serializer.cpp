@@ -1,8 +1,8 @@
-#include <mofka/Serializer.hpp>
+#include <diaspora/Serializer.hpp>
 #include <fmt/format.h>
 
 
-class EnergySerializer final : public mofka::SerializerInterface {
+class EnergySerializer final : public diaspora::SerializerInterface {
 
     size_t energy_max;
 
@@ -11,7 +11,7 @@ class EnergySerializer final : public mofka::SerializerInterface {
     EnergySerializer(size_t _energy_max)
     : energy_max(_energy_max) {}
 
-    void serialize(mofka::Archive& archive, const mofka::Metadata& metadata) const override {
+    void serialize(diaspora::Archive& archive, const diaspora::Metadata& metadata) const override {
         size_t energy = metadata.json()["energy"].get<size_t>();
         if(energy_max <= std::numeric_limits<uint8_t>::max()) {
             uint8_t val = static_cast<uint8_t>(energy);
@@ -28,8 +28,8 @@ class EnergySerializer final : public mofka::SerializerInterface {
         }
     }
 
-    void deserialize(mofka::Archive& archive, mofka::Metadata& metadata) const override {
-        metadata = mofka::Metadata{}; // ensure we have an empty JSON object
+    void deserialize(diaspora::Archive& archive, diaspora::Metadata& metadata) const override {
+        metadata = diaspora::Metadata{}; // ensure we have an empty JSON object
         if(energy_max <= std::numeric_limits<uint8_t>::max()) {
             uint8_t val;
             archive.read(&val, sizeof(val));
@@ -49,25 +49,25 @@ class EnergySerializer final : public mofka::SerializerInterface {
         }
     }
 
-    mofka::Metadata metadata() const override {
-        return mofka::Metadata{
+    diaspora::Metadata metadata() const override {
+        return diaspora::Metadata{
             {{"energy_max", energy_max}}
         };
     }
 
-    static std::unique_ptr<mofka::SerializerInterface> create(const mofka::Metadata& metadata) {
+    static std::unique_ptr<diaspora::SerializerInterface> create(const diaspora::Metadata& metadata) {
         if(!metadata.json().is_object())
-            throw mofka::InvalidMetadata{
+            throw diaspora::InvalidMetadata{
                 "EnergySerializer configuration should be a JSON object"};
         if(!metadata.json().contains("energy_max"))
-            throw mofka::InvalidMetadata{
+            throw diaspora::InvalidMetadata{
                 "EnergySerializer configuration should contain an \"energy_max\" field"};
         if(!metadata.json()["energy_max"].is_number_integer())
-            throw mofka::InvalidMetadata{
+            throw diaspora::InvalidMetadata{
                 "EnergySerializer configuration's energy_max field should be an integer"};
         return std::make_unique<EnergySerializer>(metadata.json()["energy_max"].get<size_t>());
     }
 
 };
 
-MOFKA_REGISTER_SERIALIZER(energy_serializer, EnergySerializer);
+DIASPORA_REGISTER_SERIALIZER(_, energy_serializer, EnergySerializer);

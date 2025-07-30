@@ -4,17 +4,11 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "ConsumerHandleImpl.hpp"
-#include "PimplUtil.hpp"
 #include "Promise.hpp"
 #include <spdlog/spdlog.h>
 #include <limits>
 
 namespace mofka {
-
-PIMPL_DEFINE_COMMON_FUNCTIONS_NO_DTOR(ConsumerHandle);
-
-ConsumerHandle::~ConsumerHandle() {
-}
 
 const std::string& ConsumerHandle::name() const {
     return self->m_consumer_name;
@@ -24,9 +18,9 @@ bool ConsumerHandle::shouldStop() const {
     return self->m_should_stop;
 }
 
-Future<void> ConsumerHandle::feed(
+diaspora::Future<void> ConsumerHandle::feed(
     size_t count,
-    EventID firstID,
+    diaspora::EventID firstID,
     const BulkRef &metadata_sizes,
     const BulkRef &metadata,
     const BulkRef &data_desc_sizes,
@@ -43,7 +37,7 @@ Future<void> ConsumerHandle::feed(
             data_desc_sizes,
             data_desc);
         auto req_ptr = std::make_shared<thallium::async_response>(std::move(request));
-        return Future<void>{
+        return diaspora::Future<void>{
             [req_ptr]() {
                 req_ptr->wait();
             },
@@ -52,7 +46,7 @@ Future<void> ConsumerHandle::feed(
             }
         };
     } catch(const std::exception& ex) {
-        return Future<void>{
+        return diaspora::Future<void>{
             [ex](){ throw ex; },
             [](){ return true; }
         };

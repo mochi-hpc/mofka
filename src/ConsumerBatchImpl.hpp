@@ -6,22 +6,23 @@
 #ifndef MOFKA_CONSUMER_BATCH_IMPL_H
 #define MOFKA_CONSUMER_BATCH_IMPL_H
 
+#include "BulkRef.hpp"
+#include "Result.hpp"
+#include "Promise.hpp"
+#include "MofkaPartitionInfo.hpp"
+#include "MofkaConsumer.hpp"
+
+#include <diaspora/EventID.hpp>
+#include <diaspora/Metadata.hpp>
+#include <diaspora/Archive.hpp>
+#include <diaspora/Serializer.hpp>
+#include <diaspora/DataView.hpp>
+#include <diaspora/Future.hpp>
+#include <diaspora/Consumer.hpp>
+
 #include <thallium.hpp>
 #include <mutex>
 #include <queue>
-#include "mofka/BulkRef.hpp"
-#include "mofka/Result.hpp"
-#include "mofka/EventID.hpp"
-#include "mofka/Metadata.hpp"
-#include "mofka/Archive.hpp"
-#include "mofka/Serializer.hpp"
-#include "mofka/Data.hpp"
-#include "mofka/Future.hpp"
-#include "mofka/Consumer.hpp"
-#include "MofkaPartitionInfo.hpp"
-#include "MofkaConsumer.hpp"
-#include "Promise.hpp"
-#include "DataImpl.hpp"
 #include <vector>
 #include <cstdint>
 

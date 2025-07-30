@@ -6,12 +6,14 @@
 #ifndef MOFKA_CEREAL_ARCHIVE_ADAPTOR_H
 #define MOFKA_CEREAL_ARCHIVE_ADAPTOR_H
 
-#include "mofka/Archive.hpp"
+#include <diaspora/Archive.hpp>
+
+#include <functional>
 
 namespace mofka {
 
 template<typename A>
-struct CerealInpuArchiveAdaptor : public Archive {
+struct CerealInpuArchiveAdaptor : public diaspora::Archive {
 
     std::reference_wrapper<A> m_archive;
 
@@ -30,7 +32,7 @@ struct CerealInpuArchiveAdaptor : public Archive {
 };
 
 template<typename A>
-struct CerealOutpuArchiveAdaptor : public Archive {
+struct CerealOutpuArchiveAdaptor : public diaspora::Archive {
 
     std::reference_wrapper<A> m_archive;
 

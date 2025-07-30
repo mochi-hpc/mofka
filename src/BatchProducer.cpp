@@ -3,9 +3,9 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "mofka/Producer.hpp"
-#include "mofka/Exception.hpp"
-#include "mofka/TopicHandle.hpp"
+#include <diaspora/Producer.hpp>
+#include <diaspora/Exception.hpp>
+#include <diaspora/TopicHandle.hpp>
 
 #include "Promise.hpp"
 #include "BatchProducer.hpp"
@@ -13,23 +13,26 @@
 
 namespace mofka {
 
-TopicHandle BatchProducer::topic() const {
+std::shared_ptr<diaspora::TopicHandleInterface> BatchProducer::topic() const {
     return m_topic;
 }
 
-Future<EventID> BatchProducer::push(Metadata metadata, Data data, std::optional<size_t> partition) {
+diaspora::Future<diaspora::EventID> BatchProducer::push(
+        diaspora::Metadata metadata,
+        diaspora::DataView data,
+        std::optional<size_t> partition) {
     /* Step 1: create a future/promise pair for this operation */
-    Future<EventID> future;
-    Promise<EventID> promise;
+    diaspora::Future<diaspora::EventID> future;
+    Promise<diaspora::EventID> promise;
     // if the batch size is not adaptive, wait() calls on futures should trigger a flush
     auto on_wait = [this]() mutable { flush(); };
-    std::tie(future, promise) = m_batch_size != BatchSize::Adaptive() ?
-        Promise<EventID>::CreateFutureAndPromise(std::move(on_wait))
-        : Promise<EventID>::CreateFutureAndPromise();
+    std::tie(future, promise) = m_batch_size != diaspora::BatchSize::Adaptive() ?
+        Promise<diaspora::EventID>::CreateFutureAndPromise(std::move(on_wait))
+        : Promise<diaspora::EventID>::CreateFutureAndPromise();
     /* Validate the metadata */
-    m_topic.validator().validate(metadata, data);
+    m_topic->validator().validate(metadata, data);
     /* Select the partition for this metadata */
-    auto partition_index = m_topic.selector().selectPartitionFor(metadata, partition);
+    auto partition_index = m_topic->selector().selectPartitionFor(metadata, partition);
     /* Find/create the ActiveProducerBatchQueue to send to */
     std::shared_ptr<ActiveProducerBatchQueue> queue;
     {
@@ -44,7 +47,7 @@ Future<EventID> BatchProducer::push(Metadata metadata, Data data, std::optional<
                     std::move(create_new_batch),
                     m_thread_pool,
                     batchSize(),
-                    maxBatch());
+                    maxNumBatches());
             m_batch_queues[partition_index] = queue;
         }
     }
@@ -55,7 +58,7 @@ Future<EventID> BatchProducer::push(Metadata metadata, Data data, std::optional<
 void BatchProducer::flush() {
     {
         std::lock_guard<thallium::mutex> guard{m_batch_queues_mtx};
-        std::vector<Future<void>> futures;
+        std::vector<diaspora::Future<void>> futures;
         futures.reserve(m_batch_queues.size());
         for(auto& p : m_batch_queues) {
             if(p) futures.push_back(p->flush());

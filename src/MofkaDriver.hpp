@@ -6,74 +6,69 @@
 #ifndef MOFKA_DRIVER_HPP
 #define MOFKA_DRIVER_HPP
 
-#include <mofka/ForwardDcl.hpp>
-#include <mofka/Exception.hpp>
-#include <mofka/Serializer.hpp>
-#include <mofka/Validator.hpp>
-#include <mofka/PartitionSelector.hpp>
-#include <mofka/Metadata.hpp>
+#include <diaspora/ForwardDcl.hpp>
+#include <diaspora/Exception.hpp>
+#include <diaspora/Serializer.hpp>
+#include <diaspora/Validator.hpp>
+#include <diaspora/PartitionSelector.hpp>
+#include <diaspora/Metadata.hpp>
+#include <diaspora/Driver.hpp>
 
+#include <yokan/cxx/database.hpp>
+#include <yokan/cxx/collection.hpp>
+#include <yokan/cxx/client.hpp>
 #include <bedrock/DependencyMap.hpp>
+#include <bedrock/ServiceGroupHandle.hpp>
+
 #include <thallium.hpp>
 #include <memory>
 #include <unordered_set>
 
+#include "MofkaPartitionInfo.hpp"
+
 namespace mofka {
 
-class MofkaDriverImpl;
+class MofkaClient;
 
 /**
  * @brief A MofkaDriver object is a handle for a Mofka service
  * deployed on a set of servers.
  */
-class MofkaDriver {
+class MofkaDriver : public diaspora::DriverInterface,
+                    public std::enable_shared_from_this<MofkaDriver> {
 
-    friend class TopicHandle;
+    friend class MofkaClient;
+
+    thallium::engine            m_engine;
+    bedrock::ServiceGroupHandle m_bsgh;
+    yokan::Client               m_yk_client;
+    yokan::Database             m_yk_master_db;
+    std::string                 m_yk_master_info;
 
     public:
 
-    MofkaDriver() = default;
+    MofkaDriver(
+          thallium::engine engine,
+          bedrock::ServiceGroupHandle bsgh,
+          const std::pair<std::string, uint16_t>& masterDbInfo)
+    : m_engine(std::move(engine))
+    , m_bsgh(std::move(bsgh))
+    , m_yk_client{m_engine.get_margo_instance()}
+    , m_yk_master_db{
+        m_yk_client.makeDatabaseHandle(
+            m_engine.lookup(masterDbInfo.first).get_addr(),
+                masterDbInfo.second)}
+    , m_yk_master_info{"yokan:" + std::to_string(masterDbInfo.second) + "@" + masterDbInfo.first}
+    {}
 
     /**
-     * @brief Constructor.
+     * @brief Factory function.
+     *
+     * @param options Options.
+     *
+     * @return a new Driver.
      */
-    MofkaDriver(const std::string& groupfile, bool use_progress_thread = false);
-
-    /**
-     * @brief Constructor.
-     */
-    MofkaDriver(const std::string& groupfile, thallium::engine engine);
-
-    /**
-     * @brief Constructor.
-     */
-    MofkaDriver(const std::string& groupfile, margo_instance_id mid)
-    : MofkaDriver(groupfile, thallium::engine{mid}) {}
-
-    /**
-     * @brief Copy-constructor.
-     */
-    MofkaDriver(const MofkaDriver&);
-
-    /**
-     * @brief Move-constructor.
-     */
-    MofkaDriver(MofkaDriver&&);
-
-    /**
-     * @brief Copy-assignment operator.
-     */
-    MofkaDriver& operator=(const MofkaDriver&);
-
-    /**
-     * @brief Move-assignment operator.
-     */
-    MofkaDriver& operator=(MofkaDriver&&);
-
-    /**
-     * @brief Destructor.
-     */
-    ~MofkaDriver();
+    static std::shared_ptr<DriverInterface> create(const diaspora::Metadata& options);
 
     /**
      * @brief Start a progress thread.
@@ -81,32 +76,33 @@ class MofkaDriver {
     void startProgressThread() const;
 
     /**
-     * @brief Checks if the MofkaDriver instance is valid.
-     */
-    operator bool() const;
-
-    /**
      * @brief Get the internal Thallium engine.
      */
-    thallium::engine engine() const;
+    thallium::engine engine() const {
+        return m_engine;
+    }
 
     /**
      * @brief Returns the number of servers this service currently has.
      */
-    size_t numServers() const;
+    size_t numServers() const {
+        return m_bsgh.size();
+    }
 
     /**
      * @brief Create a topic with a given name, if it does not exist yet.
      *
      * @param name Name of the topic.
+     * @param options Mofka-specific options.
      * @param validator Validator object to validate events pushed to the topic.
      * @param selector PartitionSelector object of the topic.
      * @param serializer Serializer to use for all the events in the topic.
      */
     void createTopic(std::string_view name,
-                     Validator validator = Validator{},
-                     PartitionSelector selector = PartitionSelector{},
-                     Serializer serializer = Serializer{});
+                     const diaspora::Metadata& options,
+                     std::shared_ptr<diaspora::ValidatorInterface> validator,
+                     std::shared_ptr<diaspora::PartitionSelectorInterface> selector,
+                     std::shared_ptr<diaspora::SerializerInterface> serializer) override;
 
     /**
      * @brief Open an existing topic with the given name.
@@ -115,25 +111,27 @@ class MofkaDriver {
      *
      * @return a TopicHandle representing the topic.
      */
-    TopicHandle openTopic(std::string_view name);
+    std::shared_ptr<diaspora::TopicHandleInterface> openTopic(std::string_view name) const override;
 
     /**
      * @brief Checks if a topic exists.
      */
-    bool topicExists(std::string_view name);
+    bool topicExists(std::string_view name) const override;
 
     /**
      * @brief Get the default ThreadPool.
      */
-    ThreadPool defaultThreadPool() const;
+    std::shared_ptr<diaspora::ThreadPoolInterface> defaultThreadPool() const override;
 
     /**
-     * @brief Map of dependency descriptors for the partition.
-     * Please refer to the partition type's documentation for more information
-     * on its expected dependencies.
+     * @brief Create a ThreadPool.
+     *
+     * @param count Number of threads.
+     *
+     * @return a ThreadPool with the specified number of threads.
      */
-    [[deprecated("Use MofkaDriver::Dependencies instead")]]
-        typedef bedrock::DependencyMap PartitionDependencies;
+    std::shared_ptr<diaspora::ThreadPoolInterface> makeThreadPool(diaspora::ThreadCount count) const override;
+
     typedef bedrock::DependencyMap Dependencies;
 
     /**
@@ -165,7 +163,7 @@ class MofkaDriver {
      */
     std::string addDefaultMetadataProvider(
         size_t server_rank,
-        const Metadata& config = Metadata{R"({"database":{"type":"map","config":{}}})"},
+        const diaspora::Metadata& config = diaspora::Metadata{R"({"database":{"type":"map","config":{}}})"},
         const Dependencies& dependencies = Dependencies{});
 
     /**
@@ -198,7 +196,7 @@ class MofkaDriver {
      */
     std::string addDefaultDataProvider(
         size_t server_rank,
-        const Metadata& config = Metadata{R"({"target":{"type":"memory","config":{}}})"},
+        const diaspora::Metadata& config = diaspora::Metadata{R"({"target":{"type":"memory","config":{}}})"},
         const Dependencies& dependencies = Dependencies{});
 
     /**
@@ -214,7 +212,7 @@ class MofkaDriver {
     void addCustomPartition(std::string_view topic_name,
                             size_t server_rank,
                             std::string_view partition_type = "memory",
-                            const Metadata& partition_config = Metadata{"{}"},
+                            const diaspora::Metadata& partition_config = diaspora::Metadata{"{}"},
                             const Dependencies& dependencies = {},
                             std::string_view pool_name = "");
 
@@ -248,20 +246,9 @@ class MofkaDriver {
                              size_t server_rank,
                              std::string_view metadata_provider = {},
                              std::string_view data_provider = {},
-                             const Metadata& config = {},
+                             const diaspora::Metadata& config = {},
                              std::string_view pool_name = "");
 
-    private:
-
-    /**
-     * @brief Constructor is private. Use a Client object
-     * to create a MofkaDriver instance.
-     *
-     * @param impl Pointer to implementation.
-     */
-    MofkaDriver(const std::shared_ptr<MofkaDriverImpl>& impl);
-
-    std::shared_ptr<MofkaDriverImpl> self;
 };
 
 }

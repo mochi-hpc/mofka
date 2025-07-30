@@ -1,5 +1,5 @@
-#include <mofka/MofkaDriver.hpp>
-#include <mofka/TopicHandle.hpp>
+#include <diaspora/Driver.hpp>
+#include <diaspora/TopicHandle.hpp>
 #include <iostream>
 
 int main(int argc, char** argv) {
@@ -15,21 +15,26 @@ int main(int argc, char** argv) {
 
     try {
 
-        mofka::MofkaDriver driver{group_file, true};
+        diaspora::Metadata options;
+        options.json()["group_file"] = group_file;
+        options.json()["margo"] = nlohmann::json::object();
+        options.json()["margo"]["use_progress_thread"] = true;
 
-        mofka::TopicHandle topic = driver.openTopic(topic_name);
+        diaspora::Driver driver = diaspora::Driver::New("mofka", options);
 
-        mofka::Producer producer = topic.producer();
+        diaspora::TopicHandle topic = driver.openTopic(topic_name);
+
+        diaspora::Producer producer = topic.producer();
         for(size_t i = 0; i < 100; ++i) {
             auto future = producer.push(
-                mofka::Metadata{R"({"x":42,"name":"bob"})"},
-                mofka::Data{}
+                diaspora::Metadata{R"({"x":42,"name":"bob"})"},
+                diaspora::DataView{}
             );
             // auto event_id = future.wait();
         }
         producer.flush();
 
-    } catch(const mofka::Exception& ex) {
+    } catch(const diaspora::Exception& ex) {
         std::cerr << ex.what() << std::endl;
     }
     return 0;

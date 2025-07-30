@@ -6,12 +6,13 @@
 #ifndef MOFKA_PROVIDER_IMPL_H
 #define MOFKA_PROVIDER_IMPL_H
 
-#include "mofka/PartitionManager.hpp"
-#include "mofka/DataDescriptor.hpp"
-#include "mofka/Provider.hpp"
+#include "PartitionManager.hpp"
+#include "Provider.hpp"
 #include "CerealArchiveAdaptor.hpp"
 #include "ConsumerHandleImpl.hpp"
-#include "MetadataImpl.hpp"
+
+#include <diaspora/DataDescriptor.hpp>
+#include <diaspora/Metadata.hpp>
 
 #include <thallium.hpp>
 #include <thallium/serialization/stl/string.hpp>
@@ -33,11 +34,11 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
     public:
 
-    tl::engine  m_engine;
-    Metadata    m_config;
-    UUID        m_uuid;
-    std::string m_topic;
-    tl::pool    m_pool;
+    tl::engine         m_engine;
+    diaspora::Metadata m_config;
+    UUID               m_uuid;
+    std::string        m_topic;
+    tl::pool           m_pool;
     // RPCs for PartitionManagers
     tl::auto_remote_procedure m_producer_send_batch;
     tl::auto_remote_procedure m_consumer_request_events;
@@ -48,16 +49,16 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     /* RPC for Consumers */
     thallium::remote_procedure m_consumer_recv_batch;
     // PartitionManager
-    SP<PartitionManager> m_partition_manager;
+    std::shared_ptr<PartitionManager> m_partition_manager;
     // Active consumers
     std::unordered_map<ConsumerKey,
-                       SP<ConsumerHandleImpl>,
+                       std::shared_ptr<ConsumerHandleImpl>,
                        ConsumerKey::Hash>      m_consumers;
     tl::mutex                                  m_consumers_mtx;
     tl::condition_variable                     m_consumers_cv;
 
     ProviderImpl(const tl::engine& engine, uint16_t provider_id,
-                 const Metadata& config, const tl::pool& pool,
+                 const diaspora::Metadata& config, const tl::pool& pool,
                  const bedrock::ResolvedDependencyMap& dependencies)
     : tl::provider<ProviderImpl>(engine, provider_id)
     , m_engine(engine)
@@ -80,7 +81,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
         std::string partition_type = m_config.json()["type"].get<std::string>();
         auto partition_config = m_config.json().contains("partition")
-            ? Metadata{m_config.json()["partition"]} : Metadata{};
+            ? diaspora::Metadata{m_config.json()["partition"]} : diaspora::Metadata{};
 
         /* Create the partition manager */
         m_partition_manager = PartitionManagerFactory::create(
@@ -90,7 +91,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), m_uuid.to_string());
     }
 
-    static void ValidateConfig(const Metadata& config) {
+    static void ValidateConfig(const diaspora::Metadata& config) {
         /* Schema for any provider configuration */
         static const nlohmann::json configSchema = R"(
         {
@@ -112,7 +113,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         if(!errors.empty()) {
             spdlog::error("[mofka] Error(s) while validating JSON config for provider:");
             for(auto& error : errors) spdlog::error("[mofka] \t{}", error);
-            throw Exception{"Error(s) while validating JSON config for provider"};
+            throw diaspora::Exception{"Error(s) while validating JSON config for provider"};
         }
     }
 
@@ -130,7 +131,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                       const BulkRef& metadata,
                       const BulkRef& data) {
         spdlog::trace("[mofka:{}] Received receiveBatch request (topic: {}, count:{})", id(), m_topic, count);
-        Result<EventID> result;
+        Result<diaspora::EventID> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
         ENSURE_VALID_PARTITION_MANAGER(result);
         result = m_partition_manager->receiveBatch(
@@ -147,7 +148,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Received requestEvents request"
                       " (topic: {}, partition: {}, count: {}, batchsize: {})",
                       id(), m_topic, partition_index, count, batch_size);
-        SP<ConsumerHandleImpl> consumer_handle_impl;
+        std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
         auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
 
         {
@@ -166,7 +167,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             m_consumers_cv.notify_all();
         } // response is sent here
 
-        m_partition_manager->feedConsumer(consumer_handle_impl, BatchSize{batch_size});
+        m_partition_manager->feedConsumer(consumer_handle_impl, diaspora::BatchSize{batch_size});
         {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             m_consumers.erase(consumer_key);
@@ -176,7 +177,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
 
     void acknowledge(const tl::request& req,
                      const std::string& consumer_name,
-                     EventID eventID) {
+                     diaspora::EventID eventID) {
         spdlog::trace("[mofka:{}] Received acknoweldge request (topic: {}, consumer: {}, event_id: {})",
                       id(), m_topic, consumer_name, eventID);
         Result<void> result;
@@ -194,7 +195,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
         auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
-        SP<ConsumerHandleImpl> consumer_handle_impl;
+        std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
         {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             auto it = m_consumers.find(consumer_key);
@@ -208,7 +209,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     }
 
     void requestData(const tl::request& req,
-                     const Cerealized<DataDescriptor>& descriptor,
+                     const Cerealized<diaspora::DataDescriptor>& descriptor,
                      const BulkRef& remote_bulk) {
         spdlog::trace("[mofka:{}] Received requestData request (topic: {})", id(), m_topic);
         Result<std::vector<Result<void>>> result;

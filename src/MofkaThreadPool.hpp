@@ -6,19 +6,18 @@
 #ifndef MOFKA_THREAD_POOL_IMPL_H
 #define MOFKA_THREAD_POOL_IMPL_H
 
-#include "mofka/ThreadPool.hpp"
+#include <diaspora/ThreadPool.hpp>
 #include "PrioPool.hpp"
 #include <thallium.hpp>
 #include <vector>
 
 namespace mofka {
 
-class ThreadPoolImpl {
+class MofkaThreadPool : public diaspora::ThreadPoolInterface {
 
     static thallium::pool s_default_pool;
 
     public:
-
 
     static inline void SetDefaultPool(thallium::pool pool) {
         s_default_pool = pool;
@@ -30,7 +29,7 @@ class ThreadPoolImpl {
         return s_default_pool;
     }
 
-    ThreadPoolImpl(ThreadCount tc) {
+    MofkaThreadPool(diaspora::ThreadCount tc) {
         if(tc.count == 0) {
             m_pool = GetDefaultPool();
         } else {
@@ -46,10 +45,10 @@ class ThreadPoolImpl {
         }
     }
 
-    ThreadPoolImpl(thallium::pool pool)
+    MofkaThreadPool(thallium::pool pool)
     : m_pool{pool} {}
 
-    ~ThreadPoolImpl() {
+    ~MofkaThreadPool() {
         for(auto& x : m_managed_xstreams) {
             x->join();
         }
@@ -61,22 +60,21 @@ class ThreadPoolImpl {
         }
     }
 
-    template<typename Function>
-    void pushWork(Function&& func, uint64_t priority=0) {
+    void pushWork(std::function<void()> func, uint64_t priority) override {
         if(!m_pool_def) { // not custom priority pool
-            m_pool.make_thread(std::forward<Function>(func), thallium::anonymous{});
+            m_pool.make_thread(std::move(func), thallium::anonymous{});
             thallium::thread::yield();
         } else { // custom priority pool, first argument should be a priority
             struct Args {
-                uint64_t priority;
-                Function func;
+                uint64_t              priority;
+                std::function<void()> func;
             };
             auto func_wrapper = [](void* args) {
                 auto a = static_cast<Args*>(args);
                 a->func();
                 delete a;
             };
-            auto args = new Args{priority, std::forward<Function>(func)};
+            auto args = new Args{priority, std::move(func)};
             ABT_thread_create(m_pool.native_handle(),
                               func_wrapper, args,
                               ABT_THREAD_ATTR_NULL, nullptr);
@@ -84,11 +82,11 @@ class ThreadPoolImpl {
         }
     }
 
-    std::size_t managed_xstreams_size() const {
-        return m_managed_xstreams.size();
+    diaspora::ThreadCount threadCount() const override {
+        return diaspora::ThreadCount{m_managed_xstreams.size()};
     }
 
-    std::size_t size() const {
+    std::size_t size() const override {
         return m_pool.total_size();
     }
 

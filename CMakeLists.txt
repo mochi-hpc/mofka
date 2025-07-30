@@ -22,7 +22,6 @@ add_library (warnings_config INTERFACE)
 option (ENABLE_TESTS     "Build tests" OFF)
 option (ENABLE_COVERAGE  "Build with coverage" OFF)
 option (ENABLE_PYTHON    "Build the Python module" OFF)
-option (ENABLE_BENCHMARK "Build the benchmark" OFF)
 option (ENABLE_KAFKA     "Build with Kafka support" OFF)
 
 # add our cmake module directory to the path
@@ -62,8 +61,8 @@ if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo|Debug")
     )
 endif ()
 
-# search for mofka-api
-find_package (mofka-api REQUIRED)
+# search for diaspora-stream-api
+find_package (diaspora-stream-api REQUIRED)
 # search for pkg-config
 find_package (PkgConfig REQUIRED)
 # search fo thallium
@@ -116,7 +115,3 @@ if (${ENABLE_TESTS})
     endif ()
     add_subdirectory (tests)
 endif (${ENABLE_TESTS})
-
-if (${ENABLE_BENCHMARK})
-    add_subdirectory (benchmark)
-endif (${ENABLE_BENCHMARK})

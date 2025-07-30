@@ -6,14 +6,16 @@
 #ifndef MOFKA_PARTITION_MANAGER_HPP
 #define MOFKA_PARTITION_MANAGER_HPP
 
-#include <mofka/ForwardDcl.hpp>
-#include <mofka/Result.hpp>
-#include <mofka/Metadata.hpp>
-#include <mofka/Json.hpp>
-#include <mofka/BatchSize.hpp>
-#include <mofka/EventID.hpp>
-#include <mofka/ConsumerHandle.hpp>
-#include <mofka/Factory.hpp>
+#include "Result.hpp"
+#include "UUID.hpp"
+#include "ConsumerHandle.hpp"
+
+#include <diaspora/ForwardDcl.hpp>
+#include <diaspora/Metadata.hpp>
+#include <diaspora/Json.hpp>
+#include <diaspora/BatchParams.hpp>
+#include <diaspora/EventID.hpp>
+#include <diaspora/Factory.hpp>
 
 #include <bedrock/AbstractComponent.hpp>
 
@@ -83,7 +85,7 @@ class PartitionManager {
      *
      * @return a Result containing the result.
      */
-    virtual Result<EventID> receiveBatch(
+    virtual Result<diaspora::EventID> receiveBatch(
         const thallium::endpoint& sender,
         const std::string& producer_name,
         size_t num_events,
@@ -112,7 +114,7 @@ class PartitionManager {
      */
     virtual Result<void> feedConsumer(
         ConsumerHandle consumerHandle,
-        BatchSize batchSize) = 0;
+        diaspora::BatchSize batchSize) = 0;
 
     /**
      * @brief Acknowledge that the specified consumer has consumed
@@ -120,7 +122,7 @@ class PartitionManager {
      */
     virtual Result<void> acknowledge(
         std::string_view consumer_name,
-        EventID event_id) = 0;
+        diaspora::EventID event_id) = 0;
 
     /**
      * @brief Fetch the data associated with a given series of DataDescriptors.
@@ -129,7 +131,7 @@ class PartitionManager {
      * @param bulk Bulk handle of the sender's memory.
      */
     virtual Result<std::vector<Result<void>>> getData(
-        const std::vector<DataDescriptor>& descriptors,
+        const std::vector<diaspora::DataDescriptor>& descriptors,
         const BulkRef& bulk) = 0;
 
     /**
@@ -162,15 +164,10 @@ class PartitionManagerDependencyFactory {
         return it->second;
     }
 
-    private:
-
     template<typename T>
     friend struct PartitionDependencyRegistrar;
 
-    static PartitionManagerDependencyFactory& instance() {
-        static PartitionManagerDependencyFactory factory;
-        return factory;
-    }
+    static PartitionManagerDependencyFactory& instance();
 
     std::unordered_map<std::string,
                        std::vector<bedrock::Dependency>> dependencies;
@@ -189,18 +186,18 @@ struct PartitionDependencyRegistrar {
 
 };
 
-using PartitionManagerFactory = Factory<PartitionManager,
+using PartitionManagerFactory = diaspora::Factory<PartitionManager,
     const thallium::engine&,
-    const std::string&,   /* topic name */
-    const UUID&,          /* partition UUID */
-    const Metadata&,      /* partition config */
+    const std::string&,        /* topic name */
+    const UUID&,               /* partition UUID */
+    const diaspora::Metadata&, /* partition config */
     const bedrock::ResolvedDependencyMap&>;
 
 #define MOFKA_REGISTER_PARTITION_MANAGER(__name__, __type__) \
-    MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__)
+    DIASPORA_REGISTER_IMPLEMENTATION_FOR(mofka, PartitionManagerFactory, __type__, __name__);
 
 #define MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(__name__, __type__, ...) \
-    MOFKA_REGISTER_IMPLEMENTATION_FOR(PartitionManagerFactory, __type__, __name__); \
+    DIASPORA_REGISTER_IMPLEMENTATION_FOR(mofka, PartitionManagerFactory, __type__, __name__); \
     static ::mofka::PartitionDependencyRegistrar<__type__> \
         __mofkaDependencyRegistrarFor_ ## __type__ ## _ ## __name__{#__name__, {__VA_ARGS__}}
 
