@@ -6,8 +6,8 @@
 #ifndef MEMORY_PARTITION_MANAGER_HPP
 #define MEMORY_PARTITION_MANAGER_HPP
 
-#include <mofka/PartitionManager.hpp>
-#include <mofka/DataDescriptor.hpp>
+#include "PartitionManager.hpp"
+#include <diaspora/DataDescriptor.hpp>
 
 namespace mofka {
 
@@ -25,16 +25,17 @@ class MemoryPartitionManager : public mofka::PartitionManager {
             return std::string_view{reinterpret_cast<const char*>(this), sizeof(*this)};
         }
 
-        void fromDataDescriptor(const DataDescriptor& desc) {
+        void fromDataDescriptor(const diaspora::DataDescriptor& desc) {
             if(desc.flatten().size() != 1) {
-                throw Exception{"Fragmented DataDescriptor not supported by memory partition"};
+                throw diaspora::Exception{
+                    "Fragmented DataDescriptor not supported by memory partition"};
             }
             std::memcpy(&offset, desc.location().data(), sizeof(offset));
             std::memcpy(&size, desc.location().data() + sizeof(offset), sizeof(size));
         }
     };
 
-    Metadata m_config;
+    diaspora::Metadata m_config;
 
     thallium::engine m_engine;
 
@@ -52,8 +53,8 @@ class MemoryPartitionManager : public mofka::PartitionManager {
     thallium::mutex              m_events_data_mtx;
     thallium::condition_variable m_events_cv;
 
-    std::unordered_map<std::string, EventID> m_consumer_cursor;
-    thallium::mutex                          m_consumer_cursor_mtx;
+    std::unordered_map<std::string, diaspora::EventID> m_consumer_cursor;
+    thallium::mutex                                    m_consumer_cursor_mtx;
 
     public:
 
@@ -61,7 +62,7 @@ class MemoryPartitionManager : public mofka::PartitionManager {
      * @brief Constructor.
      */
     MemoryPartitionManager(
-        const Metadata& config,
+        const diaspora::Metadata& config,
         thallium::engine engine)
     : m_config(config)
     , m_engine(engine) {}
@@ -94,7 +95,7 @@ class MemoryPartitionManager : public mofka::PartitionManager {
     /**
      * @brief Receives a batch.
      */
-    Result<EventID> receiveBatch(
+    Result<diaspora::EventID> receiveBatch(
             const thallium::endpoint& sender,
             const std::string& producer_name,
             size_t num_events,
@@ -111,20 +112,20 @@ class MemoryPartitionManager : public mofka::PartitionManager {
      */
     Result<void> feedConsumer(
             ConsumerHandle consumerHandle,
-            BatchSize batchSize) override;
+            diaspora::BatchSize batchSize) override;
 
     /**
      * @see PartitionManager::acknowledge.
      */
     Result<void> acknowledge(
           std::string_view consumer_name,
-          EventID event_id) override;
+          diaspora::EventID event_id) override;
 
     /**
      * @see PartitionManager::getData.
      */
     Result<std::vector<Result<void>>> getData(
-          const std::vector<DataDescriptor>& descriptors,
+          const std::vector<diaspora::DataDescriptor>& descriptors,
           const BulkRef& bulk) override;
 
     /**
@@ -156,7 +157,7 @@ class MemoryPartitionManager : public mofka::PartitionManager {
         const thallium::engine& engine,
         const std::string& topic_name,
         const UUID& partition_uuid,
-        const Metadata& config,
+        const diaspora::Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies);
 
 };

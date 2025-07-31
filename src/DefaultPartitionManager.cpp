@@ -5,8 +5,10 @@
  */
 #include "JsonUtil.hpp"
 #include "DefaultPartitionManager.hpp"
-#include "mofka/DataDescriptor.hpp"
-#include "mofka/BufferWrapperArchive.hpp"
+
+#include <diaspora/DataDescriptor.hpp>
+#include <diaspora/BufferWrapperArchive.hpp>
+
 #include <spdlog/spdlog.h>
 #include <numeric>
 #include <iostream>
@@ -20,7 +22,7 @@ MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(
     {"data", "warabi", true, false, false},
     {"metadata", "yokan", true, false, false});
 
-Result<EventID> DefaultPartitionManager::receiveBatch(
+Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -29,7 +31,7 @@ Result<EventID> DefaultPartitionManager::receiveBatch(
 {
     (void)producer_name;
     (void)sender;
-    Result<EventID> first_id;
+    Result<diaspora::EventID> first_id;
 
     // --------- asynchronously transfer the data to the DataStore
     auto future_descriptors = m_data_store->store(num_events, data_bulk);
@@ -39,7 +41,7 @@ Result<EventID> DefaultPartitionManager::receiveBatch(
     if(!first_id.success()) return first_id;
 
     // --------- wait for the data transfers
-    std::vector<DataDescriptor> descriptors;
+    std::vector<diaspora::DataDescriptor> descriptors;
     try {
         descriptors = future_descriptors.wait();
     } catch(const std::exception& ex) {
@@ -67,10 +69,10 @@ void DefaultPartitionManager::wakeUp() {
 
 Result<void> DefaultPartitionManager::feedConsumer(
     ConsumerHandle consumerHandle,
-    BatchSize batchSize) {
+    diaspora::BatchSize batchSize) {
     Result<void> result;
 
-    EventID first_id;
+    diaspora::EventID first_id;
     {
         auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
         if(m_consumer_cursor.count(consumerHandle.name()) == 0) {
@@ -85,7 +87,7 @@ Result<void> DefaultPartitionManager::feedConsumer(
 
 Result<void> DefaultPartitionManager::acknowledge(
     std::string_view consumer_name,
-    EventID event_id) {
+    diaspora::EventID event_id) {
     Result<void> result;
     auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
     std::string consumer_name_str{consumer_name.data(), consumer_name.size()};
@@ -94,7 +96,7 @@ Result<void> DefaultPartitionManager::acknowledge(
 }
 
 Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
-        const std::vector<DataDescriptor>& descriptors,
+        const std::vector<diaspora::DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     return m_data_store->load(descriptors, bulk);
 }
@@ -114,7 +116,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
         const thallium::engine& engine,
         const std::string& topic_name,
         const UUID& partition_uuid,
-        const Metadata& config,
+        const diaspora::Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies) {
 
     static const nlohmann::json configSchema = R"(
@@ -131,7 +133,8 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     if(!validationErrors.empty()) {
         spdlog::error("[mofka] Error(s) while validating JSON config for DefaultPartitionManager:");
         for(auto& error : validationErrors) spdlog::error("[mofka] \t{}", error);
-        throw Exception{"Error(s) while validating JSON config for DefaultPartitionManager"};
+        throw diaspora::Exception{
+            "Error(s) while validating JSON config for DefaultPartitionManager"};
     }
 
     /* the data and metadata dependencies are required so we know they are in the map */

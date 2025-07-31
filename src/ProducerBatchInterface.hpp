@@ -6,13 +6,14 @@
 #ifndef MOFKA_PRODUCER_BATCH_IFACE_H
 #define MOFKA_PRODUCER_BATCH_IFACE_H
 
-#include "mofka/EventID.hpp"
-#include "mofka/Metadata.hpp"
-#include "mofka/Archive.hpp"
-#include "mofka/Serializer.hpp"
-#include "mofka/Data.hpp"
-#include "mofka/Future.hpp"
-#include "mofka/Producer.hpp"
+#include <diaspora/EventID.hpp>
+#include <diaspora/Metadata.hpp>
+#include <diaspora/Archive.hpp>
+#include <diaspora/Serializer.hpp>
+#include <diaspora/DataView.hpp>
+#include <diaspora/Future.hpp>
+#include <diaspora/Producer.hpp>
+
 #include "Promise.hpp"
 
 namespace mofka {
@@ -24,9 +25,9 @@ class ProducerBatchInterface {
     virtual ~ProducerBatchInterface() = default;
 
     virtual void push(
-            Metadata metadata,
-            Data data,
-            Promise<EventID> promise) = 0;
+            diaspora::Metadata metadata,
+            diaspora::DataView data,
+            Promise<diaspora::EventID> promise) = 0;
 
     virtual void send() = 0;
 

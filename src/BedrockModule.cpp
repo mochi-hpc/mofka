@@ -3,11 +3,13 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "mofka/Client.hpp"
-#include "mofka/Provider.hpp"
-#include "mofka/ProviderHandle.hpp"
+#include "MofkaClient.hpp"
+#include "Provider.hpp"
+#include "ProviderHandle.hpp"
 
 #include <bedrock/AbstractComponent.hpp>
+
+#include <memory>
 
 namespace tl = thallium;
 
@@ -19,7 +21,7 @@ class MofkaComponent : public bedrock::AbstractComponent {
 
     MofkaComponent(const tl::engine& engine,
                    uint16_t  provider_id,
-                   const mofka::Metadata& config,
+                   const diaspora::Metadata& config,
                    const bedrock::ResolvedDependencyMap& dependencies)
     : m_provider{std::make_unique<mofka::Provider>(engine, provider_id, config, dependencies)}
     {}
@@ -34,14 +36,14 @@ class MofkaComponent : public bedrock::AbstractComponent {
 
     static std::shared_ptr<bedrock::AbstractComponent>
         Register(const bedrock::ComponentArgs& args) {
-            auto config = mofka::Metadata{args.config, true};
+            auto config = diaspora::Metadata{args.config, true};
             return std::make_shared<MofkaComponent>(
                 args.engine, args.provider_id, config, args.dependencies);
         }
 
     static std::vector<bedrock::Dependency>
         GetDependencies(const bedrock::ComponentArgs& args) {
-            auto config_metadata = mofka::Metadata{args.config, true};
+            auto config_metadata = diaspora::Metadata{args.config, true};
             return mofka::Provider::getDependencies(config_metadata);
         }
 };

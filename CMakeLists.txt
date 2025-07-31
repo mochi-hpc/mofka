@@ -8,8 +8,8 @@ enable_testing ()
 
 # library version set here (e.g. for shared libs).
 set (MOFKA_VERSION_MAJOR 0)
-set (MOFKA_VERSION_MINOR 6)
-set (MOFKA_VERSION_PATCH 4)
+set (MOFKA_VERSION_MINOR 7)
+set (MOFKA_VERSION_PATCH 0)
 set (MOFKA_VERSION
      "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}.${MOFKA_VERSION_PATCH}")
 
@@ -22,8 +22,6 @@ add_library (warnings_config INTERFACE)
 option (ENABLE_TESTS     "Build tests" OFF)
 option (ENABLE_COVERAGE  "Build with coverage" OFF)
 option (ENABLE_PYTHON    "Build the Python module" OFF)
-option (ENABLE_BENCHMARK "Build the benchmark" OFF)
-option (ENABLE_KAFKA     "Build with Kafka support" OFF)
 
 # add our cmake module directory to the path
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
@@ -62,6 +60,9 @@ if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo|Debug")
     )
 endif ()
 
+# search for diaspora-stream-api
+find_package (diaspora-stream-api REQUIRED)
+# search for pkg-config
 find_package (PkgConfig REQUIRED)
 # search fo thallium
 find_package (thallium REQUIRED)
@@ -90,11 +91,6 @@ if (ENABLE_PYTHON)
     add_subdirectory (python)
 endif ()
 
-if (ENABLE_KAFKA)
-    pkg_check_modules (kafka REQUIRED IMPORTED_TARGET rdkafka)
-    set (OPTIONAL_KAFKA PkgConfig::kafka)
-endif ()
-
 add_subdirectory (src)
 add_subdirectory (docs/_code)
 add_subdirectory (example)
@@ -113,7 +109,3 @@ if (${ENABLE_TESTS})
     endif ()
     add_subdirectory (tests)
 endif (${ENABLE_TESTS})
-
-if (${ENABLE_BENCHMARK})
-    add_subdirectory (benchmark)
-endif (${ENABLE_BENCHMARK})

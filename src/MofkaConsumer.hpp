@@ -6,13 +6,13 @@
 #ifndef MOFKA_CONSUMER_IMPL_H
 #define MOFKA_CONSUMER_IMPL_H
 
-#include "PimplUtil.hpp"
 #include "MofkaPartitionInfo.hpp"
-#include "Promise.hpp"
-
 #include "MofkaTopicHandle.hpp"
-#include "mofka/Consumer.hpp"
-#include "mofka/UUID.hpp"
+#include "MofkaDriver.hpp"
+#include "Promise.hpp"
+#include "UUID.hpp"
+
+#include <diaspora/Consumer.hpp>
 
 #include <thallium.hpp>
 #include <string_view>
@@ -24,8 +24,7 @@ namespace tl = thallium;
 
 class MofkaTopicHandle;
 
-class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
-                      public ConsumerInterface {
+class MofkaConsumer : public diaspora::ConsumerInterface {
 
     friend class MofkaTopicHandle;
 
@@ -33,17 +32,17 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
 
     public:
 
-    uint64_t                            m_magic_number = MOFKA_MAGIC_NUMBER;
-    thallium::engine                    m_engine;
-    std::string                         m_name;
-    BatchSize                           m_batch_size;
-    MaxBatch                            m_max_batch;
-    ThreadPool                          m_thread_pool;
-    DataBroker                          m_data_broker;
-    DataSelector                        m_data_selector;
-    EventProcessor                      m_event_processor;
-    SP<MofkaTopicHandle>                m_topic;
-    std::vector<SP<MofkaPartitionInfo>> m_partitions;
+    uint64_t                                         m_magic_number = MOFKA_MAGIC_NUMBER;
+    thallium::engine                                 m_engine;
+    std::string                                      m_name;
+    diaspora::BatchSize                              m_batch_size;
+    diaspora::MaxNumBatches                          m_max_batch;
+    std::shared_ptr<diaspora::ThreadPoolInterface>   m_thread_pool;
+    diaspora::DataAllocator                          m_data_allocator;
+    diaspora::DataSelector                           m_data_selector;
+    diaspora::EventProcessor                         m_event_processor;
+    std::shared_ptr<MofkaTopicHandle>                m_topic;
+    std::vector<std::shared_ptr<MofkaPartitionInfo>> m_partitions;
 
     std::string         m_self_addr;
     std::atomic<size_t> m_completed_partitions = 0;
@@ -53,6 +52,10 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
     tl::remote_procedure m_consumer_remove_consumer;
     tl::remote_procedure m_consumer_request_data;
     tl::remote_procedure m_consumer_recv_batch;
+
+    std::shared_ptr<MofkaConsumer> shared_from_this_mofka() {
+        return std::dynamic_pointer_cast<MofkaConsumer>(shared_from_this());
+    }
 
     /* The futures/promises queue works as follows:
      *
@@ -71,25 +74,26 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
      * at in m_futures.front() (the oldest created by the consumer)
      * and take it off the queue. This is the symetric of the above.
      */
-    std::deque<std::pair<Promise<Event>, Future<Event>>> m_futures;
-    bool                                                 m_futures_credit;
-    thallium::mutex                                      m_futures_mtx;
+    std::deque<std::pair<Promise<diaspora::Event>,
+                         diaspora::Future<diaspora::Event>>> m_futures;
+    bool                                                     m_futures_credit;
+    thallium::mutex                                          m_futures_mtx;
 
     MofkaConsumer(thallium::engine engine,
                   std::string_view name,
-                  BatchSize batch_size,
-                  MaxBatch max_batch,
-                  ThreadPool thread_pool,
-                  DataBroker broker,
-                  DataSelector selector,
-                  SP<MofkaTopicHandle> topic,
-                  std::vector<SP<MofkaPartitionInfo>> partitions)
+                  diaspora::BatchSize batch_size,
+                  diaspora::MaxNumBatches max_batch,
+                  std::shared_ptr<diaspora::ThreadPoolInterface> thread_pool,
+                  diaspora::DataAllocator allocator,
+                  diaspora::DataSelector selector,
+                  std::shared_ptr<MofkaTopicHandle> topic,
+                  std::vector<std::shared_ptr<MofkaPartitionInfo>> partitions)
     : m_engine(std::move(engine))
     , m_name(name)
     , m_batch_size(batch_size)
     , m_max_batch(max_batch)
-    , m_thread_pool(std::move(thread_pool))
-    , m_data_broker(std::move(broker))
+    , m_thread_pool(thread_pool ? std::move(thread_pool) : topic->driver()->defaultThreadPool())
+    , m_data_allocator(std::move(allocator))
     , m_data_selector(std::move(selector))
     , m_topic(std::move(topic))
     , m_partitions(std::move(partitions))
@@ -113,31 +117,41 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
         return m_name;
     }
 
-    BatchSize batchSize() const override {
+    diaspora::BatchSize batchSize() const override {
         return m_batch_size;
     }
 
-    MaxBatch maxBatch() const override {
+    diaspora::MaxNumBatches maxNumBatches() const override {
         return m_max_batch;
     }
 
-    ThreadPool threadPool() const override {
+    std::shared_ptr<diaspora::ThreadPoolInterface> threadPool() const override {
         return m_thread_pool;
     }
 
-    TopicHandle topic() const override;
+    std::shared_ptr<diaspora::TopicHandleInterface> topic() const override;
 
-    DataBroker dataBroker() const override {
-        return m_data_broker;
+    const diaspora::DataAllocator& dataAllocator() const override {
+        return m_data_allocator;
     }
 
-    DataSelector dataSelector() const override {
+    const diaspora::DataSelector& dataSelector() const override {
         return m_data_selector;
     }
 
-    Future<Event> pull() override;
+    diaspora::Future<diaspora::Event> pull() override;
 
     void unsubscribe() override;
+
+    void process(diaspora::EventProcessor processor,
+                 std::shared_ptr<diaspora::ThreadPoolInterface> threadPool,
+                 diaspora::NumEvents maxEvents) override {
+        // TODO
+        (void)processor;
+        (void)threadPool;
+        (void)maxEvents;
+        throw diaspora::Exception{"MofkaConsumer::process not implemented"};
+    }
 
     private:
 
@@ -149,23 +163,23 @@ class MofkaConsumer : public std::enable_shared_from_this<MofkaConsumer>,
         const tl::request& req,
         size_t target_info_index,
         size_t count,
-        EventID firstID,
+        diaspora::EventID firstID,
         const BulkRef &metadata_sizes,
         const BulkRef &metadata,
         const BulkRef &data_desc_sizes,
         const BulkRef &data_desc);
 
-    Data requestData(
-        SP<MofkaPartitionInfo> target,
-        Metadata metadata,
-        const DataDescriptor& descriptor);
+    diaspora::DataView requestData(
+        std::shared_ptr<MofkaPartitionInfo> target,
+        diaspora::Metadata metadata,
+        const diaspora::DataDescriptor& descriptor);
 
     static void forwardBatchToConsumer(
             const thallium::request& req,
             intptr_t consumer_ctx,
             size_t target_info_index,
             size_t count,
-            EventID firstID,
+            diaspora::EventID firstID,
             const BulkRef &metadata_sizes,
             const BulkRef &metadata,
             const BulkRef &data_desc_sizes,

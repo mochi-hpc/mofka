@@ -7,17 +7,20 @@
 #define MOFKA_YOKAN_EVENT_STORE_HPP
 
 #include "JsonUtil.hpp"
+#include "ConsumerHandle.hpp"
+#include "UUID.hpp"
+#include "Result.hpp"
+#include "BulkRef.hpp"
+
+#include <diaspora/BatchParams.hpp>
+#include <diaspora/EventID.hpp>
+#include <diaspora/Metadata.hpp>
+#include <diaspora/DataDescriptor.hpp>
+#include <diaspora/BufferWrapperArchive.hpp>
+
 #include <yokan/cxx/client.hpp>
 #include <yokan/cxx/collection.hpp>
-#include <mofka/ConsumerHandle.hpp>
-#include <mofka/BatchSize.hpp>
-#include <mofka/UUID.hpp>
-#include <mofka/EventID.hpp>
-#include <mofka/Result.hpp>
-#include <mofka/Metadata.hpp>
-#include <mofka/DataDescriptor.hpp>
-#include <mofka/BulkRef.hpp>
-#include <mofka/BufferWrapperArchive.hpp>
+
 #include <spdlog/spdlog.h>
 #include <cstddef>
 #include <string_view>
@@ -46,11 +49,11 @@ class YokanEventStore {
         m_count_cv.notify_all();
     };
 
-    Result<EventID> appendMetadata(
+    Result<diaspora::EventID> appendMetadata(
             size_t count,
             const BulkRef& remoteBulk) {
 
-        Result<EventID> result;
+        Result<diaspora::EventID> result;
         std::vector<yk_id_t> ids(count);
 
         try {
@@ -79,15 +82,15 @@ class YokanEventStore {
     }
 
     Result<void> storeDataDescriptors(
-        EventID firstID,
-        const std::vector<DataDescriptor>& descriptors) {
+        diaspora::EventID firstID,
+        const std::vector<diaspora::DataDescriptor>& descriptors) {
 
         Result<void> result;
 
         const auto count = descriptors.size();
         std::vector<size_t> descriptorSizes(count);
         std::vector<char> serializedDescriptors;
-        BufferWrapperOutputArchive outputArchive{serializedDescriptors};
+        diaspora::BufferWrapperOutputArchive outputArchive{serializedDescriptors};
 
         size_t offset = 0;
         for(size_t i = 0; i < count; ++i) {
@@ -139,13 +142,13 @@ class YokanEventStore {
 
     Result<void> feed(
             ConsumerHandle consumerHandle,
-            EventID firstID,
-            BatchSize batchSize) {
+            diaspora::EventID firstID,
+            diaspora::BatchSize batchSize) {
 
         Result<void> result;
 
-        if(batchSize.value == 0 || batchSize == BatchSize::Adaptive())
-            batchSize = BatchSize{32};
+        if(batchSize.value == 0 || batchSize == diaspora::BatchSize::Adaptive())
+            batchSize = diaspora::BatchSize{32};
 
         auto c = batchSize.value;
 
@@ -221,7 +224,7 @@ class YokanEventStore {
 
         auto b1 = std::make_shared<BufferSet>(m_engine, c);
         auto b2 = std::make_shared<BufferSet>(m_engine, c);
-        Future<void> lastFeed;
+        diaspora::Future<void> lastFeed;
 
         while(!consumerHandle.shouldStop()) {
 
@@ -243,7 +246,7 @@ class YokanEventStore {
                                             // that there are no more events to consume from this partition
                 if(lastFeed) lastFeed.wait();
                 lastFeed = consumerHandle.feed(
-                        0, NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
+                        0, diaspora::NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
                 break;
             }
 

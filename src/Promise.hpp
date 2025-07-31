@@ -6,9 +6,9 @@
 #ifndef MOFKA_PROMISE_H
 #define MOFKA_PROMISE_H
 
-#include "mofka/Future.hpp"
-#include "mofka/EventID.hpp"
-#include "mofka/Exception.hpp"
+#include <diaspora/Future.hpp>
+#include <diaspora/EventID.hpp>
+#include <diaspora/Exception.hpp>
 #include <thallium.hpp>
 #include <variant>
 
@@ -29,21 +29,21 @@ struct Promise {
             state->set_value(std::move(value));
     }
 
-    void setException(Exception ex) {
+    void setException(diaspora::Exception ex) {
         auto state = m_state.lock();
         if(state)
             state->set_value(std::move(ex));
     }
 
-    static inline std::pair<Future<Type>, Promise<Type>> CreateFutureAndPromise(
+    static inline std::pair<diaspora::Future<Type>, Promise<Type>> CreateFutureAndPromise(
         std::function<void()> on_wait = std::function<void()>{},
         std::function<void(bool)> on_test = std::function<void(bool)>{}) {
         auto state = newState();
         auto wait_fn = [state, on_wait=std::move(on_wait)]() mutable -> Type {
             if(on_wait) on_wait();
             auto v = std::move(*state).wait();
-            if(std::holds_alternative<Exception>(v))
-                throw std::get<Exception>(v);
+            if(std::holds_alternative<diaspora::Exception>(v))
+                throw std::get<diaspora::Exception>(v);
             return std::get<Type>(std::move(v));
         };
         auto complete_fn = [state, on_test=std::move(on_test)]() mutable -> bool {
@@ -52,7 +52,7 @@ struct Promise {
             return is_ready;
         };
         return std::make_pair(
-            Future<Type>{std::move(wait_fn), std::move(complete_fn)},
+            diaspora::Future<Type>{std::move(wait_fn), std::move(complete_fn)},
             Promise<Type>{std::move(state)});
     }
 
@@ -60,8 +60,8 @@ struct Promise {
 
     struct State {
 
-        std::variant<Type, Exception> m_content;
-        ABT_eventual_memory           m_eventual = ABT_EVENTUAL_INITIALIZER;
+        std::variant<Type, diaspora::Exception> m_content;
+        ABT_eventual_memory                     m_eventual = ABT_EVENTUAL_INITIALIZER;
 
         bool test() const {
             ABT_bool flag;
@@ -69,7 +69,7 @@ struct Promise {
             return flag;
         }
 
-        std::variant<Type, Exception>&& wait() && {
+        std::variant<Type, diaspora::Exception>&& wait() && {
             ABT_eventual_wait(ABT_EVENTUAL_MEMORY_GET_HANDLE(&m_eventual), nullptr);
             return std::move(m_content);
         }

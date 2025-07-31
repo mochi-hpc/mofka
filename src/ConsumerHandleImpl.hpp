@@ -6,10 +6,9 @@
 #ifndef MOFKA_CONSUMER_HANDLE_IMPL_H
 #define MOFKA_CONSUMER_HANDLE_IMPL_H
 
-#include "PimplUtil.hpp"
-#include "mofka/UUID.hpp"
-#include "mofka/ConsumerHandle.hpp"
-#include "mofka/PartitionManager.hpp"
+#include "UUID.hpp"
+#include "ConsumerHandle.hpp"
+#include "PartitionManager.hpp"
 #include <thallium.hpp>
 #include <queue>
 
@@ -51,14 +50,14 @@ class ConsumerHandleImpl {
 
     public:
 
-    const intptr_t                   m_consumer_ptr;
-    const size_t                     m_partition_index;
-    const std::string                m_consumer_name;
-    const size_t                     m_max_events;
-    const SP<PartitionManager>       m_topic_manager;
-    const thallium::endpoint         m_consumer_endpoint;
-    const thallium::remote_procedure m_send_batch;
-    std::atomic<bool>                m_should_stop = false;
+    const intptr_t                          m_consumer_ptr;
+    const size_t                            m_partition_index;
+    const std::string                       m_consumer_name;
+    const size_t                            m_max_events;
+    const std::shared_ptr<PartitionManager> m_topic_manager;
+    const thallium::endpoint                m_consumer_endpoint;
+    const thallium::remote_procedure        m_send_batch;
+    std::atomic<bool>                       m_should_stop = false;
 
     size_t m_sent_events = 0;
 
@@ -67,7 +66,7 @@ class ConsumerHandleImpl {
         size_t partition_index,
         std::string name,
         size_t max,
-        SP<PartitionManager> topic_manager,
+        std::shared_ptr<PartitionManager> topic_manager,
         thallium::endpoint endpoint,
         thallium::remote_procedure rpc)
     : m_consumer_ptr(ptr)

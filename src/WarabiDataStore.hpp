@@ -7,13 +7,16 @@
 #define MOFKA_WARABI_DATA_STORE_HPP
 
 #include "JsonUtil.hpp"
+#include "BulkRef.hpp"
+#include "Promise.hpp"
+#include "Result.hpp"
+
+#include <diaspora/Metadata.hpp>
+#include <diaspora/DataDescriptor.hpp>
+
 #include <warabi/Client.hpp>
 #include <warabi/TargetHandle.hpp>
-#include <mofka/Result.hpp>
-#include <mofka/Metadata.hpp>
-#include <mofka/DataDescriptor.hpp>
-#include <mofka/BulkRef.hpp>
-#include "Promise.hpp"
+
 #include <spdlog/spdlog.h>
 #include <cstddef>
 #include <string_view>
@@ -35,18 +38,18 @@ class WarabiDataStore {
 
     public:
 
-    Future<std::vector<DataDescriptor>> store(
+    diaspora::Future<std::vector<diaspora::DataDescriptor>> store(
             size_t count,
             const BulkRef& remoteBulk) {
 
-        Future<std::vector<DataDescriptor>> future;
-        Promise<std::vector<DataDescriptor>> promise;
-        std::tie(future, promise) = Promise<std::vector<DataDescriptor>>::CreateFutureAndPromise();
+        diaspora::Future<std::vector<diaspora::DataDescriptor>> future;
+        Promise<std::vector<diaspora::DataDescriptor>> promise;
+        std::tie(future, promise) = Promise<std::vector<diaspora::DataDescriptor>>::CreateFutureAndPromise();
 
         auto ult = [promise=std::move(promise), count, remoteBulk, this]() mutable {
             /* prepare the result array and its content by resizing the location
              * field to be able to hold a WarabiDataDescriptor. */
-            std::vector<DataDescriptor> result;
+            std::vector<diaspora::DataDescriptor> result;
             result.resize(count);
             for(auto& descriptor : result) {
                 auto& location = descriptor.location();
@@ -87,15 +90,13 @@ class WarabiDataStore {
             WarabiDataDescriptor wdescriptor{0, region_id};
             for(size_t j = 0; j < count; ++j) {
                 if(sizes[j] > 0) {
-                    result[j] = DataDescriptor::From(
+                    result[j] = diaspora::DataDescriptor(
                             std::string_view{
-                            reinterpret_cast<char*>(&wdescriptor),
-                            sizeof(wdescriptor)
+                                reinterpret_cast<char*>(&wdescriptor),
+                                sizeof(wdescriptor)
                             },
                             sizes[j]);
                     wdescriptor.offset += sizes[j];
-                } else {
-                    result[j] = DataDescriptor::Null();
                 }
             }
 
@@ -108,7 +109,7 @@ class WarabiDataStore {
     }
 
     std::vector<Result<void>> load(
-        const std::vector<DataDescriptor>& descriptors,
+        const std::vector<diaspora::DataDescriptor>& descriptors,
         const BulkRef& remoteBulk) {
 
         std::vector<Result<void>> result;

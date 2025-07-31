@@ -11,6 +11,7 @@ set_and_check (MOFKA_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
 check_required_components (mofka)
 
 include (CMakeFindDependencyMacro)
+find_dependency (diaspora-stream-api)
 find_dependency (thallium)
 find_dependency (PkgConfig)
 pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)

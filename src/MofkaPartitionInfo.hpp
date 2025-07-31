@@ -6,8 +6,8 @@
 #ifndef MOFKA_PARTITION_INFO_IMPL_H
 #define MOFKA_PARTITION_INFO_IMPL_H
 
-#include "mofka/PartitionSelector.hpp"
-#include "mofka/UUID.hpp"
+#include "UUID.hpp"
+#include <diaspora/PartitionSelector.hpp>
 #include <thallium.hpp>
 
 namespace mofka {
@@ -25,8 +25,8 @@ class MofkaPartitionInfo {
     UUID                      m_uuid;
     thallium::provider_handle m_ph;
 
-    PartitionInfo toPartitionInfo() const {
-        PartitionInfo info;
+    diaspora::PartitionInfo toPartitionInfo() const {
+        diaspora::PartitionInfo info;
         info.json()["uuid"] = m_uuid.to_string();
         info.json()["address"] = static_cast<std::string>(m_ph);
         info.json()["provider_id"] = m_ph.provider_id();

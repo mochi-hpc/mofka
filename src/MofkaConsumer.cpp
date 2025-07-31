@@ -3,38 +3,39 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "mofka/Consumer.hpp"
-#include "mofka/Result.hpp"
-#include "mofka/Exception.hpp"
-#include "mofka/TopicHandle.hpp"
-#include "mofka/Future.hpp"
-#include "mofka/BufferWrapperArchive.hpp"
-
+#include "Result.hpp"
 #include "JsonUtil.hpp"
 #include "CerealArchiveAdaptor.hpp"
 #include "MofkaEvent.hpp"
 #include "Promise.hpp"
 #include "MofkaConsumer.hpp"
 #include "ConsumerBatchImpl.hpp"
+
+#include <diaspora/Consumer.hpp>
+#include <diaspora/Exception.hpp>
+#include <diaspora/TopicHandle.hpp>
+#include <diaspora/Future.hpp>
+#include <diaspora/BufferWrapperArchive.hpp>
+
 #include <limits>
 
 using namespace std::string_literals;
 
 namespace mofka {
 
-TopicHandle MofkaConsumer::topic() const {
-    return TopicHandle{m_topic};
+std::shared_ptr<diaspora::TopicHandleInterface> MofkaConsumer::topic() const {
+    return m_topic;
 }
 
-Future<Event> MofkaConsumer::pull() {
-    Future<Event> future;
+diaspora::Future<diaspora::Event> MofkaConsumer::pull() {
+    diaspora::Future<diaspora::Event> future;
     std::unique_lock<thallium::mutex> guard{m_futures_mtx};
     if(m_futures_credit || m_futures.empty()) {
         // the queue of futures is empty or the futures
         // already in the queue have been created by
         // previous calls to pull() that haven't completed
-        Promise<Event> promise;
-        std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
+        Promise<diaspora::Event> promise;
+        std::tie(future, promise) = Promise<diaspora::Event>::CreateFutureAndPromise();
         if(m_completed_partitions != m_partitions.size()) {
             // there are uncompleted partitions, put the future in the queue
             // and it will be picked up by a recvBatch RPC from any partition
@@ -44,7 +45,7 @@ Future<Event> MofkaConsumer::pull() {
             // all partitions are completed, create a NoMoreEvents event
             // (arbitrarily from partition 0)
             // create new event instance
-            promise.setValue(Event{std::make_shared<MofkaEvent>()});
+            promise.setValue(diaspora::Event{std::make_shared<MofkaEvent>()});
         }
     } else {
         // the queue of futures has futures already
@@ -61,7 +62,7 @@ void MofkaConsumer::subscribe() {
     auto n = m_partitions.size();
     std::vector<thallium::eventual<void>> ult_completed(n);
     for(size_t i=0; i < n; ++i) {
-        m_thread_pool.pushWork(
+        m_thread_pool->pushWork(
             [this, i, &ult_completed](){
                 auto& partition = m_partitions[i];
                 auto& rpc = m_consumer_request_events;
@@ -87,7 +88,7 @@ void MofkaConsumer::unsubscribe() {
     auto n = m_partitions.size();
     std::vector<thallium::eventual<void>> ult_completed(n);
     for(size_t i=0; i < n; ++i) {
-        m_thread_pool.pushWork(
+        m_thread_pool->pushWork(
             [this, i, &ult_completed, &rpc](){
                 auto& partition = m_partitions[i];
                 auto& ph = partition->m_ph;
@@ -117,14 +118,14 @@ void MofkaConsumer::partitionCompleted() {
         auto promise = std::move(m_futures.front().first);
         m_futures.pop_front();
         m_futures_credit = true;
-        promise.setValue(Event{std::make_shared<MofkaEvent>()});
+        promise.setValue(diaspora::Event{std::make_shared<MofkaEvent>()});
     }
 }
 
 void MofkaConsumer::recvBatch(const tl::request& req,
                               size_t partition_index,
                               size_t count,
-                              EventID startID,
+                              diaspora::EventID startID,
                               const BulkRef &metadata_sizes,
                               const BulkRef &metadata,
                               const BulkRef &data_desc_sizes,
@@ -134,7 +135,7 @@ void MofkaConsumer::recvBatch(const tl::request& req,
         m_engine, count, metadata.size, data_desc.size);
     batch->pullFrom(metadata_sizes, metadata, data_desc_sizes, data_desc);
 
-    std::vector<Promise<Event>> promises;
+    std::vector<Promise<diaspora::Event>> promises;
     promises.reserve(count);
 
     // Create all the Future/Promise pairs first (to avoid locking over and over)
@@ -142,14 +143,14 @@ void MofkaConsumer::recvBatch(const tl::request& req,
         std::unique_lock<thallium::mutex> guard{m_futures_mtx};
         for(size_t i = 0; i < count; ++i) {
             // get a promise/future pair
-            Promise<Event> promise;
+            Promise<diaspora::Event> promise;
             if(!m_futures_credit || m_futures.empty()) {
                 // the queue of futures is empty or the futures
                 // already in the queue have been created by
                 // previous calls to recvBatch() that haven't had
                 // a corresponding pull() call from the user.
-                Future<Event> future;
-                std::tie(future, promise) = Promise<Event>::CreateFutureAndPromise();
+                diaspora::Future<diaspora::Event> future;
+                std::tie(future, promise) = Promise<diaspora::Event>::CreateFutureAndPromise();
                 m_futures.emplace_back(promise, future);
                 m_futures_credit = false;
             } else {
@@ -166,7 +167,7 @@ void MofkaConsumer::recvBatch(const tl::request& req,
     Result<void> result;
     req.respond(result);
 
-    auto ult = [this, self = shared_from_this(),
+    auto ult = [this, self = shared_from_this_mofka(),
                 count, startID, batch = std::move(batch),
                 serializer = m_topic->m_serializer,
                 partition = m_partitions[partition_index],
@@ -180,37 +181,34 @@ void MofkaConsumer::recvBatch(const tl::request& req,
             auto eventID = startID + i;
             try {
                 // deserialize its metadata
-                auto metadata = Metadata{};
-                BufferWrapperInputArchive metadata_archive{
+                auto metadata = diaspora::Metadata{};
+                diaspora::BufferWrapperInputArchive metadata_archive{
                     std::string_view{
                         batch->m_meta_buffer.data() + metadata_offset,
                         batch->m_meta_sizes[i]}};
                 serializer.deserialize(metadata_archive, metadata);
                 // deserialize the data descriptors
-                DataDescriptor descriptor;
+                diaspora::DataDescriptor descriptor;
                 if(batch->m_data_desc_sizes[i] > 0) {
-                    BufferWrapperInputArchive descriptors_archive{
+                    diaspora::BufferWrapperInputArchive descriptors_archive{
                         std::string_view{
                             batch->m_data_desc_buffer.data() + data_desc_offset,
-                                batch->m_data_desc_sizes[i]}};
+                            batch->m_data_desc_sizes[i]}};
                     descriptor.load(descriptors_archive);
-                } else {
-                    descriptor = DataDescriptor::Null();
                 }
                 // request Data associated with the event
                 auto data = requestData(
                     partition, metadata,
                     descriptor);
                 // create the event
-                auto event = Event{
-                    std::make_shared<MofkaEvent>(
+                auto event = std::make_shared<MofkaEvent>(
                         eventID, partition,
                         std::move(metadata), std::move(data),
                         m_name, m_consumer_ack_event
-                )};
+                );
                 // set the promise
-                promises[i].setValue(std::move(event));
-            } catch(const Exception& ex) {
+                promises[i].setValue(diaspora::Event{std::move(event)});
+            } catch(const diaspora::Exception& ex) {
                 // something bad happened somewhere,
                 // pass the exception to the promise.
                 promises[i].setException(ex);
@@ -219,27 +217,27 @@ void MofkaConsumer::recvBatch(const tl::request& req,
             data_desc_offset += batch->m_data_desc_sizes[i];
         }
     };
-    m_thread_pool.pushWork(std::move(ult));
+    m_thread_pool->pushWork(std::move(ult));
 }
 
-Data MofkaConsumer::requestData(
-        SP<MofkaPartitionInfo> partition,
-        Metadata metadata,
-        const DataDescriptor& descriptor) {
+diaspora::DataView MofkaConsumer::requestData(
+        std::shared_ptr<MofkaPartitionInfo> partition,
+        diaspora::Metadata metadata,
+        const diaspora::DataDescriptor& descriptor) {
 
     // run data selector
-    DataDescriptor requested_descriptor = m_data_selector
+    diaspora::DataDescriptor requested_descriptor = m_data_selector
         ? m_data_selector(metadata, descriptor)
-        : DataDescriptor::Null();
+        : diaspora::DataDescriptor();
 
     // run data broker
-    auto data = m_data_broker
-        ? m_data_broker(metadata, requested_descriptor)
-        : Data{};
+    auto data = m_data_allocator
+        ? m_data_allocator(metadata, requested_descriptor)
+        : diaspora::DataView{};
 
     // check the size of the allocated data
     if(data.size() != requested_descriptor.size()) {
-        throw Exception(
+        throw diaspora::Exception(
                 "DataBroker returned a Data object with a "
                 "size different from the selected DataDescriptor size");
     }
@@ -264,14 +262,14 @@ Data MofkaConsumer::requestData(
     auto& ph  = partition->m_ph;
 
     Result<std::vector<Result<void>>> result = rpc.on(ph)(
-            Cerealized<DataDescriptor>(requested_descriptor),
+            Cerealized<diaspora::DataDescriptor>(requested_descriptor),
             local_bulk_ref);
 
     if(!result.success())
-        throw Exception(result.error());
+        throw diaspora::Exception(result.error());
 
     if(!result.value()[0].success()) {
-        throw Exception(result.value()[0].error());
+        throw diaspora::Exception(result.value()[0].error());
     }
 
     return data;
@@ -282,7 +280,7 @@ void MofkaConsumer::forwardBatchToConsumer(
         intptr_t consumer_ctx,
         size_t target_info_index,
         size_t count,
-        EventID firstID,
+        diaspora::EventID firstID,
         const BulkRef &metadata_sizes,
         const BulkRef &metadata,
         const BulkRef &data_desc_sizes,
@@ -298,7 +296,7 @@ void MofkaConsumer::forwardBatchToConsumer(
         // the consumer from disappearing while the RPC executes.
         std::shared_ptr<MofkaConsumer> consumer_ptr;
         try {
-            consumer_ptr = consumer_impl->shared_from_this();
+            consumer_ptr = consumer_impl->shared_from_this_mofka();
         } catch(const std::exception& ex) {
             Result<void> result;
             result.error() = "Consumer seems to have be destroyed be client";

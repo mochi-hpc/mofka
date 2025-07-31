@@ -43,7 +43,6 @@ jobs:
                  -DENABLE_TESTS=ON \
                  -DENABLE_EXAMPLES=ON \
                  -DENABLE_PYTHON=ON \
-                 -DENABLE_KAFKA=ON \
                  -DCMAKE_BUILD_TYPE=Debug
         make
         ctest --output-on-failure

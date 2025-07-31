@@ -1,5 +1,7 @@
-#include <mofka/MofkaDriver.hpp>
-#include <mofka/TopicHandle.hpp>
+#include <diaspora/Driver.hpp>
+#include "../../src/MofkaDriver.hpp"
+#include <diaspora/Metadata.hpp>
+#include <diaspora/TopicHandle.hpp>
 #include <iostream>
 
 int main(int argc, char** argv) {
@@ -14,78 +16,87 @@ int main(int argc, char** argv) {
 
     try {
 
-        mofka::MofkaDriver driver{group_file, true};
+        diaspora::Metadata options;
+        options.json()["group_file"] = group_file;
+        options.json()["margo"] = nlohmann::json::object();
+        options.json()["margo"]["use_progress_thread"] = true;
+
+        diaspora::Driver driver = diaspora::Driver::New("mofka", options);
 
         // START CREATE TOPIC
-        mofka::Validator validator =
-            mofka::Validator::FromMetadata(
-                "energy_validator:libenergy_validator.so",
-                mofka::Metadata{{{"energy_max", 100}}}
+        diaspora::Validator validator =
+            diaspora::Validator::FromMetadata(
+                diaspora::Metadata{{
+                    {"type","energy_validator:libenergy_validator.so"},
+                    {"energy_max", 100}}}
             );
 
-        mofka::PartitionSelector selector =
-            mofka::PartitionSelector::FromMetadata(
-                "energy_partition_selector:libenergy_partition_selector.so",
-                mofka::Metadata{{{"energy_max", 100}}}
+        diaspora::PartitionSelector selector =
+            diaspora::PartitionSelector::FromMetadata(
+                diaspora::Metadata{{
+                    {"type","energy_partition_selector:libenergy_partition_selector.so"},
+                    {"energy_max", 100}}}
             );
 
-        mofka::Serializer serializer =
-            mofka::Serializer::FromMetadata(
-                "energy_serializer:libenergy_serializer.so",
-                mofka::Metadata{{{"energy_max", 100}}}
+        diaspora::Serializer serializer =
+            diaspora::Serializer::FromMetadata(
+                diaspora::Metadata{{
+                    {"type","energy_serializer:libenergy_serializer.so"},
+                    {"energy_max", 100}}}
             );
 
-        driver.createTopic("collisions", validator, selector, serializer);
+        driver.createTopic("collisions", diaspora::Metadata{}, validator, selector, serializer);
         // END CREATE TOPIC
 
         // START ADD PARTITION
+        auto& diaspora_driver = driver.as<mofka::MofkaDriver>();
         // add an in-memory partition
-        driver.addMemoryPartition("collisions", 0);
+        diaspora_driver.addMemoryPartition("collisions", 0);
         // add a default partition (all arguments specified)
-        driver.addDefaultPartition(
+        diaspora_driver.addDefaultPartition(
                 "collisions", 0,
                 "my_metadata_provider@local",
                 "my_data_provider@local",
                 {}, "__primary__");
         // add a default partition (discover providers automatically)
-        driver.addDefaultPartition("collisions", 0);
+        diaspora_driver.addDefaultPartition("collisions", 0);
         // END ADD PARTITION
 
         // START ADD PROVIDERS
         // add a metadata provider
-        auto metadata_config = mofka::Metadata{R"({
+        auto metadata_config = diaspora::Metadata{R"({
             "database": {
                 "type": "log",
                 "config": {
-                    "path": "/tmp/mofka-log",
+                    "path": "/tmp/diaspora-log",
                     "create_if_missing": true
                 }
             }
         })"};
-        auto metadata_provider = driver.addDefaultMetadataProvider(0, metadata_config);
+        auto metadata_provider = diaspora_driver.addDefaultMetadataProvider(0, metadata_config);
         // add a data provider
-        auto data_config = mofka::Metadata{R"({
+        auto data_config = diaspora::Metadata{R"({
             "target": {
                 "type": "abtio",
                 "config": {
-                    "path": "/tmp/mofka-data",
+                    "path": "/tmp/diaspora-data",
                     "create_if_missing": true
                 }
             }
         })"};
-        auto data_provider = driver.addDefaultDataProvider(0, data_config);
+        auto data_provider = diaspora_driver.addDefaultDataProvider(0, data_config);
         // create a partition that uses these providers
-        driver.addDefaultPartition("collisions", 0, metadata_provider, data_provider);
+        diaspora_driver.addDefaultPartition("collisions", 0, metadata_provider, data_provider);
         // END ADD PROVIDERS
         {
         // START PRODUCER
-        mofka::TopicHandle topic = driver.openTopic("collisions");
+        diaspora::TopicHandle topic = driver.openTopic("collisions");
 
-        mofka::ThreadPool thread_pool{mofka::ThreadCount{4}};
-        mofka::BatchSize  batch_size = mofka::BatchSize::Adaptive();
-        mofka::Ordering   ordering = mofka::Ordering::Loose; // or Strict
+        diaspora::ThreadPool thread_pool = driver.makeThreadPool(diaspora::ThreadCount{4});
+        diaspora::BatchSize  batch_size = diaspora::BatchSize::Adaptive();
+        diaspora::Ordering   ordering = diaspora::Ordering::Loose; // or Strict
 
-        mofka::Producer producer = topic.producer(
+        diaspora::Producer producer = topic.producer(
                 "app1", thread_pool, batch_size, ordering);
         // END PRODUCER
 
@@ -93,30 +104,30 @@ int main(int argc, char** argv) {
         std::vector<char> segment1 = { 'a', 'b', 'c', 'd' };
 
         // expose 1 segment using its pointer and size
-        mofka::Data data1{segment1.data(), segment1.size()};
+        diaspora::DataView data1{segment1.data(), segment1.size()};
 
         std::vector<char> segment2 = { 'e', 'f' };
 
-        // expose 2 non-contiguous segments using mofka::Data::Segment
-        mofka::Data data2{{
-            mofka::Data::Segment{segment1.data(), segment1.size()},
-            mofka::Data::Segment{segment2.data(), segment2.size()}
+        // expose 2 non-contiguous segments using diaspora::Data::Segment
+        diaspora::DataView data2{{
+            diaspora::DataView::Segment{segment1.data(), segment1.size()},
+            diaspora::DataView::Segment{segment2.data(), segment2.size()}
         }};
-        mofka::Metadata metadata1{R"({"energy": 42})"};
+        diaspora::Metadata metadata1{R"({"energy": 42})"};
 
         using json = nlohmann::json;
         auto md = json::object();
         md["energy"] = 42;
-        mofka::Metadata metadata2{md};
+        diaspora::Metadata metadata2{md};
         // END EVENT
 
         // START PRODUCE EVENT
-        mofka::Future<mofka::EventID> future = producer.push(metadata1, data1);
+        diaspora::Future<diaspora::EventID> future = producer.push(metadata1, data1);
         future.completed(); // returns true if the future has completed
 
         producer.push(metadata2, data2);
 
-        mofka::EventID event_id_1 = future.wait();
+        diaspora::EventID event_id_1 = future.wait();
 
         producer.flush();
         // END PRODUCE EVENT
@@ -124,33 +135,34 @@ int main(int argc, char** argv) {
 
         {
         // START CONSUMER
-        mofka::TopicHandle topic = driver.openTopic("collisions");
-        mofka::BatchSize  batch_size = mofka::BatchSize::Adaptive();
-        mofka::ThreadPool thread_pool{mofka::ThreadCount{4}};
-        mofka::DataSelector data_selector =
-            [](const mofka::Metadata& md, const mofka::DataDescriptor& dd) -> mofka::DataDescriptor {
+        diaspora::TopicHandle topic = driver.openTopic("collisions");
+        diaspora::BatchSize  batch_size = diaspora::BatchSize::Adaptive();
+        diaspora::ThreadPool thread_pool = driver.defaultThreadPool();
+        diaspora::DataSelector data_selector =
+            [](const diaspora::Metadata& md, const diaspora::DataDescriptor& dd) -> diaspora::DataDescriptor {
                 if(md.json()["energy"] > 20) {
                     return dd;
                 } else {
-                    return mofka::DataDescriptor::Null();
+                    return diaspora::DataDescriptor{};
                 }
             };
-        mofka::DataBroker data_broker =
-            [](const mofka::Metadata& md, const mofka::DataDescriptor& dd) -> mofka::Data {
+        diaspora::DataAllocator data_allocator =
+            [](const diaspora::Metadata& md, const diaspora::DataDescriptor& dd) -> diaspora::DataView {
+                (void)md;
                 char* ptr = new char[dd.size()];
-                return mofka::Data{ptr, dd.size()};
+                return diaspora::DataView{ptr, dd.size()};
             };
-        mofka::Consumer consumer = topic.consumer(
-            "app2", thread_pool, batch_size, data_selector, data_broker);
+        diaspora::Consumer consumer = topic.consumer(
+            "app2", thread_pool, batch_size, data_selector, data_allocator);
         // END CONSUMER
         // START CONSUME EVENTS
-        mofka::Future<mofka::Event> future = consumer.pull();
+        diaspora::Future<diaspora::Event> future = consumer.pull();
         future.completed(); // returns true if the future has completed
 
-        mofka::Event event        = future.wait();
-        mofka::Data data          = event.data();
-        mofka::Metadata metadata  = event.metadata();
-        mofka::EventID event_id   = event.id();
+        diaspora::Event event        = future.wait();
+        diaspora::DataView data      = event.data();
+        diaspora::Metadata metadata  = event.metadata();
+        diaspora::EventID event_id   = event.id();
 
         event.acknowledge();
 
@@ -158,7 +170,7 @@ int main(int argc, char** argv) {
         // END CONSUME EVENTS
         }
 
-    } catch(const mofka::Exception& ex) {
+    } catch(const diaspora::Exception& ex) {
         std::cerr << ex.what() << std::endl;
     }
 

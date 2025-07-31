@@ -1,13 +1,12 @@
-#include <mofka/MofkaDriver.hpp>
-#include <mofka/TopicHandle.hpp>
+#include <diaspora/Driver.hpp>
+#include "../src/MofkaDriver.hpp"
+#include <diaspora/TopicHandle.hpp>
 #include <tclap/CmdLine.h>
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
 #include <time.h>
 #include <string>
 #include <iostream>
-
-namespace tl = thallium;
 
 static std::string g_backend_type = "memory";
 static std::string g_group_file;
@@ -20,29 +19,32 @@ int main(int argc, char** argv) {
     parse_command_line(argc, argv);
     spdlog::set_level(spdlog::level::from_str(g_log_level));
 
-    tl::engine engine(g_protocol, THALLIUM_SERVER_MODE);
-
     try {
 
+        diaspora::Metadata options;
+        options.json()["group_file"] = g_group_file;
+        options.json()["margo"] = nlohmann::json::object();
+        options.json()["margo"]["use_progress_thread"] = true;
+
         // -- Create MofkaDriver
-        mofka::MofkaDriver driver{g_group_file, engine};
+        diaspora::Driver driver = diaspora::Driver::New("mofka", options);
 
         // -- Create a topic
         // We provide a default validator, selector, and serializer as example for the API.
-        mofka::Validator         validator;
-        mofka::Serializer        serializer;
-        mofka::PartitionSelector selector;
-        driver.createTopic("mytopic", validator, selector, serializer);
+        diaspora::Validator         validator;
+        diaspora::Serializer        serializer;
+        diaspora::PartitionSelector selector;
+        driver.createTopic("mytopic", diaspora::Metadata{}, validator, selector, serializer);
 
-        driver.addDefaultPartition("mytopic", 0);
+        driver.as<mofka::MofkaDriver>().addDefaultPartition("mytopic", 0);
 
-        mofka::TopicHandle topic = driver.openTopic("mytopic");
+        diaspora::TopicHandle topic = driver.openTopic("mytopic");
 
         // -- Get a producer for the topic
-        mofka::BatchSize   batchSize   = mofka::BatchSize::Adaptive();
-        mofka::ThreadCount threadCount = mofka::ThreadCount{1};
-        mofka::Ordering    ordering    = mofka::Ordering::Strict;
-        mofka::Producer    producer    = topic.producer("myproducer", batchSize, threadCount, ordering);
+        diaspora::BatchSize   batchSize   = diaspora::BatchSize::Adaptive();
+        diaspora::ThreadCount threadCount = diaspora::ThreadCount{1};
+        diaspora::Ordering    ordering    = diaspora::Ordering::Strict;
+        diaspora::Producer    producer    = topic.producer("myproducer", batchSize, threadCount, ordering);
 
         srand(time(nullptr));
 
@@ -53,8 +55,8 @@ int main(int argc, char** argv) {
         // -- Produce events
         for(size_t i=0; i < 1000; ++i) {
             auto j = rand() % 100;
-            mofka::Metadata metadata = fmt::format("{{\"id\": {}, \"value\": {}}}", i, j);
-            mofka::Data data{buffer.data() + i*8, 8};
+            diaspora::Metadata metadata = fmt::format("{{\"id\": {}, \"value\": {}}}", i, j);
+            diaspora::DataView data{buffer.data() + i*8, 8};
             spdlog::info("Sending event {} with metadata {} and data {}",
                          i, metadata.string(), std::string_view{buffer.data() + i*8, 8});
             auto future = producer.push(metadata, data);
@@ -66,14 +68,12 @@ int main(int argc, char** argv) {
         // -- Signal the clients that no more events are to be expected on this topic.
         topic.markAsComplete();
 
-    } catch(const mofka::Exception& ex) {
+    } catch(const diaspora::Exception& ex) {
         spdlog::critical("{}", ex.what());
         exit(-1);
     }
 
     spdlog::info("Done!");
-
-    engine.finalize();
 
     return 0;
 }

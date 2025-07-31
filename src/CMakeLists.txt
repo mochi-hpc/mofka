@@ -5,34 +5,15 @@ set (server-src-files
      MemoryPartitionManager.cpp)
 
 set (client-src-files
-     Client.cpp
+     MofkaThreadPool.cpp
      MofkaDriver.cpp
      MofkaTopicHandle.cpp
-     Producer.cpp
      BatchProducer.cpp
      MofkaProducer.cpp
-     Consumer.cpp
      MofkaConsumer.cpp
      ConsumerHandle.cpp
-     Data.cpp
-     DataDescriptor.cpp
-     Metadata.cpp
-     Serializer.cpp
-     PartitionSelector.cpp
-     Validator.cpp
-     EventbridgeValidator.cpp
-     ThreadPool.cpp
      PrioPool.cpp
      Logging.cpp)
-
-set (kafka-src-files
-     KafkaDriver.cpp
-     KafkaTopicHandle.cpp
-     KafkaProducer.cpp
-     KafkaBatchProducer.cpp
-     KafkaProducerBatch.cpp
-     KafkaConsumer.cpp
-     KafkaEvent.cpp)
 
 set (module-src-files
      BedrockModule.cpp)
@@ -51,6 +32,7 @@ add_library (mofka-client ${client-src-files})
 add_library (mofka::client ALIAS mofka-client)
 target_link_libraries (mofka-client
     PUBLIC
+    diaspora-stream-api
     thallium
     PkgConfig::uuid
     bedrock::client
@@ -71,32 +53,12 @@ set_target_properties (mofka-client
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
 
-# optional Kafka driver
-if (ENABLE_KAFKA)
-    add_library (mofka-kafka-driver ${kafka-src-files})
-    add_library (mofka::kafka-driver ALIAS mofka-kafka-driver)
-    target_link_libraries (mofka-kafka-driver
-         PUBLIC mofka::client
-         PRIVATE
-             nlohmann_json::nlohmann_json
-             PkgConfig::kafka
-             coverage_config
-             warnings_config)
-    target_include_directories (mofka-kafka-driver PUBLIC $<INSTALL_INTERFACE:include>)
-    target_include_directories (mofka-kafka-driver BEFORE PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-    target_include_directories (mofka-kafka-driver BEFORE PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-    set_target_properties (mofka-kafka-driver
-        PROPERTIES VERSION ${MOFKA_VERSION}
-        SOVERSION ${MOFKA_VERSION_MAJOR})
-endif ()
-
 # server library
 add_library (mofka-server ${server-src-files})
 add_library (mofka::server ALIAS mofka-server)
 target_link_libraries (mofka-server
     PUBLIC
+    diaspora-stream-api
     thallium
     PkgConfig::uuid
     fmt::fmt
@@ -156,17 +118,10 @@ configure_file ("mofka-client.pc.in" "mofka-client.pc" @ONLY)
 configure_file ("Config.h.in" "Config.h" @ONLY)
 
 # "make install" rules
-if (ENABLE_KAFKA)
-install (TARGETS mofka-server mofka-client mofka-bedrock-module mofka-kafka-driver
-         EXPORT mofka-targets
-         ARCHIVE DESTINATION lib
-         LIBRARY DESTINATION lib)
-else ()
 install (TARGETS mofka-server mofka-client mofka-bedrock-module
          EXPORT mofka-targets
          ARCHIVE DESTINATION lib
          LIBRARY DESTINATION lib)
-endif ()
 install (EXPORT mofka-targets
          DESTINATION ${mofka-pkg}
          FILE "mofka-targets.cmake")
