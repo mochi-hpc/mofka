@@ -114,9 +114,6 @@ set (CLIENT_PRIVATE_LIBS "-lmofka-client")
 configure_file ("mofka-server.pc.in" "mofka-server.pc" @ONLY)
 configure_file ("mofka-client.pc.in" "mofka-client.pc" @ONLY)
 
-# configure config.h
-configure_file ("Config.h.in" "Config.h" @ONLY)
-
 # "make install" rules
 install (TARGETS mofka-server mofka-client mofka-bedrock-module
          EXPORT mofka-targets
