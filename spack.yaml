@@ -16,8 +16,6 @@ spack:
   - py-pybind11
   - py-mochi-margo
   - py-configspace
-  - librdkafka
-  - kafka
   - catch2
   concretizer:
     unify: true
