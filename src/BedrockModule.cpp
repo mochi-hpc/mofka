@@ -3,9 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "MofkaClient.hpp"
 #include "Provider.hpp"
-#include "ProviderHandle.hpp"
 
 #include <bedrock/AbstractComponent.hpp>
 
