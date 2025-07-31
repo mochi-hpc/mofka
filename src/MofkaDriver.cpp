@@ -10,8 +10,9 @@
 #include "JsonUtil.hpp"
 #include "MofkaDriver.hpp"
 #include "MofkaTopicHandle.hpp"
-#include "MofkaThreadPool.hpp"
 #include "Logging.hpp"
+
+#include "mofka/MofkaThreadPool.hpp"
 
 #include <bedrock/Client.hpp>
 #include <spdlog/spdlog.h>

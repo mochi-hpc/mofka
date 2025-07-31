@@ -30,8 +30,8 @@ struct ULT {
         ABT_thread_get_arg(other.m_thread, (void**)&other_args);
         if(this_args) this_prio = this_args->priority;
         if(other_args) other_prio = other_args->priority;
-        if(this_prio < other_prio) return false;
-        if(this_prio > other_prio) return true;
+        if(this_prio < other_prio) return true;
+        if(this_prio > other_prio) return false;
         return (intptr_t)m_thread < (intptr_t)other.m_thread;
     }
 };
