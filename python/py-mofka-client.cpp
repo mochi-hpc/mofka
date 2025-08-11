@@ -19,9 +19,10 @@ PYBIND11_MODULE(pymofka_client, m) {
 
     py::class_<mofka::MofkaDriver,
                std::shared_ptr<mofka::MofkaDriver>>(m, "MofkaDriver")
-        .def("__init__", [](const nlohmann::json& options) {
-            return mofka::MofkaDriver::create(diaspora::Metadata{options});
-        })
+        .def(py::init([](const nlohmann::json& options) {
+            return std::dynamic_pointer_cast<mofka::MofkaDriver>(
+                mofka::MofkaDriver::create(diaspora::Metadata{options}));
+        }))
         .def_property_readonly("num_servers", &mofka::MofkaDriver::numServers)
         .def("start_progress_thread", &mofka::MofkaDriver::startProgressThread)
         .def("add_default_partition",
