@@ -17,7 +17,7 @@ using namespace pybind11::literals;
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the MofkaDriver class";
 
-    py::class_<mofka::MofkaDriver,
+    py::class_<mofka::MofkaDriver, diaspora::DriverInterface,
                std::shared_ptr<mofka::MofkaDriver>>(m, "MofkaDriver")
         .def(py::init([](const nlohmann::json& options) {
             return std::dynamic_pointer_cast<mofka::MofkaDriver>(

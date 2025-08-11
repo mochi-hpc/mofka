@@ -14,24 +14,28 @@ high-speed HPC networks with the `Mercury <https://mercury-hpc.github.io/>`_
 RPC and RDMA library and a high level of on-node concurrency using
 `Argobots <https://www.argobots.org/>`_.
 
-Mofka provides a C++ and a Python interface. One of its particularities is that it
+Mofka follows the
+`Diaspora Streaming API <https://github.com/diaspora-project/diaspora-stream-api>`_,
+a C++ and Python API for developing streaming systems for HPC. The present documentation
+is as much about the Diaspora Streaming API as it is about Mofka.
+
+One of the particularities of this API is that it
 splits events into two parts: a **data** part, referencing potentially large, raw data,
-which Mofka will try its best not to copy more than necessary (e.g., by relying on
-RDMA to transfer it directly from a client application's memory to a storage device
-on servers) and a **metadata** part, which consists of structured information about
-the data (usually expressed in JSON). Doing so allows Mofka to store each part
-independently, batch metadata together, and allow an event to reference (a subset of)
-the data of another event. This interface is also often more adapted to HPC applications,
-which manipulate large datasets and their metadata.
+and a **metadata** part, which consists of structured information about the data
+(usually expressed in JSON).
+This separation allows the system to optimize independently the data and metadata
+transfers, for instance by relying on zero-copy mechanisms, RDMA, or batching.
+This interface is also often more adapted to HPC applications, which manipulate
+large datasets and their metadata.
 
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   usage/installation
-   usage/quickstart
-   usage/topics
+   usage/installation.rst
+   usage/quickstart.rst
+   usage/topics.rst
    usage/producer.rst
    usage/consumer.rst
    usage/deployment.rst

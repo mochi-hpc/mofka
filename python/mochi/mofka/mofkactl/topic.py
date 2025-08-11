@@ -39,15 +39,15 @@ def create(
         try:
             service.create_topic(
                 name,
-                Validator.from_metadata(
+                validator=Validator.from_metadata(
                     type=validator,
-                    metadata=validator_config),
-                PartitionSelector.from_metadata(
+                    **validator_config),
+                partition_selector=PartitionSelector.from_metadata(
                     type=selector,
-                    metadata=selector_config),
-                Serializer.from_metadata(
+                    **selector_config),
+                serializer=Serializer.from_metadata(
                     type=serializer,
-                    metadata=serializer_config))
+                    **serializer_config))
         except ClientException as err:
             print(f"Error: {err}")
             del service

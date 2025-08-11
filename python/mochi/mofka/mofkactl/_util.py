@@ -30,15 +30,12 @@ class ServiceContext:
             raise typer.Exit(code=-1)
 
     def __enter__(self):
-        self.engine = Engine(self.protocol)
         from ..client import MofkaDriver
-        self.service = MofkaDriver(self.groupfile, self.engine.mid)
+        self.service = MofkaDriver(group_file=self.groupfile)
         return self.service
 
     def __exit__(self, type, value, traceback):
-        del self.service
-        self.engine.finalize()
-
+        pass
 
 def parse_config_from_args(args: List[str], prefix):
     config = {}

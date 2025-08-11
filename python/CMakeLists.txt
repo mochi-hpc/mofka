@@ -5,15 +5,6 @@ pybind11_strip (pymofka_client)
 
 set (PY_MOFKA_TARGETS pymofka_client)
 
-if (ENABLE_KAFKA)
-    add_library (pymofka_kafka MODULE py-mofka-kafka.cpp)
-    target_link_libraries (pymofka_kafka PRIVATE pybind11::module mofka-client mofka-kafka-driver
-                           PRIVATE coverage_config)
-    pybind11_extension (pymofka_kafka)
-    pybind11_strip (pymofka_kafka)
-    list (APPEND PY_MOFKA_TARGETS pymofka_kafka)
-endif ()
-
 set (PY_VERSION ${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR})
 
 configure_file (mofkactl.sh.in ${CMAKE_BINARY_DIR}/bin/mofkactl USE_SOURCE_PERMISSIONS @ONLY)
