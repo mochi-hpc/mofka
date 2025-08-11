@@ -29,7 +29,7 @@ class MofkaComponent : public bedrock::AbstractComponent {
     }
 
     std::string getConfig() override {
-        return m_provider->getConfig().string();
+        return m_provider->getConfig().json().dump();
     }
 
     static std::shared_ptr<bedrock::AbstractComponent>

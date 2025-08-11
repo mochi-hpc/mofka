@@ -27,9 +27,9 @@ set (mofka-pkg "share/cmake/mofka")
 set (mofka-vers "${MOFKA_VERSION_MAJOR}.${MOFKA_VERSION_MINOR}")
 
 # client library
-add_library (mofka-client ${client-src-files})
-add_library (mofka::client ALIAS mofka-client)
-target_link_libraries (mofka-client
+add_library (mofka ${client-src-files})
+add_library (mofka::client ALIAS mofka)
+target_link_libraries (mofka
     PUBLIC
     diaspora-stream-api
     thallium
@@ -43,12 +43,12 @@ target_link_libraries (mofka-client
     fmt::fmt
     coverage_config
     warnings_config)
-target_include_directories (mofka-client PUBLIC $<INSTALL_INTERFACE:include>)
-target_include_directories (mofka-client BEFORE PUBLIC
+target_include_directories (mofka PUBLIC $<INSTALL_INTERFACE:include>)
+target_include_directories (mofka BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories (mofka-client BEFORE PUBLIC
+target_include_directories (mofka BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-set_target_properties (mofka-client
+set_target_properties (mofka
     PROPERTIES VERSION ${MOFKA_VERSION}
     SOVERSION ${MOFKA_VERSION_MAJOR})
 
@@ -63,7 +63,7 @@ target_link_libraries (mofka-server
     fmt::fmt
     nlohmann_json::nlohmann_json
     nlohmann_json_schema_validator::validator
-    mofka-client
+    mofka
     PRIVATE
     warabi-client
     spdlog::spdlog
@@ -81,7 +81,7 @@ set_target_properties (mofka-server
 # bedrock module library
 add_library (mofka-bedrock-module ${module-src-files})
 target_link_libraries (mofka-bedrock-module
-    PUBLIC mofka-server mofka-client bedrock::module-api
+    PUBLIC mofka-server mofka bedrock::module-api
     PRIVATE coverage_config warnings_config)
 target_include_directories (mofka-bedrock-module PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (mofka-bedrock-module BEFORE PUBLIC
@@ -109,12 +109,12 @@ configure_package_config_file (mofka-config.cmake.in
 # some bits for the pkg-config file
 set (DEST_DIR "${CMAKE_INSTALL_PREFIX}")
 set (SERVER_PRIVATE_LIBS "-lmofka-server")
-set (CLIENT_PRIVATE_LIBS "-lmofka-client")
+set (CLIENT_PRIVATE_LIBS "-lmofka")
 configure_file ("mofka-server.pc.in" "mofka-server.pc" @ONLY)
-configure_file ("mofka-client.pc.in" "mofka-client.pc" @ONLY)
+configure_file ("mofka-client.pc.in" "mofka.pc" @ONLY)
 
 # "make install" rules
-install (TARGETS mofka-server mofka-client mofka-bedrock-module
+install (TARGETS mofka-server mofka mofka-bedrock-module
          EXPORT mofka-targets
          ARCHIVE DESTINATION lib
          LIBRARY DESTINATION lib)
@@ -128,5 +128,5 @@ install (DIRECTORY ../include/mofka
          DESTINATION include
          FILES_MATCHING PATTERN "*.hpp")
 install (FILES "${CMAKE_CURRENT_BINARY_DIR}/mofka-server.pc"
-               "${CMAKE_CURRENT_BINARY_DIR}/mofka-client.pc"
+               "${CMAKE_CURRENT_BINARY_DIR}/mofka.pc"
          DESTINATION "lib/pkgconfig/")

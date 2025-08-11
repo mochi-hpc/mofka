@@ -1,5 +1,5 @@
 add_library (pymofka_client MODULE py-mofka-client.cpp)
-target_link_libraries (pymofka_client PRIVATE pybind11::module mofka-client PRIVATE coverage_config)
+target_link_libraries (pymofka_client PRIVATE pybind11::module mofka PRIVATE coverage_config)
 pybind11_extension (pymofka_client)
 pybind11_strip (pymofka_client)
 
