@@ -7,8 +7,8 @@
 #include <catch2/catch_all.hpp>
 #include <bedrock/Server.hpp>
 #include <diaspora/Driver.hpp>
-#include "../../src/MofkaDriver.hpp"
 #include <diaspora/TopicHandle.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include "Configs.hpp"
 #include "Ensure.hpp"
 

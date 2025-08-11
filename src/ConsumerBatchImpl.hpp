@@ -6,11 +6,12 @@
 #ifndef MOFKA_CONSUMER_BATCH_IMPL_H
 #define MOFKA_CONSUMER_BATCH_IMPL_H
 
-#include "BulkRef.hpp"
 #include "Result.hpp"
-#include "Promise.hpp"
-#include "MofkaPartitionInfo.hpp"
-#include "MofkaConsumer.hpp"
+
+#include <mofka/BulkRef.hpp>
+#include <mofka/Promise.hpp>
+#include <mofka/MofkaPartitionInfo.hpp>
+#include <mofka/MofkaConsumer.hpp>
 
 #include <diaspora/EventID.hpp>
 #include <diaspora/Metadata.hpp>

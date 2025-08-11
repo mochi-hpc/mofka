@@ -6,7 +6,7 @@
 #ifndef DEFAULT_TOPIC_MANAGER_HPP
 #define DEFAULT_TOPIC_MANAGER_HPP
 
-#include "UUID.hpp"
+#include <mofka/UUID.hpp>
 #include "PartitionManager.hpp"
 #include "WarabiDataStore.hpp"
 #include "YokanEventStore.hpp"

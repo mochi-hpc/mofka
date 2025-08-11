@@ -1,7 +1,7 @@
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 #define PYBIND11_NO_ASSERT_GIL_HELD_INCREF_DECREF
 
-#include "../src/MofkaDriver.hpp"
+#include <mofka/MofkaDriver.hpp>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>

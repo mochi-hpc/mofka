@@ -6,9 +6,11 @@
 #ifndef MOFKA_CONSUMER_HANDLE_IMPL_H
 #define MOFKA_CONSUMER_HANDLE_IMPL_H
 
-#include "UUID.hpp"
 #include "ConsumerHandle.hpp"
 #include "PartitionManager.hpp"
+
+#include <mofka/UUID.hpp>
+
 #include <thallium.hpp>
 #include <queue>
 

@@ -6,11 +6,12 @@
 #ifndef MOFKA_CONSUMER_IMPL_H
 #define MOFKA_CONSUMER_IMPL_H
 
-#include "MofkaPartitionInfo.hpp"
-#include "MofkaTopicHandle.hpp"
-#include "MofkaDriver.hpp"
-#include "Promise.hpp"
-#include "UUID.hpp"
+#include <mofka/MofkaPartitionInfo.hpp>
+#include <mofka/MofkaTopicHandle.hpp>
+#include <mofka/MofkaDriver.hpp>
+#include <mofka/UUID.hpp>
+#include <mofka/BulkRef.hpp>
+#include <mofka/Promise.hpp>
 
 #include <diaspora/Consumer.hpp>
 

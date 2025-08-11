@@ -1,5 +1,5 @@
+#include <mofka/MofkaDriver.hpp>
 #include <diaspora/Driver.hpp>
-#include "../src/MofkaDriver.hpp"
 #include <diaspora/TopicHandle.hpp>
 #include <tclap/CmdLine.h>
 #include <spdlog/spdlog.h>

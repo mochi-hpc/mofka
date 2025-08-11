@@ -8,7 +8,6 @@ set (client-src-files
      MofkaThreadPool.cpp
      MofkaDriver.cpp
      MofkaTopicHandle.cpp
-     BatchProducer.cpp
      MofkaProducer.cpp
      MofkaConsumer.cpp
      ConsumerHandle.cpp

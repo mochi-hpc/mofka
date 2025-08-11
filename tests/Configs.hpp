@@ -5,7 +5,7 @@
  */
 #include <string>
 #include <cstdio>
-#include "../src/MofkaDriver.hpp"
+#include <mofka/MofkaDriver.hpp>
 
 static inline const char* config = R"(
 {

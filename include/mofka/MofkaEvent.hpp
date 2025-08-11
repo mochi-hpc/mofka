@@ -6,9 +6,9 @@
 #ifndef MOFKA_EVENT_IMPL_H
 #define MOFKA_EVENT_IMPL_H
 
-#include <diaspora/Event.hpp>
+#include <mofka/MofkaPartitionInfo.hpp>
 
-#include "MofkaPartitionInfo.hpp"
+#include <diaspora/Event.hpp>
 
 #include <thallium.hpp>
 #include <thallium/serialization/stl/string.hpp>

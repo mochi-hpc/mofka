@@ -7,8 +7,9 @@
 #define MOFKA_PARTITION_MANAGER_HPP
 
 #include "Result.hpp"
-#include "UUID.hpp"
 #include "ConsumerHandle.hpp"
+
+#include <mofka/UUID.hpp>
 
 #include <diaspora/ForwardDcl.hpp>
 #include <diaspora/Metadata.hpp>

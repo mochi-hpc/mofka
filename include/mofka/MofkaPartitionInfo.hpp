@@ -3,11 +3,11 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_PARTITION_INFO_IMPL_H
-#define MOFKA_PARTITION_INFO_IMPL_H
+#ifndef MOFKA_PARTITION_INFO_H
+#define MOFKA_PARTITION_INFO_H
 
-#include "UUID.hpp"
 #include <diaspora/PartitionSelector.hpp>
+#include <mofka/UUID.hpp>
 #include <thallium.hpp>
 
 namespace mofka {

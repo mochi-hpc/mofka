@@ -8,10 +8,10 @@
 #include <diaspora/TopicHandle.hpp>
 
 #include "JsonUtil.hpp"
-#include "MofkaDriver.hpp"
-#include "MofkaTopicHandle.hpp"
 #include "Logging.hpp"
 
+#include "mofka/MofkaTopicHandle.hpp"
+#include "mofka/MofkaDriver.hpp"
 #include "mofka/MofkaThreadPool.hpp"
 
 #include <bedrock/Client.hpp>
@@ -115,6 +115,7 @@ std::shared_ptr<diaspora::DriverInterface> MofkaDriver::create(const diaspora::M
             auto margo_config_str = margo_config.dump();
             engine = thallium::engine{
                 protocol.c_str(), THALLIUM_SERVER_MODE, margo_config_str.c_str()};
+            MofkaThreadPool::SetDefaultPool(engine.get_progress_pool());
         }
 
         // create the bedrock ServiceGroupHandle

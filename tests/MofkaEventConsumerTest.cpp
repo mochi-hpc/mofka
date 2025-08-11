@@ -6,7 +6,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_all.hpp>
 #include <bedrock/Server.hpp>
-#include "../src/MofkaDriver.hpp"
 #include <diaspora/Driver.hpp>
 #include <diaspora/TopicHandle.hpp>
 #include "Configs.hpp"

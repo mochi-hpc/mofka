@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_TOPIC_HANDLE_IMPL_H
-#define MOFKA_TOPIC_HANDLE_IMPL_H
+#ifndef MOFKA_TOPIC_HANDLE_H
+#define MOFKA_TOPIC_HANDLE_H
 
 #include <diaspora/Producer.hpp>
 #include <diaspora/Ordering.hpp>
@@ -13,8 +13,8 @@
 #include <diaspora/Serializer.hpp>
 #include <diaspora/TopicHandle.hpp>
 
-#include "MofkaPartitionInfo.hpp"
-#include "MofkaProducer.hpp"
+#include <mofka/MofkaPartitionInfo.hpp>
+#include <mofka/MofkaProducer.hpp>
 
 #include <string_view>
 

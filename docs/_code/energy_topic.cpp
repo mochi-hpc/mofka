@@ -1,7 +1,7 @@
 #include <diaspora/Driver.hpp>
-#include "../../src/MofkaDriver.hpp"
 #include <diaspora/Metadata.hpp>
 #include <diaspora/TopicHandle.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <iostream>
 
 int main(int argc, char** argv) {

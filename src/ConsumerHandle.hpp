@@ -6,7 +6,7 @@
 #ifndef MOFKA_CONSUMER_HANDLE_HPP
 #define MOFKA_CONSUMER_HANDLE_HPP
 
-#include "BulkRef.hpp"
+#include <mofka/BulkRef.hpp>
 
 #include <diaspora/ForwardDcl.hpp>
 #include <diaspora/EventID.hpp>

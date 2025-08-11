@@ -8,9 +8,10 @@
 
 #include "JsonUtil.hpp"
 #include "ConsumerHandle.hpp"
-#include "UUID.hpp"
 #include "Result.hpp"
-#include "BulkRef.hpp"
+
+#include <mofka/BulkRef.hpp>
+#include <mofka/UUID.hpp>
 
 #include <diaspora/BatchParams.hpp>
 #include <diaspora/EventID.hpp>

@@ -24,7 +24,7 @@
 #include <memory>
 #include <unordered_set>
 
-#include "MofkaPartitionInfo.hpp"
+#include <mofka/MofkaPartitionInfo.hpp>
 
 namespace mofka {
 

@@ -4,7 +4,9 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "ConsumerHandleImpl.hpp"
-#include "Promise.hpp"
+
+#include <mofka/Promise.hpp>
+
 #include <spdlog/spdlog.h>
 #include <limits>
 

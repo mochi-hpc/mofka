@@ -6,10 +6,11 @@
 #include "Result.hpp"
 #include "JsonUtil.hpp"
 #include "CerealArchiveAdaptor.hpp"
-#include "MofkaEvent.hpp"
-#include "Promise.hpp"
-#include "MofkaConsumer.hpp"
 #include "ConsumerBatchImpl.hpp"
+
+#include <mofka/Promise.hpp>
+#include <mofka/MofkaConsumer.hpp>
+#include <mofka/MofkaEvent.hpp>
 
 #include <diaspora/Consumer.hpp>
 #include <diaspora/Exception.hpp>

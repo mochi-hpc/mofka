@@ -6,10 +6,12 @@
 #ifndef MOFKA_ACTIVE_PRODUCER_BATCH_QUEUE_H
 #define MOFKA_ACTIVE_PRODUCER_BATCH_QUEUE_H
 
-#include <diaspora/DataView.hpp>
+#include "ProducerBatch.hpp"
 
-#include "Promise.hpp"
-#include "ProducerBatchInterface.hpp"
+#include <mofka/Promise.hpp>
+
+#include <diaspora/DataView.hpp>
+#include <diaspora/Future.hpp>
 
 #include <thallium.hpp>
 #include <mutex>
@@ -25,7 +27,7 @@ class ActiveProducerBatchQueue {
 
     public:
 
-    using NewBatchFn = std::function<std::shared_ptr<ProducerBatchInterface>()>;
+    using NewBatchFn = std::function<std::shared_ptr<ProducerBatch>()>;
 
     ActiveProducerBatchQueue(
         NewBatchFn new_batch,
@@ -156,17 +158,15 @@ class ActiveProducerBatchQueue {
     std::shared_ptr<diaspora::ThreadPoolInterface> m_thread_pool;
     diaspora::BatchSize                            m_batch_size;
     diaspora::MaxNumBatches                        m_max_batch;
-    std::queue<
-        std::shared_ptr<
-            ProducerBatchInterface>>    m_batch_queue;
-    //std::list<SP<ProducerBatchInterface>>  m_reusable_batches;
-    thallium::managed<thallium::thread> m_sender_ult;
-    bool                                m_need_stop = false;
-    bool                                m_request_flush = false;
-    std::atomic<bool>                   m_running = false;
-    thallium::mutex                     m_mutex;
-    thallium::condition_variable        m_cv;
-    thallium::eventual<void>            m_terminated;
+    std::queue<std::shared_ptr<ProducerBatch>>     m_batch_queue;
+    //std::list<SP<ProducerBatchInterface>>          m_reusable_batches;
+    thallium::managed<thallium::thread>            m_sender_ult;
+    bool                                           m_need_stop = false;
+    bool                                           m_request_flush = false;
+    std::atomic<bool>                              m_running = false;
+    thallium::mutex                                m_mutex;
+    thallium::condition_variable                   m_cv;
+    thallium::eventual<void>                       m_terminated;
 
 };
 

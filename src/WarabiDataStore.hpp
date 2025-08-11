@@ -7,8 +7,8 @@
 #define MOFKA_WARABI_DATA_STORE_HPP
 
 #include "JsonUtil.hpp"
-#include "BulkRef.hpp"
-#include "Promise.hpp"
+#include <mofka/BulkRef.hpp>
+#include <mofka/Promise.hpp>
 #include "Result.hpp"
 
 #include <diaspora/Metadata.hpp>

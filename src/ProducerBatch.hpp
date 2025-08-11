@@ -3,8 +3,15 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MOFKA_PRODUCER_BATCH_IMPL_H
-#define MOFKA_PRODUCER_BATCH_IMPL_H
+#ifndef MOFKA_PRODUCER_BATCH_H
+#define MOFKA_PRODUCER_BATCH_H
+
+#include "Result.hpp"
+
+#include <mofka/MofkaPartitionInfo.hpp>
+#include <mofka/MofkaProducer.hpp>
+#include <mofka/Promise.hpp>
+#include <mofka/BulkRef.hpp>
 
 #include <diaspora/EventID.hpp>
 #include <diaspora/Metadata.hpp>
@@ -14,13 +21,6 @@
 #include <diaspora/Future.hpp>
 #include <diaspora/Producer.hpp>
 #include <diaspora/BufferWrapperArchive.hpp>
-
-#include "MofkaPartitionInfo.hpp"
-#include "MofkaProducer.hpp"
-#include "Promise.hpp"
-#include "ProducerBatchInterface.hpp"
-#include "BulkRef.hpp"
-#include "Result.hpp"
 
 #include <thallium.hpp>
 #include <fmt/format.h>
@@ -33,7 +33,7 @@ namespace mofka {
 
 namespace tl = thallium;
 
-class MofkaProducerBatch : public ProducerBatchInterface {
+class ProducerBatch {
 
     struct Entry {
         diaspora::Metadata         metadata;
@@ -59,7 +59,7 @@ class MofkaProducerBatch : public ProducerBatchInterface {
 
     public:
 
-    MofkaProducerBatch(
+    ProducerBatch(
         std::string producer_name,
         thallium::engine engine,
         diaspora::Serializer serializer,
@@ -74,11 +74,11 @@ class MofkaProducerBatch : public ProducerBatchInterface {
 
     void push(diaspora::Metadata metadata,
               diaspora::DataView data,
-              Promise<diaspora::EventID> promise) override {
+              Promise<diaspora::EventID> promise) {
         m_entries.push_back({std::move(metadata), std::move(data), std::move(promise)});
     }
 
-    void send() override {
+    void send() {
 
         m_meta_sizes.reserve(count());
         bool first_entry = true;
@@ -138,7 +138,7 @@ class MofkaProducerBatch : public ProducerBatchInterface {
         m_data_segments.clear();
     }
 
-    size_t count() const override {
+    size_t count() const {
         return m_entries.size();
     }
 

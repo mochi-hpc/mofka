@@ -8,7 +8,6 @@
 #include <bedrock/Server.hpp>
 #include <diaspora/Driver.hpp>
 #include <diaspora/TopicHandle.hpp>
-#include "../src/MofkaDriver.hpp"
 #include "Configs.hpp"
 #include "Ensure.hpp"
 

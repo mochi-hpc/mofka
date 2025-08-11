@@ -3,14 +3,15 @@
  *
  * See COPYRIGHT in top-level directory.
  */
+#include "Result.hpp"
+
+#include <mofka/MofkaTopicHandle.hpp>
+#include <mofka/MofkaProducer.hpp>
+#include <mofka/MofkaConsumer.hpp>
+#include <mofka/MofkaDriver.hpp>
+
 #include <diaspora/TopicHandle.hpp>
 #include <diaspora/Exception.hpp>
-
-#include "Result.hpp"
-#include "MofkaTopicHandle.hpp"
-#include "MofkaProducer.hpp"
-#include "MofkaConsumer.hpp"
-#include "MofkaDriver.hpp"
 
 #include <thallium/serialization/stl/string.hpp>
 #include <thallium/serialization/stl/pair.hpp>
@@ -25,8 +26,12 @@ std::shared_ptr<diaspora::ProducerInterface> MofkaTopicHandle::makeProducer(
         std::shared_ptr<diaspora::ThreadPoolInterface> thread_pool,
         diaspora::Metadata options) {
     (void)options;
+    if(!thread_pool) thread_pool = m_driver->makeThreadPool(diaspora::ThreadCount{0});
+    auto mofka_thread_pool = std::dynamic_pointer_cast<MofkaThreadPool>(thread_pool);
+    if(!mofka_thread_pool)
+        throw diaspora::Exception{"ThreadPool should be an instance of MofkaThreadPool"};
     return std::make_shared<MofkaProducer>(
-        m_engine, name, batch_size, max_batch, ordering, std::move(thread_pool),
+        m_engine, name, batch_size, max_batch, ordering, std::move(mofka_thread_pool),
         shared_from_this());
 }
 
@@ -40,6 +45,10 @@ std::shared_ptr<diaspora::ConsumerInterface> MofkaTopicHandle::makeConsumer(
         const std::vector<size_t>& targets,
         diaspora::Metadata options) {
     (void)options;
+    if(!thread_pool) thread_pool = m_driver->makeThreadPool(diaspora::ThreadCount{0});
+    auto mofka_thread_pool = std::dynamic_pointer_cast<MofkaThreadPool>(thread_pool);
+    if(!mofka_thread_pool)
+        throw diaspora::Exception{"ThreadPool should be an instance of MofkaThreadPool"};
     std::vector<std::shared_ptr<MofkaPartitionInfo>> partitions;
     if(targets.empty()) {
         partitions = m_partitions;
@@ -54,7 +63,7 @@ std::shared_ptr<diaspora::ConsumerInterface> MofkaTopicHandle::makeConsumer(
     }
     auto consumer = std::make_shared<MofkaConsumer>(
             m_engine, name, batch_size, max_batch,
-            std::move(thread_pool), data_allocator, data_selector,
+            std::move(mofka_thread_pool), data_allocator, data_selector,
             shared_from_this(),
             std::move(partitions));
     consumer->subscribe();
