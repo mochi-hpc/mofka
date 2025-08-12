@@ -2,11 +2,17 @@ import sys
 import json
 import pymargo.core
 from pymargo.core import Engine
-from mochi.mofka.client import MofkaDriver
+from diaspora_stream.api import Driver
 
 
 def consume(group_file: str, topic_name: str):
-    driver = MofkaDriver(group_file, use_progress_thread=True)
+    options = {
+        "group_file": group_file,
+        "margo": {
+            "use_progress_thread": True
+        }
+    }
+    driver = Driver.new("mofka", options)
     topic = driver.open_topic(topic_name)
     consumer = topic.consumer(name="myconsumer")
 

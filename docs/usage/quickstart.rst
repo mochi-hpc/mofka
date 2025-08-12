@@ -6,7 +6,7 @@ like Kafka or any other streaming service, it is *defined by a composition
 of specific building blocks*. The advantage of this approach is that Mofka
 is infinitely more modular than other services. You can change nearly everything
 about it, from the implementation of its databases, down to how they share
-resources such as hardware threads and I/O devices, ensuring that you can
+resources such as hardware threads and storage devices, ensuring that you can
 configure it to maximize performance on each individual platform and for
 each individual use case. The downside of this approach, however, is that
 you will need more knowledge about Mochi than you would need about the inner
@@ -99,13 +99,16 @@ The sections hereafter show how to use both the C++ and Python interface to prod
 Simple producer application
 ---------------------------
 
-The following code examplified a producer.
-We first create a :code:`MofkaDriver` object  using the file
-created by our running Mofka server (*mofka.json*) as first argument.
+The following code examplifies a producer.
+We first create a :code:`Driver` object, passing it some options including the file
+created by our running Mofka server (*mofka.json*). Note that we are using the Diaspora
+API. The first argument passed to :code:`Driver::New`, "mofka", tells it to load the
+Mofka driver implementation (it will automatically search for *libmofka.so* in :code:`LD_LIBRARY_PATH`).
 
 .. note::
 
-   The second argument here specifies that the network progress loop
+   The "margo" section of the options here specifies what to pass to the underlying
+   Margo runtime. Here it specifies that the network progress loop
    should run in its own thread. This is a recommended setting since
    Mofka's API encourages non-blocking calls.
 
@@ -114,15 +117,16 @@ We then open the topic we have created, using :code:`driver.openTopic()`
 to interact with the topic.
 
 We create a :code:`Producer` using :code:`topic.producer()`, and we use
-it in a loop to create 100 events with their :code:`Metadata` and :code:`Data`
+it in a loop to create 100 events with their :code:`Metadata` and :code:`DataView`
 parts (we always send the same metadata here and we don't provide any data).
-In Python, the metadata part can be either a :code:`str`, or a a :code:`dict`
-convertible to JSON, and the data part can be anything that satisfies the buffer protocol.
+In Python, the metadata part can be either a :code:`str`, or a :code:`dict`
+convertible to JSON, and the data part can be anything that satisfies the buffer protocol,
+or a list of objects that satisfy the buffer protocol.
 
 The :code:`push()` function is non-blocking. It returns a future object that callers
 can wait on to obtain the event ID after the event has been stored. The call to :code:`wait()`
 in the code bellow is however commented: a better practice consists of periodically flushing
-the producer by calling :code:`producer.flush()`, or at least wait on futures as later as possible
+the producer by calling :code:`producer.flush()`, or at least wait on futures as late as possible
 so as to overlap the sending of the event with actual work from the application.
 
 .. important::
