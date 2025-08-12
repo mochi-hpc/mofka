@@ -172,6 +172,7 @@ int main(int argc, char** argv) {
 
     } catch(const diaspora::Exception& ex) {
         std::cerr << ex.what() << std::endl;
+        exit(-1);
     }
 
     return 0;

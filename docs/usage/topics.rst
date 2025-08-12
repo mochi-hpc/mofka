@@ -224,7 +224,9 @@ We can now add a partition that uses these providers.
          :dedent: 8
 
       Adding a partition is done via the :code:`MofkaDriver` instance by calling
-      :code:`addMemoryPartition()` or :code:`addDefaultPartition()`. These functions
+      :code:`addMemoryPartition()` or :code:`addDefaultPartition()`. We first need to cast
+      our Diaspora Driver into a MofkaDriver using :code:`as<mofka::MofkaDriver>()`. The
+      :code:`addMemoryPartition()` and :code:`addDefaultPartition()` functions
       take at least two arguments: the topic name, and the rank of the server in which
       to add the partition. Servers are numbered contiguously from :code:`0` to :code:`N-1`
       where `N` can be obtained by calling :code:`sh.numServers()`.
@@ -241,7 +243,9 @@ We can now add a partition that uses these providers.
          :dedent: 4
 
       Adding a partition is done via the :code:`MofkaDriver` instance by calling
-      :code:`add_memory_partition()` or :code:`add_default_partition()`. These functions
+      :code:`add_memory_partition()` or :code:`add_default_partition()`. Note that to have
+      access to these methods, we are instantiating a :code:`MofkaDriver` directly
+      instead of calling :code:`Driver.new` from the Diaspora API. These functions
       take at least two arguments: the topic name, and the rank of the server in which
       to add the partition. Servers are numbered contiguously from :code:`0` to :code:`N-1`
       where `N` can be obtained by calling :code:`service.num_servers`.

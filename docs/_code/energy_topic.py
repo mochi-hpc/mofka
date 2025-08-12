@@ -5,22 +5,28 @@ from mochi.mofka.client import MofkaDriver
 
 
 def main(group_file: str):
-    driver = MofkaDriver(group_file, use_progress_thread=True)
+    options = {
+        "group_file": group_file,
+        "margo": {
+            "use_progress_thread": True
+        }
+    }
+    driver = MofkaDriver(**options)
 
     # START CREATE TOPIC
-    from mochi.mofka.client import Validator, PartitionSelector, Serializer
+    from diaspora_stream.api import Validator, PartitionSelector, Serializer
 
     validator = Validator.from_metadata(
-        "energy_validator:libenergy_validator.so", {"energy_max": 100})
+        type="energy_validator:libenergy_validator.so", energy_max=100)
     selector = PartitionSelector.from_metadata(
-        "energy_partition_selector:libenergy_partition_selector.so", {"energy_max": 100})
+        type="energy_partition_selector:libenergy_partition_selector.so", energy_max=100)
     serializer = Serializer.from_metadata(
-        "energy_serializer:libenergy_serializer.so", {"energy_max": 100})
+        type="energy_serializer:libenergy_serializer.so", energy_max=100)
 
     driver.create_topic(
-        topic_name="collisions",
+        name="collisions",
         validator=validator,
-        selector=selector,
+        partition_selector=selector,
         serializer=serializer)
     # END CREATE TOPIC
 
@@ -69,7 +75,7 @@ def main(group_file: str):
     from mochi.mofka.client import ThreadPool, AdaptiveBatchSize, Ordering
 
     topic = driver.open_topic("collisions")
-    thread_pool = ThreadPool(4)
+    thread_pool = driver.make_thread_pool(4)
     batch_size = AdaptiveBatchSize # or an integer > 0
     ordering = Ordering.Strict # or Ordering.Loose
 
@@ -104,7 +110,7 @@ def main(group_file: str):
     from mochi.mofka.client import ThreadPool, AdaptiveBatchSize, DataDescriptor
 
     batch_size = AdaptiveBatchSize
-    thread_pool = ThreadPool(0)
+    thread_pool = driver.make_thread_pool(0)
 
     def data_selector(metadata, descriptor):
         if metadata["energy"] > 20:
@@ -112,7 +118,7 @@ def main(group_file: str):
         else:
             return None
 
-    def data_broker(metadata, descriptor):
+    def data_allocator(metadata, descriptor):
         # note that we return a *list* of objects satisfying the buffer protocol
         return [ bytearray(descriptor.size) ]
 
@@ -121,7 +127,7 @@ def main(group_file: str):
         thread_pool=thread_pool,
         batch_size=batch_size,
         data_selector=data_selector,
-        data_broker=data_broker)
+        data_allocator=data_allocator)
     # END CONSUMER
 
     # START CONSUME EVENTS
