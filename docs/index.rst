@@ -42,10 +42,6 @@ large datasets and their metadata.
    usage/restarting.rst
    usage/benchmarking.rst
 
-   ..
-     usage/kafka.rst
-
-
 
 Indices and tables
 ==================
