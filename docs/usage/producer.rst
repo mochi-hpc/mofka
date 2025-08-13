@@ -8,19 +8,11 @@ selector, and serializer on the events it is being passed to validate the event'
 metadata and data, select a destination partition for each event, and serialize
 the event's metadata into batches aimed at the same partition.
 
-.. note::
-
-   In Kafka, only one process can produce to a partition at any given time, limiting
-   the parallelism of a parallel producing application to the number of partitions a
-   topic has, rather than the number of producing processes. Mofka works differently:
-   any process can push events to any partitions. It is up to the user to restrict
-   this usage to one closer to Kafka's if needed.
-
 
 Creating a producer
 -------------------
 
-To obtain a :code:`Producer` instance, one must first instantiate a :code:`MofkaDriver`,
+To obtain a :code:`Producer` instance, one must first instantiate a :code:`Driver`,
 before obtaining a :code:`TopicHandle` by opening a topic. The :code:`TopicHandle`
 can then be used to create a :code:`Producer`, as examplified hereafter.
 
@@ -42,7 +34,7 @@ can then be used to create a :code:`Producer`, as examplified hereafter.
          :end-before: END PRODUCER
          :dedent: 4
 
-A producer can be created with four optional parameters.
+A producer can be created with five optional parameters.
 
 * **Name**: the producer name is not currently used by Mofka but may be in the future,
   it is therefore advised to give your producer a name. If you have a multi-process
@@ -50,23 +42,26 @@ A producer can be created with four optional parameters.
 
 * **Thread pool**: the producer will run the topic's validator, partition selector, and
   serializer in user-level threads pushed into a thread pool. The thread pool is backed
-  by a number of hardware threads (here 4). By default, a thread pool with 1 hardware
-  thread will be created by the producer if not provided. It is also possible to initialize
-  a :code:`ThreadPool` with 0 hardware thread. In this case, the producer will run its tasks
-  and send RPCs whenever the user code blocks on a Mofka Future.
+  by a number of hardware threads. If not specified, the default thread pool of the
+  driver will be used, which corresponds to a pool tied to the main thread of the application.
 
 * **Batch size**: the batch size is the number of events to batch together before the batch
-  is sent to the target partition. :code:`mofka::BatchSize::Adaptive()` (:code:`AdaptiveBatchSize`
+  is sent to the target partition. :code:`diaspora::BatchSize::Adaptive()` (:code:`AdaptiveBatchSize`
   in Python) can be used to tell the producer to adapt the batch size at run time: the
   producer will aim to send batches as soon as possible but will increase the batch size
   if the server is not responding fast enough.
 
-* **Ordering**: because the producer runs the validator, partition selector, and serializer
+* **Maximum batches***: this parameter controls the maximum number of batches that can
+  be pending on the client before :code:`push` calls start blocking. By default this number
+  is 2 (i.e., one batch is being sent while the next one is being filled through :code:`push`
+  calls). Increasing this number may be useful in bursty applications.
+
+* **Ordering**: because the producer may run the validator, partition selector, and serializer
   in user-level threads posted to the thread pool, one could imagine an application posting
   event A then event B, but event A takes more time being validated than event B and event B
-  ends up in the batch before event A. :code:`mofka::Ordering::Loose` (:code:`Ordering.Loose`
+  ends up in the batch before event A. :code:`diaspora::Ordering::Loose` (:code:`Ordering.Loose`
   in Python) allows this behavior.
-  :code:`mofka::Ordering::Strict` (:code:`Ordering.Strict`) forces events that target the
+  :code:`diaspora::Ordering::Strict` (:code:`Ordering.Strict`) forces events that target the
   same batch to be added to the batch in the same order they were produced by the application.
   This constraint may limit parallelism opportunities in the producer and should be used only
   if necessary.
@@ -75,8 +70,8 @@ A producer can be created with four optional parameters.
 .. note::
 
    As of Mofka 0.4.0, the thread pool of a producer will only run one task that operates
-   the serialization events into batches and the sending of these batches. A recommended
-   practice is therefore to initialize a ThreadPool with 1 thread.
+   the serialization of events into batches and the sending of these batches. A recommended
+   practice is therefore to create a :code:`ThreadPool` with 1 thread.
 
 
 Producing events
@@ -114,14 +109,14 @@ The code bellow shows how to create the data and metadata pieces of an event.
          :end-before: END EVENT
          :dedent: 8
 
-      The first :code:`mofka::Data data1` object is a view of a single contiguous
+      The first :code:`diaspora::DataView data1` object is a view of a single contiguous
       segment of memory underlying the :code:`segment1` vector. The second
-      :code:`Data data2` object is a view of two non-contiguous segments.
+      :code:`diaspora::DataView data2` object is a view of two non-contiguous segments.
 
-      The first :code:`mofka::Metadata` object, :code:`metadata1`, is created from a
+      The first :code:`diaspora::Metadata` object, :code:`metadata1`, is created from a
       raw string representing a JSON object with and "energy" field. The second :code:`Metadata`
       object contains the same information but is initialized using an :code:`nlohmann::json`
-      instance, which is the library used by Mofka to manage JSON data in C++.
+      instance, which is the library used by Mofka/Diaspora to manage JSON data in C++.
 
    .. group-tab:: Python
 
@@ -145,7 +140,7 @@ The code bellow shows how to create the data and metadata pieces of an event.
 
 .. important::
 
-   In C++, a :code:`mofka::Data` object is a **non-owning view** of a potentially
+   In C++, a :code:`diaspora::DataView` object is a **non-owning view** of a potentially
    non-contiguous series of memory segments. You can think of it as a list of
    :code:`std::span<char>`. This means that (1) you need to make sure that the application
    does not free the memory before it has been transferred, and (2) you need to make sure

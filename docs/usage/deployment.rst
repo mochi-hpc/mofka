@@ -83,7 +83,7 @@ We will use RocksDB as an example. First we need to ensure that RocksDB is avail
 a backend for Yokan. With our Spack environment activated, type :code:`spack find -v mochi-yokan`.
 If :code:`+rocksdb` appears in the returned specification, RocksDB is available. If :code:`~rocksdb`
 appears, we need to re-install Yokan with RocksDB support. Type :code:`spack add mochi-yokan+rocksdb`,
-the :code:`spack concretize -f`, and finally :code:`spack install`.
+then :code:`spack concretize -f`, and finally :code:`spack install`.
 
 The following *master.json* configuration replaces the *map* database with a *rocksdb* database
 stored in */tmp/mofka/master*. First, create the */tmp/mofka* directory, then launch Bedrock
