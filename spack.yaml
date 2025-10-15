@@ -34,7 +34,7 @@ spack:
       - "@0.3.0:"
       - "+python"
       - "+tests"
-      - "+benchmark"
+      - "+benchmarks"
     mochi-margo:
       require:
       - "@0.19.1:"
