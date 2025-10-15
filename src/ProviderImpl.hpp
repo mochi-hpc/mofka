@@ -133,10 +133,15 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Received receiveBatch request (topic: {}, count:{})", id(), m_topic, count);
         Result<diaspora::EventID> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        ENSURE_VALID_PARTITION_MANAGER(result);
-        result = m_partition_manager->receiveBatch(
-            req.get_endpoint(), producer_name, count, metadata, data);
-        spdlog::trace("[mofka:{}] Successfully executed receiveBatch", id());
+        try {
+            ENSURE_VALID_PARTITION_MANAGER(result);
+            result = m_partition_manager->receiveBatch(
+                req.get_endpoint(), producer_name, count, metadata, data);
+        } catch(const diaspora::Exception& ex) {
+            result.error() = ex.what();
+            result.success() = false;
+        }
+        spdlog::trace("[mofka:{}] Done executing receiveBatch", id());
     }
 
     void requestEvents(const tl::request& req,
@@ -154,17 +159,22 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         {
             Result<void> result;
             tl::auto_respond<decltype(result)> ensureResponse(req, result);
-            ENSURE_VALID_PARTITION_MANAGER(result);
-            consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
-                consumer_ctx, partition_index,
-                consumer_name, count, m_partition_manager,
-                req.get_endpoint(),
-                m_consumer_recv_batch);
-            {
-                auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
-                m_consumers.emplace(consumer_key, consumer_handle_impl);
+            try {
+                ENSURE_VALID_PARTITION_MANAGER(result);
+                consumer_handle_impl = std::make_shared<ConsumerHandleImpl>(
+                        consumer_ctx, partition_index,
+                        consumer_name, count, m_partition_manager,
+                        req.get_endpoint(),
+                        m_consumer_recv_batch);
+                {
+                    auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
+                    m_consumers.emplace(consumer_key, consumer_handle_impl);
+                }
+                m_consumers_cv.notify_all();
+            } catch(const diaspora::Exception& ex) {
+                result.error() = ex.what();
+                result.success() = false;
             }
-            m_consumers_cv.notify_all();
         } // response is sent here
 
         m_partition_manager->feedConsumer(consumer_handle_impl, diaspora::BatchSize{batch_size});
@@ -172,7 +182,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
             m_consumers.erase(consumer_key);
         }
-        spdlog::trace("[mofka:{}] Successfully executed requestEvents", id());
+        spdlog::trace("[mofka:{}] Done executing requestEvents", id());
     }
 
     void acknowledge(const tl::request& req,
@@ -182,9 +192,14 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                       id(), m_topic, consumer_name, eventID);
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        ENSURE_VALID_PARTITION_MANAGER(result);
-        result = m_partition_manager->acknowledge(consumer_name, eventID);
-        spdlog::trace("[mofka:{}] Successfully executed acknowledge", id());
+        try {
+            ENSURE_VALID_PARTITION_MANAGER(result);
+            result = m_partition_manager->acknowledge(consumer_name, eventID);
+        } catch(const diaspora::Exception& ex) {
+            result.error() = ex.what();
+            result.success() = false;
+        }
+        spdlog::trace("[mofka:{}] Done executing acknowledge", id());
     }
 
     void removeConsumer(const tl::request& req,
@@ -194,18 +209,23 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
                       id(), m_topic, partition_index);
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
-        std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
-        {
-            auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
-            auto it = m_consumers.find(consumer_key);
-            if(it != m_consumers.end()) {
-                consumer_handle_impl = it->second;
-                m_consumers.erase(it);
+        try {
+            auto consumer_key = ConsumerKey{consumer_ctx, req.get_endpoint(), partition_index};
+            std::shared_ptr<ConsumerHandleImpl> consumer_handle_impl;
+            {
+                auto g = std::unique_lock<tl::mutex>{m_consumers_mtx};
+                auto it = m_consumers.find(consumer_key);
+                if(it != m_consumers.end()) {
+                    consumer_handle_impl = it->second;
+                    m_consumers.erase(it);
+                }
             }
+            if(consumer_handle_impl) consumer_handle_impl->stop();
+        } catch(const diaspora::Exception& ex) {
+            result.error() = ex.what();
+            result.success() = false;
         }
-        if(consumer_handle_impl) consumer_handle_impl->stop();
-        spdlog::trace("[mofka:{}] Successfully executed removeConsumer", id());
+        spdlog::trace("[mofka:{}] Done executing removeConsumer", id());
     }
 
     void requestData(const tl::request& req,
@@ -214,18 +234,28 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Received requestData request (topic: {})", id(), m_topic);
         Result<std::vector<Result<void>>> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        ENSURE_VALID_PARTITION_MANAGER(result);
-        result = m_partition_manager->getData({descriptor.content}, remote_bulk);
-        spdlog::trace("[mofka:{}] Successfully executed requestData", id());
+        try {
+            ENSURE_VALID_PARTITION_MANAGER(result);
+            result = m_partition_manager->getData({descriptor.content}, remote_bulk);
+        } catch(const diaspora::Exception& ex) {
+            result.error() = ex.what();
+            result.success() = false;
+        }
+        spdlog::trace("[mofka:{}] Done executing requestData", id());
     }
 
     void markAsComplete(const tl::request& req) {
         spdlog::trace("[mofka:{}] Received markAsComplete request (topic: {})", id(), m_topic);
         Result<void> result;
         tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        ENSURE_VALID_PARTITION_MANAGER(result);
-        result = m_partition_manager->markAsComplete();
-        spdlog::trace("[mofka:{}] Successfully executed markAsComplete", id());
+        try {
+            ENSURE_VALID_PARTITION_MANAGER(result);
+            result = m_partition_manager->markAsComplete();
+        } catch(const diaspora::Exception& ex) {
+            result.error() = ex.what();
+            result.success() = false;
+        }
+        spdlog::trace("[mofka:{}] Done executing markAsComplete", id());
     }
 
 };

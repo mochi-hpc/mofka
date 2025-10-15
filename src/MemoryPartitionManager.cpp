@@ -217,24 +217,31 @@ Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
         const std::vector<diaspora::DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     Result<std::vector<Result<void>>> result;
+    result.value().resize(descriptors.size());
 
-    if(descriptors.size() != 1) {
-        result.error() = "Expected 1 descriptor";
-        result.success() = false;
-        return result;
+    auto client_address = m_engine.lookup(bulk.address);
+
+    std::vector<std::pair<void*, size_t>> local_segments;
+    std::unique_lock<thallium::mutex> lock{m_events_data_mtx};
+
+    for(auto& desc : descriptors) {
+        OffsetSize event_location;
+        event_location.fromDataDescriptor(desc);
+        auto flat = desc.flatten();
+        for(auto& seg : flat) {
+            local_segments.push_back({
+                m_events_data.data() + event_location.offset + seg.offset,
+                seg.size
+            });
+        }
     }
 
-    result.value().resize(descriptors.size());
-    OffsetSize location;
-    location.fromDataDescriptor(descriptors[0]);
+    auto local_data_bulk = m_engine.expose(local_segments, thallium::bulk_mode::read_only);
+    bulk.handle.on(client_address) << local_data_bulk;
 
-    auto client = m_engine.lookup(bulk.address);
-
-    std::unique_lock<thallium::mutex> lock{m_events_data_mtx};
-    auto local_data_bulk = m_engine.expose(
-        {{m_events_data.data() + location.offset, location.size}},
-        thallium::bulk_mode::read_only);
-    bulk.handle.on(client) << local_data_bulk;
+    // TODO there are a few things that would need to be checked in the above code,
+    // such as whether we are reading outside of an event's boundary, or whether
+    // the remote bulk handle's size matches what is expected.
 
     return result;
 }
