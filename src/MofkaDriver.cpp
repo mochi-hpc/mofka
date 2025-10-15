@@ -74,6 +74,9 @@ std::shared_ptr<diaspora::DriverInterface> MofkaDriver::create(const diaspora::M
 
         std::vector<std::string> server_addresses;
         std::ifstream group_file(group_file_name);
+        if(!group_file.good()) {
+            throw diaspora::Exception{"Could not find or open group file"};
+        }
         nlohmann::json group_file_content;
         group_file >> group_file_content;
         if(!group_file_content.is_object()
@@ -204,6 +207,17 @@ void MofkaDriver::createTopic(
         }
     }
     spdlog::trace("[mofka:client] Successfully create topic {}", name);
+
+    // initialize partitions
+    if(options.json().is_object()
+    && options.json().contains("partitions")
+    && options.json()["partitions"].is_number_unsigned()) {
+        size_t num_partitions = options.json()["partitions"].get<size_t>();
+        auto num_servers = m_bsgh.size();
+        for(size_t i = 0; i < num_partitions; ++i) {
+            addMemoryPartition(name, i % num_servers);
+        }
+    }
 }
 
 std::shared_ptr<diaspora::TopicHandleInterface> MofkaDriver::openTopic(std::string_view name) const {
