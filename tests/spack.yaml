@@ -27,13 +27,16 @@ spack:
       lib: [LD_LIBRARY_PATH]
       lib64: [LD_LIBRARY_PATH]
   packages:
-    all:
-      providers:
-        mpi: [mpich]
     argobots:
       require: "@1.2:"
     catch2:
       require: "@3.6.0:"
+    diaspora-stream-api:
+      require:
+      - "@0.3.0:"
+      - "+python"
+      - "+tests"
+      - "+benchmark"
     mochi-margo:
       require:
       - "@0.19.1:"
@@ -60,6 +63,9 @@ spack:
       - "+bedrock"
       - "+python"
       - "+mpi"
+    mpi:
+      require:
+      - mpich
     mercury:
       require: "~checksum~boostsys"
     libfabric:
