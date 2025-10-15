@@ -6,13 +6,19 @@ $HERE/pre-test.sh
 
 echo "{\"group_file\":\"mofka.json\", \"margo\":{\"use_progress_thread\":true}}" > benchmark_config.json
 
-RET=0
-
 echo "==> Creating topic"
 python -m mochi.mofka.mofkactl topic create my_topic -g mofka.json
+if [ "$?" -ne 0 ]; then
+    $HERE/post-test.sh
+    exit 1
+fi
 
 echo "==> Adding memory partition"
 python -m mochi.mofka.mofkactl partition add my_topic -r 0 -t memory -g mofka.json
+if [ "$?" -ne 0 ]; then
+    $HERE/post-test.sh
+    exit 1
+fi
 
 echo "==> Running producer benchmark"
 diaspora-producer-benchmark -d mofka \
@@ -24,6 +30,10 @@ diaspora-producer-benchmark -d mofka \
                             -b 8 \
                             -f 10 \
                             -p 1
+if [ "$?" -ne 0 ]; then
+    $HERE/post-test.sh
+    exit 1
+fi
 
 echo "==> Running consumer benchmark"
 diaspora-consumer-benchmark -d mofka \
@@ -33,5 +43,9 @@ diaspora-consumer-benchmark -d mofka \
                             -s 0.5 \
                             -i 0.8 \
                             -p 1
+if [ "$?" -ne 0 ]; then
+    $HERE/post-test.sh
+    exit 1
+fi
 
 $HERE/post-test.sh

@@ -45,7 +45,7 @@ jobs:
                  -DENABLE_PYTHON=ON \
                  -DCMAKE_BUILD_TYPE=Debug
         make
-        ctest --output-on-failure
+        ctest -VV --output-on-failure
 
     - name: Send coverage report
       uses: codecov/codecov-action@v3
