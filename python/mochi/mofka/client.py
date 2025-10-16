@@ -1,3 +1,4 @@
+import pydiaspora_stream_api
 from diaspora_stream.api import *
 import pymargo
 import pymofka_client
