@@ -9,7 +9,7 @@ spack:
   - nlohmann-json-schema-validator
   - spdlog
   - fmt
-  - diaspora-stream-api
+  - diaspora-stream-api@main
   - mochi-bedrock
   - mochi-warabi
   - mochi-yokan

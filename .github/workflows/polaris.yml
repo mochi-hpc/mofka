@@ -2,9 +2,9 @@ name: Trigger performance testing on Polaris
 
 on:
   workflow_dispatch: {}
-  push:
-    branches:
-    - main
+#  push:
+#    branches:
+#    - main
 
 jobs:
   polaris:
