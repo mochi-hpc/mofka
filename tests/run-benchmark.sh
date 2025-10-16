@@ -6,6 +6,9 @@ $HERE/pre-test.sh
 
 echo "{\"group_file\":\"mofka.json\", \"margo\":{\"use_progress_thread\":true}}" > benchmark_config.json
 
+echo "PYTHONPATH=$PYTHONPATH"
+echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+
 echo "==> Creating topic"
 python -m mochi.mofka.mofkactl topic create my_topic -g mofka.json
 r="$?"
