@@ -17,6 +17,8 @@ using namespace pybind11::literals;
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the MofkaDriver class";
 
+    py::module_::import("pydiaspora_stream_api");
+
     py::class_<mofka::MofkaDriver, diaspora::DriverInterface,
                std::shared_ptr<mofka::MofkaDriver>>(m, "MofkaDriver")
         .def(py::init([](const nlohmann::json& options) {
