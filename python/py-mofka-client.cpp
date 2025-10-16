@@ -17,10 +17,10 @@ using namespace pybind11::literals;
 PYBIND11_MODULE(pymofka_client, m) {
     m.doc() = "Python binding for the MofkaDriver class";
 
-    py::module_::import("pydiaspora_stream_api");
+    py::object DriverInterface = (py::object) py::module_::import("pydiaspora_stream_api").attr("Driver");
 
-    py::class_<mofka::MofkaDriver, diaspora::DriverInterface,
-               std::shared_ptr<mofka::MofkaDriver>>(m, "MofkaDriver")
+    py::class_<mofka::MofkaDriver,
+               std::shared_ptr<mofka::MofkaDriver>>(m, "MofkaDriver", DriverInterface)
         .def(py::init([](const nlohmann::json& options) {
             return std::dynamic_pointer_cast<mofka::MofkaDriver>(
                 mofka::MofkaDriver::create(diaspora::Metadata{options}));
