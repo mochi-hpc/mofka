@@ -8,3 +8,4 @@
 /docs/_build/
 __pycache__/
 /docs/_env/
+.aider*
