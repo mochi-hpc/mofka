@@ -17,12 +17,12 @@ else
     show_logs=1
 fi
 
-if [ $1 -ne "0" ]; then
+if [ "$1" -ne "0" ]; then
     echo "The test didn't seem to succeed"
     show_logs=1
 fi
 
-if [ $show_logs -ne 0 ]; then
+if [ "$show_logs" -ne 0 ]; then
     echo "Mofka stderr ===================================="
     cat mofka.err
     echo "Mofka stdout ===================================="

@@ -8,15 +8,17 @@ echo "{\"group_file\":\"mofka.json\", \"margo\":{\"use_progress_thread\":true}}"
 
 echo "==> Creating topic"
 python -m mochi.mofka.mofkactl topic create my_topic -g mofka.json
-if [ "$?" -ne 0 ]; then
-    $HERE/post-test.sh
+r="$?"
+if [ "$r" -ne "0" ]; then
+    $HERE/post-test.sh $r
     exit 1
 fi
 
 echo "==> Adding memory partition"
 python -m mochi.mofka.mofkactl partition add my_topic -r 0 -t memory -g mofka.json
-if [ "$?" -ne 0 ]; then
-    $HERE/post-test.sh
+r="$?"
+if [ "$r" -ne "0" ]; then
+    $HERE/post-test.sh $r
     exit 1
 fi
 
@@ -30,8 +32,9 @@ diaspora-producer-benchmark -d mofka \
                             -b 8 \
                             -f 10 \
                             -p 1
-if [ "$?" -ne 0 ]; then
-    $HERE/post-test.sh
+r="$?"
+if [ "$r" -ne "0" ]; then
+    $HERE/post-test.sh $r
     exit 1
 fi
 
@@ -43,9 +46,10 @@ diaspora-consumer-benchmark -d mofka \
                             -s 0.5 \
                             -i 0.8 \
                             -p 1
-if [ "$?" -ne 0 ]; then
-    $HERE/post-test.sh
+r="$?"
+if [ "$r" -ne "0" ]; then
+    $HERE/post-test.sh $r
     exit 1
 fi
 
-$HERE/post-test.sh
+$HERE/post-test.sh 0

@@ -66,6 +66,9 @@ spack:
     mpi:
       require:
       - mpich
+    python:
+      require:
+      - "@3.13.0:"
     mercury:
       require: "~checksum~boostsys"
     libfabric:
