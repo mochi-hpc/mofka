@@ -196,7 +196,7 @@ class BenchmarkTopicPartitionSpec:
         for param in config:
             if not param.startswith(f'{prefix}metadata_provider_weight'):
                 continue
-            match = re.search('metadata_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
+            match = re.search(r'metadata_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
             server = int(match[1])
             index = int(match[2])
             metadata_provider_weights.append((float(config[param]), f'metadata_{index}@{server}'))
@@ -206,7 +206,7 @@ class BenchmarkTopicPartitionSpec:
         for param in config:
             if not param.startswith(f'{prefix}data_provider_weight'):
                 continue
-            match = re.search('data_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
+            match = re.search(r'data_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
             server = int(match[1])
             index = int(match[2])
             data_provider_weights.append((float(config[param]), f'data_{index}@{server}'))
@@ -541,7 +541,7 @@ class BenchmarkSpec:
         for param in cs:
             if not '.metadata_provider_weight' in param:
                   continue
-            match = re.search('metadata_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
+            match = re.search(r'metadata_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
             rank = int(match[1])
             index = int(match[2])
             f = 'main[0]' if rank == 0 else f'secondary[{rank-1}]'
@@ -554,7 +554,7 @@ class BenchmarkSpec:
         for param in cs:
             if not '.data_provider_weight' in param:
                   continue
-            match = re.search('data_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
+            match = re.search(r'data_provider_weight\[([0-9]+)\]\[([0-9]+)\]', param)
             rank = int(match[1])
             index = int(match[2])
             f = 'main[0]' if rank == 0 else f'secondary[{rank-1}]'
