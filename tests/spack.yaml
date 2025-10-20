@@ -68,7 +68,7 @@ spack:
       - mpich
     python:
       require:
-      - "@3.13.0:"
+      - "@3.13.0:3.13.9"
     mercury:
       require: "~checksum~boostsys"
     libfabric:
@@ -77,10 +77,10 @@ spack:
       require: "@2.3.0:"
     py-configspace:
       require: "@1.1.4:"
-  mirrors:
-    mochi-buildcache:
-      url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
-      signed: false
+#  mirrors:
+#    mochi-buildcache:
+#      url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
+#      signed: false
   config:
     install_tree:
       padded_length: 128
