@@ -162,7 +162,7 @@ last acknowledged event. This acknowledgement is done using the
 :code:`Event`'s :code:`acknowledge()` function, which in the example bellow
 is called every 10 events.
 
-:code:`consumer.pull()` is a non-blocking function returning a :code`Future`.
+:code:`consumer.pull()` is a non-blocking function returning a :code:`Future`.
 Waiting for this future with :code:`.wait()` returns an :code:`Event` object
 from which we can retrieve an event ID as well as the event's metadata and data.
 
