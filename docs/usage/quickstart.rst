@@ -65,7 +65,7 @@ Creating a topic and a partition
 --------------------------------
 
 You can now use the :code:`mofkactl` command-line tool to create a topic.
-In a separate terminate, with your Spack environment activated, enter the following command.
+In a separate terminal, with your Spack environment activated, enter the following command.
 
 .. code-block:: bash
 
