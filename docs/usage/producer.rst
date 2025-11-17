@@ -177,7 +177,7 @@ into the producer, as shown in the code bellow.
 
 
 The producer's :code:`push` function takes the metadata and data objects and returns a
-:code:`Future`. Such a future can be tested for completion (:code:`future.completed`) and
+:code:`Future`. Such a future can be tested for completion (:code:`future.completed()`) and
 can be blocked on until it completes (:code:`future.wait()`). The latter method returns the
 event ID of the created event (64-bits unsigned integer).
 It is perfectly OK to drop the future if you do not care to wait for its completion or
