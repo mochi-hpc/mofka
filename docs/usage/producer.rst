@@ -51,7 +51,7 @@ A producer can be created with five optional parameters.
   producer will aim to send batches as soon as possible but will increase the batch size
   if the server is not responding fast enough.
 
-* **Maximum batches***: this parameter controls the maximum number of batches that can
+* **Maximum batches**: this parameter controls the maximum number of batches that can
   be pending on the client before :code:`push` calls start blocking. By default this number
   is 2 (i.e., one batch is being sent while the next one is being filled through :code:`push`
   calls). Increasing this number may be useful in bursty applications.
