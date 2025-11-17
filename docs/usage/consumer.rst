@@ -10,7 +10,7 @@ Creating a consumer
 -------------------
 
 One can obtain a :code:`Consumer` instance from a :code:`TopicHandle` the same way
-as producers, as examplified hereafter.
+as producers, as exemplified hereafter.
 
 .. tabs::
 
