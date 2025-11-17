@@ -181,7 +181,7 @@ The producer's :code:`push` function takes the metadata and data objects and ret
 can be blocked on until it completes (:code:`future.wait()`). The latter method returns the
 event ID of the created event (64-bits unsigned integer).
 It is perfectly OK to drop the future if you do not care to wait for its completion or
-for the resulting event ID, as examplified with the second event. Event IDs are monotonically
+for the resulting event ID, as exemplified with the second event. Event IDs are monotonically
 increasing and are per-partition, so two events stored in distinct partitions can end up with the same ID.
 
 Calling :code:`producer.flush()` is a blocking call that will force all the pending batches of events
