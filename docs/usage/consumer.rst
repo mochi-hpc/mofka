@@ -36,7 +36,7 @@ A consumer can be created with five parameters, four of which are optional.
 * **Name**: the consumer name is mandatory. Mofka will keep track of the last event
   *acknowledged* by consumers, so that if an application stops and restarts with the
   same consumer name, it will restart consuming events from the last acknowledged event.
-  At present, :code:`Consumer`s with the same name should not pull from the same partition.
+  At present, :code:`Consumers` with the same name should not pull from the same partition.
 
 * **Batch size**: the batch size is the number of events to batch together on the server
   side before the batch is sent to the consumer. :code:`diaspora::BatchSize::Adaptive()`
