@@ -92,7 +92,7 @@ The data part of an event would be the image itself.
 .. note::
 
    As of Mofka 0.4.0, the metadata part does not have to be JSON-formatted. A raw string
-   with any format may be used. the :code:`Metadata` class provides useful members functions
+   with any format may be used. The :code:`Metadata` class provides useful members functions
    such as :code:`json()` that will convert the content in JSON format in a lazy manner.
    Mofka itself won't use this function, and will not make assumption that the metadata is
    in JSON format.
