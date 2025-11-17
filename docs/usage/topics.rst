@@ -128,7 +128,7 @@ and serializer classes.
 .. literalinclude:: ../_code/energy_validator.cpp
    :language: cpp
 
-The :code:`EnergyValidator` class inherits from :code:`mofka::ValidatorInterface`
+The :code:`EnergyValidator` class inherits from :code:`diaspora::ValidatorInterface`
 and provides the :code:`validate` member function. This function checks for the
 presence of an :code:`energy` field of type unsigned integer and checks that
 its value is less than an :code:`energy_max` value provided when creating the
@@ -136,7 +136,7 @@ validator. If validation fails, the :code:`validate` function throws an exceptio
 
 .. important::
 
-   The :code:`MOFKA_REGISTER_VALIDATOR` macro must be used to tell Mofka
+   The :code:`DIASPORA_REGISTER_VALIDATOR` macro must be used to tell Mofka
    about the :code:`EnergyValidator` class. Its first argument is the name by
    which we will refer to the class in user code (*"energy_validator"*), the
    second argument is the name of the class itself (*EnergyValidator*).
@@ -146,8 +146,8 @@ validator. If validation fails, the :code:`validate` function throws an exceptio
 
 The :code:`EnergyPartitionSelector` is also initialized with an :code:`energy_max`
 value and uses it to aggregate events into uniform "bins" of similar energy values.
-It inherits from :code:`mofka::PartitionSelectorInterface` and we call
-:code:`MOFKA_REGISTER_PARTITION_SELECTOR` to make it available for Mofka to use.
+It inherits from :code:`diaspora::PartitionSelectorInterface` and we call
+:code:`DIASPORA_REGISTER_PARTITION_SELECTOR` to make it available for Mofka to use.
 
 .. literalinclude:: ../_code/energy_serializer.cpp
    :language: cpp
@@ -156,7 +156,7 @@ The :code:`EnergySerializer` is also initialized with an :code:`energy_max` valu
 This value is used to choose an appropriate number of bytes for the raw representation
 of the energy when it is serialized. :code:`EnergySerializer` inherits from
 :code:`SerializerInterface` and is registered with Mofka using
-:code:`MOFKA_REGISTER_SERIALIZER`.
+:code:`DIASPORA_REGISTER_SERIALIZER`.
 
 
 Adding partitions
