@@ -14,7 +14,7 @@ Creating a producer
 
 To obtain a :code:`Producer` instance, one must first instantiate a :code:`Driver`,
 before obtaining a :code:`TopicHandle` by opening a topic. The :code:`TopicHandle`
-can then be used to create a :code:`Producer`, as examplified hereafter.
+can then be used to create a :code:`Producer`, as exemplified hereafter.
 
 .. tabs::
 
