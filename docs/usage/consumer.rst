@@ -155,7 +155,7 @@ as shown in the picture bellow.
 
 The data selector is given a descriptor :code:`D` for the full data. :code:`D.size()`
 (:code:`D.size` in Python) will return :code:`W*H`. We can first use
-:code:`auto d1 = D.makeSubView(y*W + x, W*h)` (:code:`D.make_sub_view` in Python) to select
+:code:`auto d1 = D.makeSubView(y*W+x, W*h)` (:code:`D.make_sub_view` in Python) to select
 only the rows containing the rectangle we are interested in. This function takes the offset
 at which to start the selection and the size of the selection.
 
