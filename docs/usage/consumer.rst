@@ -78,7 +78,7 @@ A consumer can be created with five parameters, four of which are optional.
    in the code above (we could have, alternatively, not specified the :code:`thread_pool` argument
    at all).
 
-In Python, if your consumer intends to alway request the full data part of each event, and would
+In Python, if your consumer intends to always request the full data part of each event, and would
 like said data in the form of a :code:`bytearray`, you may use the :code:`FullDataSelector`
 and :code:`ByteArrayAllocator` from the :code:`diaspora_stream.api` module as data selector and
 data allocator respectively. These are variables, not classes. The latter will create a Python
