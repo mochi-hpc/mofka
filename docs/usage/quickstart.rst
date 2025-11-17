@@ -99,7 +99,7 @@ The sections hereafter show how to use both the C++ and Python interface to prod
 Simple producer application
 ---------------------------
 
-The following code examplifies a producer.
+The following code exemplifies a producer.
 We first create a :code:`Driver` object, passing it some options including the file
 created by our running Mofka server (*mofka.json*). Note that we are using the Diaspora
 API. The first argument passed to :code:`Driver::New`, "mofka", tells it to load the
