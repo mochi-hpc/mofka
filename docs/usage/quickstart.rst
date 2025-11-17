@@ -125,7 +125,7 @@ or a list of objects that satisfy the buffer protocol.
 
 The :code:`push()` function is non-blocking. It returns a future object that callers
 can wait on to obtain the event ID after the event has been stored. The call to :code:`wait()`
-in the code bellow is however commented: a better practice consists of periodically flushing
+in the code below is however commented: a better practice consists of periodically flushing
 the producer by calling :code:`producer.flush()`, or at least wait on futures as late as possible
 so as to overlap the sending of the event with actual work from the application.
 
