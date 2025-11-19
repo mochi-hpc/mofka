@@ -14,7 +14,7 @@ Creating a producer
 
 To obtain a :code:`Producer` instance, one must first instantiate a :code:`Driver`,
 before obtaining a :code:`TopicHandle` by opening a topic. The :code:`TopicHandle`
-can then be used to create a :code:`Producer`, as examplified hereafter.
+can then be used to create a :code:`Producer`, as exemplified hereafter.
 
 .. tabs::
 
@@ -51,7 +51,7 @@ A producer can be created with five optional parameters.
   producer will aim to send batches as soon as possible but will increase the batch size
   if the server is not responding fast enough.
 
-* **Maximum batches***: this parameter controls the maximum number of batches that can
+* **Maximum batches**: this parameter controls the maximum number of batches that can
   be pending on the client before :code:`push` calls start blocking. By default this number
   is 2 (i.e., one batch is being sent while the next one is being filled through :code:`push`
   calls). Increasing this number may be useful in bursty applications.
@@ -92,7 +92,7 @@ The data part of an event would be the image itself.
 .. note::
 
    As of Mofka 0.4.0, the metadata part does not have to be JSON-formatted. A raw string
-   with any format may be used. the :code:`Metadata` class provides useful members functions
+   with any format may be used. The :code:`Metadata` class provides useful members functions
    such as :code:`json()` that will convert the content in JSON format in a lazy manner.
    Mofka itself won't use this function, and will not make assumption that the metadata is
    in JSON format.
@@ -177,11 +177,11 @@ into the producer, as shown in the code bellow.
 
 
 The producer's :code:`push` function takes the metadata and data objects and returns a
-:code:`Future`. Such a future can be tested for completion (:code:`future.completed`) and
+:code:`Future`. Such a future can be tested for completion (:code:`future.completed()`) and
 can be blocked on until it completes (:code:`future.wait()`). The latter method returns the
 event ID of the created event (64-bits unsigned integer).
 It is perfectly OK to drop the future if you do not care to wait for its completion or
-for the resulting event ID, as examplified with the second event. Event IDs are monotonically
+for the resulting event ID, as exemplified with the second event. Event IDs are monotonically
 increasing and are per-partition, so two events stored in distinct partitions can end up with the same ID.
 
 Calling :code:`producer.flush()` is a blocking call that will force all the pending batches of events

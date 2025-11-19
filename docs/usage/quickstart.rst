@@ -65,7 +65,7 @@ Creating a topic and a partition
 --------------------------------
 
 You can now use the :code:`mofkactl` command-line tool to create a topic.
-In a separate terminate, with your Spack environment activated, enter the following command.
+In a separate terminal, with your Spack environment activated, enter the following command.
 
 .. code-block:: bash
 
@@ -99,7 +99,7 @@ The sections hereafter show how to use both the C++ and Python interface to prod
 Simple producer application
 ---------------------------
 
-The following code examplifies a producer.
+The following code exemplifies a producer.
 We first create a :code:`Driver` object, passing it some options including the file
 created by our running Mofka server (*mofka.json*). Note that we are using the Diaspora
 API. The first argument passed to :code:`Driver::New`, "mofka", tells it to load the
@@ -125,7 +125,7 @@ or a list of objects that satisfy the buffer protocol.
 
 The :code:`push()` function is non-blocking. It returns a future object that callers
 can wait on to obtain the event ID after the event has been stored. The call to :code:`wait()`
-in the code bellow is however commented: a better practice consists of periodically flushing
+in the code below is however commented: a better practice consists of periodically flushing
 the producer by calling :code:`producer.flush()`, or at least wait on futures as late as possible
 so as to overlap the sending of the event with actual work from the application.
 
@@ -162,7 +162,7 @@ last acknowledged event. This acknowledgement is done using the
 :code:`Event`'s :code:`acknowledge()` function, which in the example bellow
 is called every 10 events.
 
-:code:`consumer.pull()` is a non-blocking function returning a :code`Future`.
+:code:`consumer.pull()` is a non-blocking function returning a :code:`Future`.
 Waiting for this future with :code:`.wait()` returns an :code:`Event` object
 from which we can retrieve an event ID as well as the event's metadata and data.
 

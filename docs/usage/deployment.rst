@@ -141,7 +141,7 @@ Copy the following *storage.jx9* file.
 .. literalinclude:: ../_code/storage-persistent-config.jx9
    :language: cpp
 
-This JX9 file contains is a script that mostly looks like the *storage.json* configuration we
+This JX9 file contains a script that mostly looks like the *storage.json* configuration we
 had before, except for the fact that this configuration is *returned* from the script after
 being completed with two parameters, :code:`$database_path` and :code:`$target_path`, which
 are themselves generated from an :code:`$id` parameter.

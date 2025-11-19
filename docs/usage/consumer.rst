@@ -10,7 +10,7 @@ Creating a consumer
 -------------------
 
 One can obtain a :code:`Consumer` instance from a :code:`TopicHandle` the same way
-as producers, as examplified hereafter.
+as producers, as exemplified hereafter.
 
 .. tabs::
 
@@ -78,7 +78,7 @@ A consumer can be created with five parameters, four of which are optional.
    in the code above (we could have, alternatively, not specified the :code:`thread_pool` argument
    at all).
 
-In Python, if your consumer intends to alway request the full data part of each event, and would
+In Python, if your consumer intends to always request the full data part of each event, and would
 like said data in the form of a :code:`bytearray`, you may use the :code:`FullDataSelector`
 and :code:`ByteArrayAllocator` from the :code:`diaspora_stream.api` module as data selector and
 data allocator respectively. These are variables, not classes. The latter will create a Python
@@ -155,7 +155,7 @@ as shown in the picture bellow.
 
 The data selector is given a descriptor :code:`D` for the full data. :code:`D.size()`
 (:code:`D.size` in Python) will return :code:`W*H`. We can first use
-:code:`audo d1 = D.makeSubView(y*W + x, W*h)` (:code:`D.make_sub_view` in Python) to select
+:code:`auto d1 = D.makeSubView(y*W+x, W*h)` (:code:`D.make_sub_view` in Python) to select
 only the rows containing the rectangle we are interested in. This function takes the offset
 at which to start the selection and the size of the selection.
 
