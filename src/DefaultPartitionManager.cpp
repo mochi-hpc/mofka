@@ -43,7 +43,7 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
     // --------- wait for the data transfers
     std::vector<diaspora::DataDescriptor> descriptors;
     try {
-        descriptors = future_descriptors.wait();
+        descriptors = future_descriptors.wait(-1);
     } catch(const std::exception& ex) {
         first_id.success() = false;
         first_id.error() = ex.what();

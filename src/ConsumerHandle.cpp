@@ -40,7 +40,7 @@ diaspora::Future<void> ConsumerHandle::feed(
             data_desc);
         auto req_ptr = std::make_shared<thallium::async_response>(std::move(request));
         return diaspora::Future<void>{
-            [req_ptr]() {
+            [req_ptr](int) {
                 req_ptr->wait();
             },
             [req_ptr]() {
@@ -49,7 +49,7 @@ diaspora::Future<void> ConsumerHandle::feed(
         };
     } catch(const std::exception& ex) {
         return diaspora::Future<void>{
-            [ex](){ throw ex; },
+            [ex](int){ throw ex; },
             [](){ return true; }
         };
     }

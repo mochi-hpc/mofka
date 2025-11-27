@@ -76,12 +76,12 @@ class MofkaProducer : public diaspora::ProducerInterface {
         return m_thread_pool;
     }
 
-    diaspora::Future<diaspora::EventID> push(
+    diaspora::Future<std::optional<diaspora::EventID>> push(
             diaspora::Metadata metadata,
             diaspora::DataView data,
             std::optional<size_t> partition) override;
 
-    void flush() override;
+    diaspora::Future<std::optional<diaspora::Flushed>> flush() override;
 
 };
 

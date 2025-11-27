@@ -50,7 +50,7 @@ class ActiveProducerBatchQueue {
 
     void push(diaspora::Metadata metadata,
               diaspora::DataView data,
-              Promise<diaspora::EventID> promise) {
+              Promise<std::optional<diaspora::EventID>> promise) {
         bool need_notification;
         {
             auto adaptive = m_batch_size == diaspora::BatchSize::Adaptive();
@@ -103,14 +103,16 @@ class ActiveProducerBatchQueue {
     }
 
     diaspora::Future<void> flush() {
-        if(!m_running) return diaspora::Future<void>{[](){}, [](){ return true; }};
+        if(!m_running) return diaspora::Future<void>{[](int){}, [](){ return true; }};
         {
             std::unique_lock<thallium::mutex> guard{m_mutex};
             m_request_flush = true;
             m_cv.notify_one();
         }
         return diaspora::Future<void>{
-            [this]() {
+            [this](int timeout_ms) {
+                // TODO handle timeout
+                (void)timeout_ms;
                 std::unique_lock<thallium::mutex> guard{m_mutex};
                 m_cv.wait(guard, [this]() {
                     return m_batch_queue.empty() && m_request_flush == false;

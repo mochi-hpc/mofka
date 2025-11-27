@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 
         // -- Consume events
         for(size_t i=0; i < 1000; ++i) {
-            auto event = consumer.pull().wait();
+            auto event = consumer.pull().wait(-1).value();
             if(event.id() == diaspora::NoMoreEvents)
                 break;
             auto data = event.data();
