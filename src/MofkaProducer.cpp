@@ -49,15 +49,15 @@ std::shared_ptr<diaspora::TopicHandleInterface> MofkaProducer::topic() const {
     return m_topic;
 }
 
-diaspora::Future<diaspora::EventID> MofkaProducer::push(
+diaspora::Future<std::optional<diaspora::EventID>> MofkaProducer::push(
         diaspora::Metadata metadata,
         diaspora::DataView data,
         std::optional<size_t> partition) {
     /* Step 1: create a future/promise pair for this operation */
-    diaspora::Future<diaspora::EventID> future;
+    diaspora::Future<std::optional<diaspora::EventID>> future;
     Promise<diaspora::EventID> promise;
     // if the batch size is not adaptive, wait() calls on futures should trigger a flush
-    auto on_wait = [this]() mutable { flush(); };
+    auto on_wait = [this](int timeout_ms) mutable { flush(); };
     std::tie(future, promise) = m_batch_size != diaspora::BatchSize::Adaptive() ?
         Promise<diaspora::EventID>::CreateFutureAndPromise(std::move(on_wait))
         : Promise<diaspora::EventID>::CreateFutureAndPromise();

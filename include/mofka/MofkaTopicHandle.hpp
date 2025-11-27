@@ -103,8 +103,6 @@ class MofkaTopicHandle : public diaspora::TopicHandleInterface,
     diaspora::Serializer serializer() const override {
         return m_serializer;
     }
-
-    void markAsComplete() override;
 };
 
 }

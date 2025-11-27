@@ -70,29 +70,6 @@ std::shared_ptr<diaspora::ConsumerInterface> MofkaTopicHandle::makeConsumer(
     return consumer;
 }
 
-void MofkaTopicHandle::markAsComplete() {
-    auto rpc = m_topic_mark_as_complete;
-    std::vector<tl::async_response> responses;
-    std::vector<Result<void>> results;
-    responses.reserve(m_partitions.size());
-    results.reserve(m_partitions.size());
-    try {
-        for(auto& partition : m_partitions) {
-            auto& ph = partition->m_ph;
-            responses.push_back(rpc.on(ph).async());
-        }
-        for(auto& response : responses)
-            results.push_back(static_cast<Result<void>>(response.wait()));
-    } catch(const std::exception& ex) {
-        throw diaspora::Exception{
-            fmt::format("Could not mark topic as comleted: {}", ex.what())
-        };
-    }
-    for(auto& result : results) {
-        if(!result.success()) throw diaspora::Exception{result.error()};
-    }
-}
-
 std::shared_ptr<diaspora::DriverInterface> MofkaTopicHandle::driver() const {
     return m_driver;
 }

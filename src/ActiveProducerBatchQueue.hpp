@@ -102,19 +102,32 @@ class ActiveProducerBatchQueue {
         m_thread_pool->pushWork([this]() { loop(); });
     }
 
-    diaspora::Future<void> flush() {
-        if(!m_running) return diaspora::Future<void>{[](){}, [](){ return true; }};
+    diaspora::Future<std::optional<diaspora::Flushed>> flush() {
+        if(!m_running)
+            return {
+                [](int){ return std::optional<diaspora::Flushed>{diaspora::Flushed{}};},
+                [](){ return true; }
+            };
         {
             std::unique_lock<thallium::mutex> guard{m_mutex};
             m_request_flush = true;
             m_cv.notify_one();
         }
-        return diaspora::Future<void>{
-            [this]() {
+        return {
+            [this](int timeout_ms) -> std::optional<diaspora::Flushed> {
                 std::unique_lock<thallium::mutex> guard{m_mutex};
-                m_cv.wait(guard, [this]() {
-                    return m_batch_queue.empty() && m_request_flush == false;
-                });
+                if(m_batch_queue.empty() && m_request_flush == false)
+                    return diaspora::Flushed{};
+                auto start = std::chrono::steady_clock::now();
+                auto end   = start + std::chrono::milliseconds{timeout_ms};
+                auto now   = start;
+                while(now < end) {
+                    m_cv.wait_until(guard, end);
+                    if(m_batch_queue.empty() && m_request_flush == false)
+                        return diaspora::Flushed{};
+                    now = std::chrono::steady_clock::now();
+                }
+                return std::nullopt;
             },
             [this]() {
                 std::unique_lock<thallium::mutex> guard{m_mutex};
