@@ -149,13 +149,20 @@ void MofkaDriver::createTopic(
         std::shared_ptr<diaspora::SerializerInterface> serializer) {
     if(name.size() > 256) throw diaspora::Exception{"Topic names cannot exceed 256 characters"};
     // check options
+    int num_partitions = 0;
+    std::string partition_type = "memory";
     if(options.json().is_object()) {
         if(options.json().contains("partitions")) {
             if(!options.json()["partitions"].is_number())
                 throw diaspora::Exception{"\"partitions\" parameter in options should be an integer"};
-            int num_partitions = options.json()["partitions"].get<int>();
+            num_partitions = options.json()["partitions"].get<int>();
             if(num_partitions <= 0)
                 throw diaspora::Exception{"\"partitions\" value in options is invalid"};
+        }
+        if(options.json().contains("partitions_type")) {
+            if(!options.json()["partitions_type"].is_string())
+                throw diaspora::Exception{"\"partitions_type\" parameter in options should be a string"};
+            options.json()["partitions_type"].get_to(partition_type);
         }
     }
     spdlog::trace("[mofka:client] Creating topic {}", name);
@@ -217,15 +224,10 @@ void MofkaDriver::createTopic(
     }
     spdlog::trace("[mofka:client] Successfully create topic {}", name);
 
-    // initialize partitions
-    if(options.json().is_object()
-    && options.json().contains("partitions")
-    && options.json()["partitions"].is_number()) {
-        int num_partitions = options.json()["partitions"].get<int>();
-        auto num_servers = m_bsgh.size();
-        for(int i = 0; i < num_partitions; ++i) {
-            addMemoryPartition(name, i % num_servers);
-        }
+    // initialize partitions if options required it
+    auto num_servers = m_bsgh.size();
+    for(int i=0; i < num_partitions; ++i) {
+        addCustomPartition(name, i % num_servers, partition_type);
     }
 }
 

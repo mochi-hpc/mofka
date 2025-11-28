@@ -28,6 +28,28 @@
                     "type": "map"
                 }
             }
+        },
+        {
+            "name": "metadata",
+            "provider_id": 3,
+            "type": "yokan",
+            "tags" : [ "mofka:metadata" ],
+            "config" : {
+                "database" : {
+                    "type": "map"
+                }
+            }
+        },
+        {
+            "name": "data",
+            "provider_id": 4,
+            "type": "warabi",
+            "tags" : [ "mofka:data" ],
+            "config" : {
+                "target" : {
+                    "type": "memory"
+                }
+            }
         }
     ]
 }
