@@ -151,6 +151,9 @@ void MofkaDriver::createTopic(
     // check options
     int num_partitions = 0;
     std::string partition_type = "memory";
+    std::string partition_pool = "";
+    std::string partition_config = "{}";
+    Dependencies partition_dependencies;
     if(options.json().is_object()) {
         if(options.json().contains("partitions")) {
             if(!options.json()["partitions"].is_number())
@@ -163,6 +166,37 @@ void MofkaDriver::createTopic(
             if(!options.json()["partitions_type"].is_string())
                 throw diaspora::Exception{"\"partitions_type\" parameter in options should be a string"};
             options.json()["partitions_type"].get_to(partition_type);
+        }
+        if(options.json().contains("partitions_pool")) {
+            if(!options.json()["partitions_pool"].is_string())
+                throw diaspora::Exception{"\"partitions_pool\" parameter in options should be a string"};
+            options.json()["partitions_pool"].get_to(partition_pool);
+        }
+        if(options.json().contains("partitions_config"))
+            partition_config = options.json()["partitions_config"].dump();
+        if(options.json().contains("partitions_dependencies")) {
+            auto& deps = options.json()["partitions_dependencies"];
+            if(!deps.is_object())
+                throw diaspora::Exception{
+                    "\"partitions_dependencies\" parameter in options should be an object"};
+            for(auto& p : deps.items()) {
+                if(p.value().is_string()) {
+                    partition_dependencies[p.key()] = {p.value().get<std::string>()};
+                } else if(p.value().is_array()) {
+                    for(auto& s : p.value()) {
+                        if(!s.is_string()) {
+                            throw diaspora::Exception{
+                                "\"partitions_dependencies\" in options should only contain"
+                                " strings or arrays of strings"};
+                        }
+                        partition_dependencies[p.key()].push_back(s.get<std::string>());
+                    }
+                } else {
+                    throw diaspora::Exception{
+                        "\"partitions_dependencies\" in options should only contain"
+                        " strings or arrays of strings"};
+                }
+            }
         }
     }
     spdlog::trace("[mofka:client] Creating topic {}", name);
@@ -227,7 +261,9 @@ void MofkaDriver::createTopic(
     // initialize partitions if options required it
     auto num_servers = m_bsgh.size();
     for(int i=0; i < num_partitions; ++i) {
-        addCustomPartition(name, i % num_servers, partition_type);
+        addCustomPartition(name, i % num_servers, partition_type,
+                           partition_config, partition_dependencies,
+                           partition_pool);
     }
 }
 

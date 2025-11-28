@@ -1,0 +1,4 @@
+{
+    "partitions":1,
+    "partitions_type":"memory"
+}
