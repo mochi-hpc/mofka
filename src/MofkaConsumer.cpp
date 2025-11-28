@@ -28,15 +28,15 @@ std::shared_ptr<diaspora::TopicHandleInterface> MofkaConsumer::topic() const {
     return m_topic;
 }
 
-diaspora::Future<diaspora::Event> MofkaConsumer::pull() {
-    diaspora::Future<diaspora::Event> future;
+diaspora::Future<std::optional<diaspora::Event>> MofkaConsumer::pull() {
+    diaspora::Future<std::optional<diaspora::Event>> future;
     std::unique_lock<thallium::mutex> guard{m_futures_mtx};
     if(m_futures_credit || m_futures.empty()) {
         // the queue of futures is empty or the futures
         // already in the queue have been created by
         // previous calls to pull() that haven't completed
-        Promise<diaspora::Event> promise;
-        std::tie(future, promise) = Promise<diaspora::Event>::CreateFutureAndPromise();
+        Promise<std::optional<diaspora::Event>> promise;
+        std::tie(future, promise) = Promise<std::optional<diaspora::Event>>::CreateFutureAndPromise();
         if(m_completed_partitions != m_partitions.size()) {
             // there are uncompleted partitions, put the future in the queue
             // and it will be picked up by a recvBatch RPC from any partition
@@ -136,7 +136,7 @@ void MofkaConsumer::recvBatch(const tl::request& req,
         m_engine, count, metadata.size, data_desc.size);
     batch->pullFrom(metadata_sizes, metadata, data_desc_sizes, data_desc);
 
-    std::vector<Promise<diaspora::Event>> promises;
+    std::vector<Promise<std::optional<diaspora::Event>>> promises;
     promises.reserve(count);
 
     // Create all the Future/Promise pairs first (to avoid locking over and over)
@@ -144,14 +144,14 @@ void MofkaConsumer::recvBatch(const tl::request& req,
         std::unique_lock<thallium::mutex> guard{m_futures_mtx};
         for(size_t i = 0; i < count; ++i) {
             // get a promise/future pair
-            Promise<diaspora::Event> promise;
+            Promise<std::optional<diaspora::Event>> promise;
             if(!m_futures_credit || m_futures.empty()) {
                 // the queue of futures is empty or the futures
                 // already in the queue have been created by
                 // previous calls to recvBatch() that haven't had
                 // a corresponding pull() call from the user.
-                diaspora::Future<diaspora::Event> future;
-                std::tie(future, promise) = Promise<diaspora::Event>::CreateFutureAndPromise();
+                diaspora::Future<std::optional<diaspora::Event>> future;
+                std::tie(future, promise) = Promise<std::optional<diaspora::Event>>::CreateFutureAndPromise();
                 m_futures.emplace_back(promise, future);
                 m_futures_credit = false;
             } else {

@@ -49,18 +49,20 @@ std::shared_ptr<diaspora::TopicHandleInterface> MofkaProducer::topic() const {
     return m_topic;
 }
 
-diaspora::Future<diaspora::EventID> MofkaProducer::push(
+diaspora::Future<std::optional<diaspora::EventID>> MofkaProducer::push(
         diaspora::Metadata metadata,
         diaspora::DataView data,
         std::optional<size_t> partition) {
     /* Step 1: create a future/promise pair for this operation */
-    diaspora::Future<diaspora::EventID> future;
-    Promise<diaspora::EventID> promise;
+    diaspora::Future<std::optional<diaspora::EventID>> future;
+    Promise<std::optional<diaspora::EventID>> promise;
     // if the batch size is not adaptive, wait() calls on futures should trigger a flush
-    auto on_wait = [this]() mutable { flush(); };
+    auto on_wait = [this](int timeout_ms) mutable {
+        flush().wait(timeout_ms);
+    };
     std::tie(future, promise) = m_batch_size != diaspora::BatchSize::Adaptive() ?
-        Promise<diaspora::EventID>::CreateFutureAndPromise(std::move(on_wait))
-        : Promise<diaspora::EventID>::CreateFutureAndPromise();
+        Promise<std::optional<diaspora::EventID>>::CreateFutureAndPromise(std::move(on_wait))
+        : Promise<std::optional<diaspora::EventID>>::CreateFutureAndPromise();
     /* Validate the metadata */
     m_topic->validator().validate(metadata, data);
     /* Select the partition for this metadata */
@@ -92,16 +94,43 @@ diaspora::Future<diaspora::EventID> MofkaProducer::push(
     return future;
 }
 
-void MofkaProducer::flush() {
+diaspora::Future<std::optional<diaspora::Flushed>> MofkaProducer::flush() {
     std::lock_guard<thallium::mutex> guard{m_batch_queues_mtx};
-    std::vector<diaspora::Future<void>> futures;
-    futures.reserve(m_batch_queues.size());
+    std::shared_ptr<
+        std::vector<
+            diaspora::Future<
+                std::optional<diaspora::Flushed>>>> futures
+        = std::make_shared<decltype(futures)::element_type>();
+    futures->reserve(m_batch_queues.size());
     for(auto& p : m_batch_queues) {
-        if(p) futures.push_back(p->flush());
+        if(p) futures->push_back(p->flush());
     }
-    for(auto& f : futures) {
-        f.wait();
-    }
+    return {
+        [futures](int timeout_ms) -> std::optional<diaspora::Flushed> {
+            if(futures->empty()) return diaspora::Flushed{};
+            if(futures->empty() || timeout_ms <= 0) {
+                for(auto& f : *futures) f.wait(timeout_ms);
+                futures->clear();
+                return diaspora::Flushed{};
+            } else {
+                auto now = std::chrono::steady_clock::now();
+                auto deadline = now + std::chrono::milliseconds{timeout_ms};
+                auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
+                while(remaining > 0 && !futures->empty()) {
+                    if(futures->back().wait(remaining).has_value()) {
+                        futures->pop_back();
+                    }
+                    now = std::chrono::steady_clock::now();
+                    remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
+                }
+                if(futures->empty()) return diaspora::Flushed{};
+                else return std::nullopt;
+            }
+        },
+        [futures]() -> bool {
+            return futures->empty();
+        }
+    };
 }
 
 }

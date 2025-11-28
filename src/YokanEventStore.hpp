@@ -245,7 +245,7 @@ class YokanEventStore {
             if(num_available_events == 0) { // m_is_marked_complete must be true
                                             // feed consumer 0 events with first_id = NoMoreEvents to indicate
                                             // that there are no more events to consume from this partition
-                if(lastFeed) lastFeed.wait();
+                if(lastFeed) lastFeed.wait(-1);
                 lastFeed = consumerHandle.feed(
                         0, diaspora::NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
                 break;
@@ -282,7 +282,7 @@ class YokanEventStore {
                 descriptors_sizes, descriptors_sizes + num_events, (size_t)0);
 
             if(lastFeed)
-                lastFeed.wait();
+                lastFeed.wait(-1);
 
             // feed the consumer handle
             lastFeed = consumerHandle.feed(
@@ -298,7 +298,7 @@ class YokanEventStore {
         }
 
         if(lastFeed)
-            lastFeed.wait();
+            lastFeed.wait(-1);
 
         return result;
     }

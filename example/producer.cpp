@@ -65,9 +65,6 @@ int main(int argc, char** argv) {
             if(i % 100 == 0) producer.flush();
         }
 
-        // -- Signal the clients that no more events are to be expected on this topic.
-        topic.markAsComplete();
-
     } catch(const diaspora::Exception& ex) {
         spdlog::critical("{}", ex.what());
         exit(-1);

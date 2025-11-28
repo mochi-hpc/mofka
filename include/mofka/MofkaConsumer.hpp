@@ -75,10 +75,12 @@ class MofkaConsumer : public diaspora::ConsumerInterface {
      * at in m_futures.front() (the oldest created by the consumer)
      * and take it off the queue. This is the symetric of the above.
      */
-    std::deque<std::pair<Promise<diaspora::Event>,
-                         diaspora::Future<diaspora::Event>>> m_futures;
-    bool                                                     m_futures_credit;
-    thallium::mutex                                          m_futures_mtx;
+    std::deque<
+        std::pair<
+            Promise<std::optional<diaspora::Event>>,
+            diaspora::Future<std::optional<diaspora::Event>>>> m_futures;
+    bool                                                       m_futures_credit;
+    thallium::mutex                                            m_futures_mtx;
 
     MofkaConsumer(thallium::engine engine,
                   std::string_view name,
@@ -140,14 +142,16 @@ class MofkaConsumer : public diaspora::ConsumerInterface {
         return m_data_selector;
     }
 
-    diaspora::Future<diaspora::Event> pull() override;
+    diaspora::Future<std::optional<diaspora::Event>> pull() override;
 
     void unsubscribe() override;
 
     void process(diaspora::EventProcessor processor,
-                 std::shared_ptr<diaspora::ThreadPoolInterface> threadPool,
-                 diaspora::NumEvents maxEvents) override {
+                 int timeout_ms,
+                 diaspora::NumEvents maxEvents,
+                 std::shared_ptr<diaspora::ThreadPoolInterface> threadPool) override {
         // TODO
+        (void)timeout_ms;
         (void)processor;
         (void)threadPool;
         (void)maxEvents;

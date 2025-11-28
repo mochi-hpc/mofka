@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
 
         diaspora::Consumer consumer = topic.consumer("consumer");
         for(size_t i = 0; i < 100; ++i) {
-            diaspora::Event event = consumer.pull().wait();
+            diaspora::Event event = consumer.pull().wait(-1).value();
             std::cout << event.id() << ": " << event.metadata().string() << std::endl;
             if((i+1) % 10 == 0) event.acknowledge();
         }

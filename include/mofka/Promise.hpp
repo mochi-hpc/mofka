@@ -26,25 +26,22 @@ struct Promise {
     void setValue(Type value) {
         auto state = m_state.lock();
         if(state)
-            state->set_value(std::move(value));
+            state->set(std::move(value));
     }
 
     void setException(diaspora::Exception ex) {
         auto state = m_state.lock();
         if(state)
-            state->set_value(std::move(ex));
+            state->set(std::move(ex));
     }
 
     static inline std::pair<diaspora::Future<Type>, Promise<Type>> CreateFutureAndPromise(
-        std::function<void()> on_wait = std::function<void()>{},
+        std::function<void(int)> on_wait = std::function<void(int)>{},
         std::function<void(bool)> on_test = std::function<void(bool)>{}) {
         auto state = newState();
-        auto wait_fn = [state, on_wait=std::move(on_wait)]() mutable -> Type {
-            if(on_wait) on_wait();
-            auto v = std::move(*state).wait();
-            if(std::holds_alternative<diaspora::Exception>(v))
-                throw std::get<diaspora::Exception>(v);
-            return std::get<Type>(std::move(v));
+        auto wait_fn = [state, on_wait=std::move(on_wait)](int timeout_ms) mutable -> Type {
+            if(on_wait) on_wait(timeout_ms);
+            return std::move(*state).wait(timeout_ms);
         };
         auto complete_fn = [state, on_test=std::move(on_test)]() mutable -> bool {
             auto is_ready = state->test();
@@ -60,24 +57,55 @@ struct Promise {
 
     struct State {
 
+        std::atomic<bool>                       m_is_set = false;
         std::variant<Type, diaspora::Exception> m_content;
-        ABT_eventual_memory                     m_eventual = ABT_EVENTUAL_INITIALIZER;
+        ABT_cond_memory                         m_cv = ABT_COND_INITIALIZER;
+        ABT_mutex_memory                        m_mutex = ABT_MUTEX_INITIALIZER;
 
         bool test() const {
-            ABT_bool flag;
-            ABT_eventual_test(ABT_EVENTUAL_MEMORY_GET_HANDLE(&m_eventual), nullptr, &flag);
-            return flag;
+            return m_is_set;
         }
 
-        std::variant<Type, diaspora::Exception>&& wait() && {
-            ABT_eventual_wait(ABT_EVENTUAL_MEMORY_GET_HANDLE(&m_eventual), nullptr);
-            return std::move(m_content);
+        Type wait(int timeout_ms) && {
+            ABT_mutex_lock(ABT_MUTEX_MEMORY_GET_HANDLE(&m_mutex));
+            if(timeout_ms > 0) {
+                struct timespec deadline, now;
+                clock_gettime(CLOCK_REALTIME, &now);
+                deadline = now;
+                deadline.tv_nsec += timeout_ms*1000*1000;
+                while(!m_is_set
+                    && (now.tv_sec < deadline.tv_sec
+                        || (now.tv_sec == deadline.tv_sec && now.tv_nsec < deadline.tv_nsec))) {
+                    ABT_cond_timedwait(
+                        ABT_COND_MEMORY_GET_HANDLE(&m_cv),
+                        ABT_MUTEX_MEMORY_GET_HANDLE(&m_mutex), &deadline);
+                    clock_gettime(CLOCK_REALTIME, &now);
+                }
+            } else {
+                while(!m_is_set) {
+                    ABT_cond_wait(
+                        ABT_COND_MEMORY_GET_HANDLE(&m_cv),
+                        ABT_MUTEX_MEMORY_GET_HANDLE(&m_mutex));
+                }
+            }
+            if(m_content.index() == 0) {
+                auto result = std::get<Type>(std::move(m_content));
+                ABT_mutex_unlock(ABT_MUTEX_MEMORY_GET_HANDLE(&m_mutex));
+                return result;
+            } else {
+                auto ex = std::get<diaspora::Exception>(std::move(m_content));
+                ABT_mutex_unlock(ABT_MUTEX_MEMORY_GET_HANDLE(&m_mutex));
+                throw ex;
+            }
         }
 
         template<typename T>
-        void set_value(T&& value) {
+        void set(T&& value) {
+            ABT_mutex_lock(ABT_MUTEX_MEMORY_GET_HANDLE(&m_mutex));
             m_content = std::move(value);
-            ABT_eventual_set(ABT_EVENTUAL_MEMORY_GET_HANDLE(&m_eventual), nullptr, 0);
+            m_is_set = true;
+            ABT_mutex_unlock(ABT_MUTEX_MEMORY_GET_HANDLE(&m_mutex));
+            ABT_cond_signal(ABT_COND_MEMORY_GET_HANDLE(&m_cv));
         }
     };
 

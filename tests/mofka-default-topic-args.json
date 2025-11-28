@@ -1,0 +1,9 @@
+{
+    "partitions":1,
+    "partitions_type":"default",
+    "partitions_config": {},
+    "partitions_dependencies": {
+        "metadata": "metadata@local",
+        "data": "data@local"
+    }
+}

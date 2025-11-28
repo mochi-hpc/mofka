@@ -36,9 +36,9 @@ namespace tl = thallium;
 class ProducerBatch {
 
     struct Entry {
-        diaspora::Metadata         metadata;
-        diaspora::DataView         data;
-        Promise<diaspora::EventID> promise;
+        diaspora::Metadata                        metadata;
+        diaspora::DataView                        data;
+        Promise<std::optional<diaspora::EventID>> promise;
     };
 
     std::string                m_producer_name;
@@ -74,7 +74,7 @@ class ProducerBatch {
 
     void push(diaspora::Metadata metadata,
               diaspora::DataView data,
-              Promise<diaspora::EventID> promise) {
+              Promise<std::optional<diaspora::EventID>> promise) {
         m_entries.push_back({std::move(metadata), std::move(data), std::move(promise)});
     }
 

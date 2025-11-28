@@ -122,12 +122,14 @@ int main(int argc, char** argv) {
         // END EVENT
 
         // START PRODUCE EVENT
-        diaspora::Future<diaspora::EventID> future = producer.push(metadata1, data1);
+        diaspora::Future<std::optional<diaspora::EventID>> future = producer.push(metadata1, data1);
         future.completed(); // returns true if the future has completed
 
         producer.push(metadata2, data2);
 
-        diaspora::EventID event_id_1 = future.wait();
+        // the value passed to wait is a timeout in milliseconds,
+        // -1 indicates that the wait call should block until the value is available
+        diaspora::EventID event_id_1 = future.wait(-1).value();
 
         producer.flush();
         // END PRODUCE EVENT
@@ -156,10 +158,10 @@ int main(int argc, char** argv) {
             "app2", thread_pool, batch_size, data_selector, data_allocator);
         // END CONSUMER
         // START CONSUME EVENTS
-        diaspora::Future<diaspora::Event> future = consumer.pull();
+        diaspora::Future<std::optional<diaspora::Event>> future = consumer.pull();
         future.completed(); // returns true if the future has completed
 
-        diaspora::Event event        = future.wait();
+        diaspora::Event event        = future.wait(-1).value();
         diaspora::DataView data      = event.data();
         diaspora::Metadata metadata  = event.metadata();
         diaspora::EventID event_id   = event.id();
