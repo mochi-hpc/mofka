@@ -96,17 +96,41 @@ diaspora::Future<std::optional<diaspora::EventID>> MofkaProducer::push(
 
 diaspora::Future<std::optional<diaspora::Flushed>> MofkaProducer::flush() {
     std::lock_guard<thallium::mutex> guard{m_batch_queues_mtx};
-    std::vector<diaspora::Future<void>> futures;
-    futures.reserve(m_batch_queues.size());
+    std::shared_ptr<
+        std::vector<
+            diaspora::Future<
+                std::optional<diaspora::Flushed>>>> futures
+        = std::make_shared<decltype(futures)::element_type>();
+    futures->reserve(m_batch_queues.size());
     for(auto& p : m_batch_queues) {
-        if(p) futures.push_back(p->flush());
+        if(p) futures->push_back(p->flush());
     }
-    for(auto& f : futures) {
-        f.wait(-1);
-        // TODO handle timeout properly
-    }
-    return { [](int) -> std::optional<diaspora::Flushed> { return diaspora::Flushed{}; },
-             []() -> bool { return true; } };
+    return {
+        [futures](int timeout_ms) -> std::optional<diaspora::Flushed> {
+            if(futures->empty()) return diaspora::Flushed{};
+            if(futures->empty() || timeout_ms <= 0) {
+                for(auto& f : *futures) f.wait(timeout_ms);
+                futures->clear();
+                return diaspora::Flushed{};
+            } else {
+                auto now = std::chrono::steady_clock::now();
+                auto deadline = now + std::chrono::milliseconds{timeout_ms};
+                auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
+                while(remaining > 0 && !futures->empty()) {
+                    if(futures->back().wait(remaining).has_value()) {
+                        futures->pop_back();
+                    }
+                    now = std::chrono::steady_clock::now();
+                    remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
+                }
+                if(futures->empty()) return diaspora::Flushed{};
+                else return std::nullopt;
+            }
+        },
+        [futures]() -> bool {
+            return futures->empty();
+        }
+    };
 }
 
 }
