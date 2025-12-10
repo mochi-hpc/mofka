@@ -34,7 +34,7 @@ spack:
       git: https://github.com/diaspora-project/diaspora-spack-packages.git
       destination: $env/repos
       paths:
-      - spack_packages/diaspora
+      - spack_repo/diaspora
   packages:
     argobots:
       require: "@1.2:"
