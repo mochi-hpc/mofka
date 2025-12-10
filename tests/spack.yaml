@@ -26,13 +26,15 @@ spack:
     prefix_inspections:
       lib: [LD_LIBRARY_PATH]
       lib64: [LD_LIBRARY_PATH]
-#  repos:
-#    mochi:
-#      git: https://github.com/mochi-hpc/mochi-spack-packages.git
-#      destination: $env/repos
-#    diaspora:
-#      git: https://github.com/diaspora-project/diaspora-spack-packages.git
-#      destination: $env/repos
+  repos:
+    mochi:
+      git: https://github.com/mochi-hpc/mochi-spack-packages.git
+      destination: $env/repos
+    diaspora:
+      git: https://github.com/diaspora-project/diaspora-spack-packages.git
+      destination: $env/repos
+      paths:
+      - spack_packages/diaspora
   packages:
     argobots:
       require: "@1.2:"
