@@ -16,6 +16,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install gfortran
+      run: |
+        apt install gfortran
+
     - name: Setup spack
       uses: spack/setup-spack@v2.1.1
       with:
