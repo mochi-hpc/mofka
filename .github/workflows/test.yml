@@ -34,7 +34,7 @@ jobs:
     - name: Add diaspora-spack-packages
       run: |
         git clone https://github.com/diaspora-project/diaspora-spack-packages
-        spack -e tests repo add diaspora-spack-packages
+        spack -e tests repo add diaspora-spack-packages/spack_repo/diaspora/
 
     - name: Install spack environment
       run: |
