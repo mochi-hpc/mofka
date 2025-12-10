@@ -71,7 +71,7 @@ spack:
       - mpich
     python:
       require:
-      - "@3.13.0:3.13.999"
+      - "@3.13"
     mercury:
       require: "~checksum~boostsys"
     libfabric:
