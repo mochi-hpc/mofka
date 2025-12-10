@@ -19,7 +19,7 @@ jobs:
     - name: Setup spack
       uses: spack/setup-spack@v2.1.1
       with:
-        ref: v1.1.0
+        ref: 4ab9199b31957ed09c868554a7dcd131492e3dee
 
     - name: Set install root for Spack
       run: |
