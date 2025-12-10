@@ -411,6 +411,43 @@ std::shared_ptr<diaspora::TopicHandleInterface> MofkaDriver::openTopic(std::stri
         const_cast<MofkaDriver*>(this)->shared_from_this());
 }
 
+std::unordered_map<std::string, diaspora::Metadata> MofkaDriver::listTopics() const {
+    std::vector<std::vector<char>> keys(48);
+    std::vector<size_t> ksizes(48, 4096);
+    std::vector<void*> keyptrs(48);
+    std::unordered_map<std::string, diaspora::Metadata> result;
+    for(size_t i = 0; i < 48; ++i) {
+        keys[i].resize(4096);
+        keyptrs[i] = keys[i].data();
+    }
+    std::string from_key = "";
+    try {
+        while(true) {
+            m_yk_master_db.listKeys(
+                    from_key.c_str(), from_key.size(),
+                    "MOFKA:GLOBAL:", 13,
+                    48, keyptrs.data(), ksizes.data(),
+                    YOKAN_MODE_DEFAULT);
+            for(size_t i = 0; i < 48; ++i) {
+                if(ksizes[i] == YOKAN_NO_MORE_KEYS)
+                    goto done;
+                auto& key = keys[i];
+                auto k = std::string{key.data(), ksizes[i]};
+                auto s = k.substr(13);
+                s = s.substr(0, s.find(':'));
+                result[s]; // TODO add metadata
+            }
+            from_key.assign(keys[47].data(), ksizes[47]);
+        }
+    } catch(const yokan::Exception& ex) {
+        throw diaspora::Exception{fmt::format(
+                "Could not list keys. Yokan listKeys error: {}",
+                ex.what())};
+    }
+done:
+    return result;
+}
+
 bool MofkaDriver::topicExists(std::string_view name) const {
     try {
         openTopic(name);

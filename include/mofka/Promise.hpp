@@ -58,7 +58,7 @@ struct Promise {
     struct State {
 
         std::atomic<bool>                       m_is_set = false;
-        std::variant<Type, diaspora::Exception> m_content;
+        std::variant<Type, diaspora::Exception> m_content = Type{};
         ABT_cond_memory                         m_cv = ABT_COND_INITIALIZER;
         ABT_mutex_memory                        m_mutex = ABT_MUTEX_INITIALIZER;
 

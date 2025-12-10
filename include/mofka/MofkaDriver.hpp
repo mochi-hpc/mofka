@@ -114,6 +114,13 @@ class MofkaDriver : public diaspora::DriverInterface,
     std::shared_ptr<diaspora::TopicHandleInterface> openTopic(std::string_view name) const override;
 
     /**
+     * @brief List the available topics.
+     *
+     * @return a mapping from topic name to their information.
+     */
+    std::unordered_map<std::string, diaspora::Metadata> listTopics() const override;
+
+    /**
      * @brief Checks if a topic exists.
      */
     bool topicExists(std::string_view name) const override;
