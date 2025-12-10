@@ -1,8 +1,4 @@
 spack:
-  repos:
-    builtin:
-      git: https://github.com/spack/spack-packages.git
-      commit: 4590c15a8f8f326e9c893444a907359506ff2709
   specs:
   - mpich
   - cmake
@@ -75,7 +71,7 @@ spack:
       - mpich
     python:
       require:
-      - "@3.13.0:3.13.9"
+      - "@3.13.0:3.13.999"
     mercury:
       require: "~checksum~boostsys"
     libfabric:
