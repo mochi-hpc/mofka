@@ -2,7 +2,7 @@ spack:
   repos:
     builtin:
       git: https://github.com/spack/spack-packages.git
-      commit: 580bdd5b82e9329a4b5c0b30411e43ea3221d958
+      commit: 10c88baef26836bcaad5eacaf473eea7defeba09
   specs:
   - mpich
   - cmake
