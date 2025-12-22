@@ -118,8 +118,6 @@ std::shared_ptr<diaspora::DriverInterface> MofkaDriver::create(const diaspora::M
             auto margo_config_str = margo_config.dump();
             engine = thallium::engine{
                 protocol.c_str(), THALLIUM_SERVER_MODE, margo_config_str.c_str()};
-            auto pool = thallium::xstream::self().get_main_pools(1)[0];
-            MofkaThreadPool::SetDefaultPool(pool);
         }
 
         // create the bedrock ServiceGroupHandle

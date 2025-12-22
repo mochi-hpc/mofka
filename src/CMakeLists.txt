@@ -5,7 +5,6 @@ set (server-src-files
      MemoryPartitionManager.cpp)
 
 set (client-src-files
-     MofkaThreadPool.cpp
      MofkaDriver.cpp
      MofkaTopicHandle.cpp
      MofkaProducer.cpp
