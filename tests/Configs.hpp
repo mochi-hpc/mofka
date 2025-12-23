@@ -77,7 +77,7 @@ static inline void getPartitionArguments(
     if(partition_type == "memory") {
         dependencies = mofka::MofkaDriver::Dependencies{};
         partition_config = diaspora::Metadata{"{}"};
-    } else if(partition_type == "default") {
+    } else if(partition_type == "legacy") {
         dependencies = {
             {"data", {"my_warabi_provider@local"}},
             {"metadata", {"my_yokan_metadata_provider@local"}}

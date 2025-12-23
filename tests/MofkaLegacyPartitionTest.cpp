@@ -11,7 +11,7 @@
 #include "Configs.hpp"
 #include "Ensure.hpp"
 
-TEST_CASE("DefaultPartition test", "[default-partition]") {
+TEST_CASE("LegacyPartition test", "[legacy-partition]") {
 
     spdlog::set_level(spdlog::level::from_str("error"));
 
@@ -40,11 +40,11 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
 
             diaspora::Metadata partition_config;
             mofka::MofkaDriver::Dependencies partition_dependencies;
-            getPartitionArguments("default", partition_dependencies, partition_config);
+            getPartitionArguments("legacy", partition_dependencies, partition_config);
 
             REQUIRE_NOTHROW(
                 driver.as<mofka::MofkaDriver>().addCustomPartition(
-                    "mytopic", 0, "default",
+                    "mytopic", 0, "legacy",
                     partition_config, partition_dependencies));
 
             REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
@@ -52,10 +52,10 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
 
         }
 
-        SECTION("Create partition using addDefaultPartition") {
+        SECTION("Create partition using addLegacyPartition") {
 
 
-            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addDefaultPartition(
+            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addLegacyPartition(
                         "mytopic", 0, "my_yokan_metadata_provider@local",
                         "my_warabi_provider@local"));
 
@@ -68,7 +68,7 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
 
             diaspora::Metadata partition_config;
 
-            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addDefaultPartition("mytopic", 0));
+            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addLegacyPartition("mytopic", 0));
 
             REQUIRE_NOTHROW(topic = driver.openTopic("mytopic"));
             REQUIRE(static_cast<bool>(topic));
@@ -78,13 +78,13 @@ TEST_CASE("DefaultPartition test", "[default-partition]") {
         SECTION("Create metadata and data providers") {
             std::string metadata_provider_address, data_provider_address;
             REQUIRE_NOTHROW(metadata_provider_address =
-                            driver.as<mofka::MofkaDriver>().addDefaultMetadataProvider(0));
+                            driver.as<mofka::MofkaDriver>().addYokanMetadataProvider(0));
             REQUIRE_NOTHROW(data_provider_address =
-                            driver.as<mofka::MofkaDriver>().addDefaultDataProvider(0));
+                            driver.as<mofka::MofkaDriver>().addWarabiDataProvider(0));
             REQUIRE(!metadata_provider_address.empty());
             REQUIRE(!data_provider_address.empty());
 
-            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addDefaultPartition(
+            REQUIRE_NOTHROW(driver.as<mofka::MofkaDriver>().addLegacyPartition(
                         "mytopic", 0, metadata_provider_address,
                         data_provider_address));
 

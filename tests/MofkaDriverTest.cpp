@@ -14,7 +14,7 @@
 TEST_CASE("Mofka driver test", "[driver]") {
 
     spdlog::set_level(spdlog::level::from_str("error"));
-    auto partition_type = GENERATE(as<std::string>{}, "memory", "default");
+    auto partition_type = GENERATE(as<std::string>{}, "memory", "legacy");
     CAPTURE(partition_type);
 
     auto remove_file = EnsureFileRemoved{"mofka.json"};

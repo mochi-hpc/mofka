@@ -36,7 +36,7 @@ def main(group_file: str):
         topic_name="collisions",
         server_rank=0)
     # add a default partition (all arguments specified)
-    driver.add_default_partition(
+    driver.add_legacy_partition(
         topic_name="collisions",
         server_rank=0,
         metadata_provider="my_metadata_provider@local",
@@ -44,20 +44,20 @@ def main(group_file: str):
         partition_config={},
         pool_name="__primary__")
     # add a default partition (discover providers automatically)
-    driver.add_default_partition(
+    driver.add_legacy_partition(
         topic_name="collisions",
         server_rank=0)
     # END ADD PARTITION
 
     # START ADD PROVIDERS
-    metadata_provider = driver.add_metadata_provider(
+    metadata_provider = driver.add_yokan_metadata_provider(
         server_rank=0,
         database_type="log",
         database_config={
             "path": "/tmp/mofka-log",
             "create_if_missing": True
         })
-    data_provider = driver.add_data_provider(
+    data_provider = driver.add_warabi_data_provider(
         server_rank=0,
         target_type="abtio",
         target_config={

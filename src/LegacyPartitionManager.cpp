@@ -4,7 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "JsonUtil.hpp"
-#include "DefaultPartitionManager.hpp"
+#include "LegacyPartitionManager.hpp"
 
 #include <diaspora/DataDescriptor.hpp>
 #include <diaspora/BufferWrapperArchive.hpp>
@@ -18,11 +18,11 @@ namespace tl = thallium;
 namespace mofka {
 
 MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(
-    default, DefaultPartitionManager,
+    legacy, LegacyPartitionManager,
     {"data", "warabi", true, false, false},
     {"metadata", "yokan", true, false, false});
 
-Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
+Result<diaspora::EventID> LegacyPartitionManager::receiveBatch(
           const thallium::endpoint& sender,
           const std::string& producer_name,
           size_t num_events,
@@ -63,11 +63,11 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
     return first_id;
 }
 
-void DefaultPartitionManager::wakeUp() {
+void LegacyPartitionManager::wakeUp() {
     m_event_store->wakeUp();
 }
 
-Result<void> DefaultPartitionManager::feedConsumer(
+Result<void> LegacyPartitionManager::feedConsumer(
     ConsumerHandle consumerHandle,
     diaspora::BatchSize batchSize) {
     Result<void> result;
@@ -85,7 +85,7 @@ Result<void> DefaultPartitionManager::feedConsumer(
     return result;
 }
 
-Result<void> DefaultPartitionManager::acknowledge(
+Result<void> LegacyPartitionManager::acknowledge(
     std::string_view consumer_name,
     diaspora::EventID event_id) {
     Result<void> result;
@@ -95,20 +95,20 @@ Result<void> DefaultPartitionManager::acknowledge(
     return result;
 }
 
-Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
+Result<std::vector<Result<void>>> LegacyPartitionManager::getData(
         const std::vector<diaspora::DataDescriptor>& descriptors,
         const BulkRef& bulk) {
     return m_data_store->load(descriptors, bulk);
 }
 
-Result<bool> DefaultPartitionManager::destroy() {
+Result<bool> LegacyPartitionManager::destroy() {
     Result<bool> result;
     // TODO wait for all the consumers to be done consuming
     result.value() = true;
     return result;
 }
 
-std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
+std::unique_ptr<mofka::PartitionManager> LegacyPartitionManager::create(
         const thallium::engine& engine,
         const std::string& topic_name,
         const UUID& partition_uuid,
@@ -127,10 +127,10 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     static JsonSchemaValidator schemaValidator{configSchema};
     auto validationErrors = schemaValidator.validate(config.json());
     if(!validationErrors.empty()) {
-        spdlog::error("[mofka] Error(s) while validating JSON config for DefaultPartitionManager:");
+        spdlog::error("[mofka] Error(s) while validating JSON config for LegacyPartitionManager:");
         for(auto& error : validationErrors) spdlog::error("[mofka] \t{}", error);
         throw diaspora::Exception{
-            "Error(s) while validating JSON config for DefaultPartitionManager"};
+            "Error(s) while validating JSON config for LegacyPartitionManager"};
     }
 
     /* the data and metadata dependencies are required so we know they are in the map */
@@ -153,7 +153,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
 
     /* create topic manager */
     return std::unique_ptr<mofka::PartitionManager>(
-        new DefaultPartitionManager(std::move(config),
+        new LegacyPartitionManager(std::move(config),
                                     std::move(data_store),
                                     std::move(event_store),
                                     engine));

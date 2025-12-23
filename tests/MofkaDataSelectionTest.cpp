@@ -14,7 +14,7 @@
 TEST_CASE("Event consumer test", "[event-consumer]") {
 
     // memory partition does not support fragmented descriptors
-    auto partition_type = GENERATE(as<std::string>{}, "default");
+    auto partition_type = GENERATE(as<std::string>{}, "legacy");
     CAPTURE(partition_type);
     auto remove_file = EnsureFileRemoved{"mofka.json"};
 
@@ -42,7 +42,6 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
     std::string seg1 = "abcdefghijklmnopqrstuvwxyz";
     std::string seg2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-    //spdlog::set_level(spdlog::level::from_str("trace"));
     // Producer
     {
         auto producer = topic.producer();
@@ -52,7 +51,6 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         producer.push(metadata, data);
         producer.flush();
     }
-    topic.markAsComplete();
 
     SECTION("Consume no data") {
         diaspora::DataSelector data_selector =

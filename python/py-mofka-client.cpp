@@ -28,7 +28,7 @@ PYBIND11_MODULE(pymofka_client, m) {
         }))
         .def_property_readonly("num_servers", &mofka::MofkaDriver::numServers)
         .def("start_progress_thread", &mofka::MofkaDriver::startProgressThread)
-        .def("add_default_partition",
+        .def("add_legacy_partition",
             [](mofka::MofkaDriver& service,
                std::string_view topic_name,
                size_t server_rank,
@@ -36,7 +36,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::string_view data_provider,
                const nlohmann::json& partition_config,
                const std::string& pool_name) {
-                service.addDefaultPartition(
+                service.addLegacyPartition(
                     topic_name, server_rank,
                     metadata_provider,
                     data_provider,
@@ -48,7 +48,7 @@ PYBIND11_MODULE(pymofka_client, m) {
             "data_provider"_a=std::string_view{},
             "partition_config"_a=nlohmann::json::object(),
             "pool_name"_a="")
-        .def("add_metadata_provider",
+        .def("add_yokan_metadata_provider",
             [](mofka::MofkaDriver& service,
                size_t server_rank,
                const std::string database_type,
@@ -58,12 +58,24 @@ PYBIND11_MODULE(pymofka_client, m) {
                 config.json()["database"] = nlohmann::json::object();
                 config.json()["database"]["type"] = database_type;
                 config.json()["database"]["config"] = database_config;
-                return service.addDefaultMetadataProvider(server_rank, config, dependencies);
+                return service.addYokanMetadataProvider(server_rank, config, dependencies);
             },
-            "server_rank"_a, "database_type"_a="map",
+            "server_rank"_a,
+            "database_type"_a="map",
             "database_config"_a=nlohmann::json::object(),
             "dependencies"_a=mofka::MofkaDriver::Dependencies{})
-        .def("add_data_provider",
+        .def("add_yokan_metadata_provider",
+            [](mofka::MofkaDriver& service,
+               size_t server_rank,
+               const nlohmann::json& config,
+               const mofka::MofkaDriver::Dependencies& dependencies) {
+                return service.addYokanMetadataProvider(
+                    server_rank, diaspora::Metadata{config}, dependencies);
+            },
+            "server_rank"_a,
+            "config"_a=R"({"database":{"type":"map","config":{}}})"_json,
+            "dependencies"_a=mofka::MofkaDriver::Dependencies{})
+        .def("add_warabi_data_provider",
             [](mofka::MofkaDriver& service,
                size_t server_rank,
                const std::string target_type,
@@ -73,10 +85,20 @@ PYBIND11_MODULE(pymofka_client, m) {
                 config.json()["target"] = nlohmann::json::object();
                 config.json()["target"]["type"] = target_type;
                 config.json()["target"]["config"] = target_config;
-                return service.addDefaultDataProvider(server_rank, config, dependencies);
+                return service.addWarabiDataProvider(server_rank, config, dependencies);
             },
             "server_rank"_a, "target_type"_a="memory",
             "target_config"_a=nlohmann::json::object(),
+            "dependencies"_a=mofka::MofkaDriver::Dependencies{})
+        .def("add_warabi_data_provider",
+            [](mofka::MofkaDriver& service,
+               size_t server_rank,
+               const nlohmann::json& config,
+               const mofka::MofkaDriver::Dependencies& dependencies) {
+                return service.addWarabiDataProvider(server_rank, diaspora::Metadata{config}, dependencies);
+            },
+            "server_rank"_a,
+            "config"_a=R"({"target":{"type":"memory","config":{}}})"_json,
             "dependencies"_a=mofka::MofkaDriver::Dependencies{})
         .def("add_custom_partition",
             [](mofka::MofkaDriver& service,
@@ -103,24 +125,6 @@ PYBIND11_MODULE(pymofka_client, m) {
                 service.addMemoryPartition(topic_name, server_rank, pool_name);
             },
             "topic_name"_a, "server_rank"_a, "pool_name"_a="")
-        .def("add_default_data_provider",
-            [](mofka::MofkaDriver& service,
-               size_t server_rank,
-               const nlohmann::json& config,
-               const mofka::MofkaDriver::Dependencies& dependencies) {
-                return service.addDefaultDataProvider(server_rank, diaspora::Metadata{config}, dependencies);
-            },
-            "server_rank"_a, "config"_a=R"({"target":{"type":"memory","config":{}}})"_json,
-            "dependencies"_a=mofka::MofkaDriver::Dependencies{})
-        .def("add_default_metadata_provider",
-            [](mofka::MofkaDriver& service,
-               size_t server_rank,
-               const nlohmann::json& config,
-               const mofka::MofkaDriver::Dependencies& dependencies) {
-                return service.addDefaultMetadataProvider(server_rank, diaspora::Metadata{config}, dependencies);
-            },
-            "server_rank"_a, "config"_a=R"({"database":{"type":"map","config":{}}})"_json,
-            "dependencies"_a=mofka::MofkaDriver::Dependencies{})
     ;
 
 #if 0
