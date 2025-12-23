@@ -45,7 +45,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     tl::auto_remote_procedure m_consumer_ack_event;
     tl::auto_remote_procedure m_consumer_remove_consumer;
     tl::auto_remote_procedure m_consumer_request_data;
-    tl::auto_remote_procedure m_topic_mark_as_complete;
     /* RPC for Consumers */
     thallium::remote_procedure m_consumer_recv_batch;
     // PartitionManager
@@ -68,7 +67,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     , m_consumer_ack_event(define("mofka_consumer_ack_event", &ProviderImpl::acknowledge, pool))
     , m_consumer_remove_consumer(define("mofka_consumer_remove_consumer", &ProviderImpl::removeConsumer, pool))
     , m_consumer_request_data(define("mofka_consumer_request_data", &ProviderImpl::requestData, pool))
-    , m_topic_mark_as_complete(define("mofka_topic_mark_as_complete", &ProviderImpl::markAsComplete, pool))
     , m_consumer_recv_batch(m_engine.define("mofka_consumer_recv_batch"))
     {
         /* Validate the configuration */
@@ -243,21 +241,6 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         }
         spdlog::trace("[mofka:{}] Done executing requestData", id());
     }
-
-    void markAsComplete(const tl::request& req) {
-        spdlog::trace("[mofka:{}] Received markAsComplete request (topic: {})", id(), m_topic);
-        Result<void> result;
-        tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        try {
-            ENSURE_VALID_PARTITION_MANAGER(result);
-            result = m_partition_manager->markAsComplete();
-        } catch(const diaspora::Exception& ex) {
-            result.error() = ex.what();
-            result.success() = false;
-        }
-        spdlog::trace("[mofka:{}] Done executing markAsComplete", id());
-    }
-
 };
 
 }

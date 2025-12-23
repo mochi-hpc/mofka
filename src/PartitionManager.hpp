@@ -136,12 +136,6 @@ class PartitionManager {
         const BulkRef& bulk) = 0;
 
     /**
-     * @brief Mark the partition as complete, i.e. it will not receive
-     * any more events from producers.
-     */
-    virtual Result<void> markAsComplete() = 0;
-
-    /**
      * @brief Destroys the underlying topic.
      *
      * @return a Result<bool> instance indicating

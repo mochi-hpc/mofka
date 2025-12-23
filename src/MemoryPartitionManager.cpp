@@ -138,7 +138,7 @@ Result<void> MemoryPartitionManager::feedConsumer(
                 size_t max_available_events = m_events_metadata_sizes.size() - first_id;
                 num_events_to_send = std::min(batchSize.value, max_available_events);
                 should_stop = consumerHandle.shouldStop();
-                if(num_events_to_send != 0 || should_stop || m_is_marked_complete) break;
+                if(num_events_to_send != 0 || should_stop) break;
                 m_events_cv.wait(g);
             }
             if(should_stop) break;
@@ -243,14 +243,6 @@ Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
     // such as whether we are reading outside of an event's boundary, or whether
     // the remote bulk handle's size matches what is expected.
 
-    return result;
-}
-
-Result<void> MemoryPartitionManager::markAsComplete() {
-    Result<void> result;
-    m_is_marked_complete = true;
-    m_events_cv.notify_all();
-    result.success() = true;
     return result;
 }
 

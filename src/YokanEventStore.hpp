@@ -42,7 +42,6 @@ class YokanEventStore {
     size_t                       m_data_count = 0;
     thallium::mutex              m_count_mtx;
     thallium::condition_variable m_count_cv;
-    std::atomic<bool>            m_is_marked_complete = false;
 
     public:
 
@@ -129,15 +128,6 @@ class YokanEventStore {
             m_data_count += descriptors.size();
         }
 
-        return result;
-    }
-
-    Result<void> markAsComplete() {
-        Result<void> result;
-        result.success() = true;
-        m_metadata_coll.update(0, "T", 1, YOKAN_MODE_NO_RDMA);
-        m_is_marked_complete = true;
-        m_count_cv.notify_all();
         return result;
     }
 
@@ -237,7 +227,7 @@ class YokanEventStore {
                 auto num_events = std::min(m_metadata_count, m_data_count);
                 num_available_events = num_events - firstID;
                 should_stop = consumerHandle.shouldStop();
-                if(num_available_events > 0 || should_stop || m_is_marked_complete) break;
+                if(num_available_events > 0 || should_stop) break;
                 m_count_cv.wait(g);
             }
             if(should_stop) break;
@@ -319,8 +309,7 @@ class YokanEventStore {
     , m_metadata_coll(std::move(metadata_coll))
     , m_descriptors_coll(std::move(descriptors_coll))
     , m_metadata_count(num_events)
-    , m_data_count(num_events)
-    , m_is_marked_complete{marked_as_complete} {}
+    , m_data_count(num_events) {}
 
     static std::unique_ptr<YokanEventStore> create(
             thallium::engine engine,
