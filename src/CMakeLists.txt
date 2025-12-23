@@ -1,7 +1,7 @@
 # set source files
 set (server-src-files
      Provider.cpp
-     DefaultPartitionManager.cpp
+     LegacyPartitionManager.cpp
      MemoryPartitionManager.cpp)
 
 set (client-src-files
