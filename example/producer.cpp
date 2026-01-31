@@ -1,23 +1,20 @@
 #include <mofka/MofkaDriver.hpp>
 #include <diaspora/Driver.hpp>
 #include <diaspora/TopicHandle.hpp>
-#include <tclap/CmdLine.h>
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
-#include <time.h>
+#include <cstdlib>
+#include <ctime>
 #include <string>
 #include <iostream>
 
-static std::string g_backend_type = "memory";
-static std::string g_group_file;
-static std::string g_protocol;
-static std::string g_log_level = "info";
-
-static void parse_command_line(int argc, char** argv);
-
 int main(int argc, char** argv) {
-    parse_command_line(argc, argv);
-    spdlog::set_level(spdlog::level::from_str(g_log_level));
+    if(argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <group-file>" << std::endl;
+        return -1;
+    }
+    std::string g_group_file = argv[1];
+    spdlog::set_level(spdlog::level::info);
 
     try {
 
@@ -73,38 +70,4 @@ int main(int argc, char** argv) {
     spdlog::info("Done!");
 
     return 0;
-}
-
-static void parse_command_line(int argc, char** argv) {
-    try {
-        TCLAP::CmdLine cmd("Mofka client", ' ', "0.1");
-        TCLAP::ValueArg<std::string> groupFileArg(
-                "f", "group-file", "Flock group file of the driver", true, "", "string");
-        TCLAP::ValueArg<std::string> protocolArg(
-                "p", "protocol", "Protocol", true, "na+sm", "string");
-        TCLAP::ValuesConstraint<std::string> allowedLogLevels({
-            "trace", "debug", "info", "warning", "error", "critical", "off"
-        });
-        TCLAP::ValueArg<std::string> logLevel(
-                "v", "verbose", "Logging level",
-                false, "info", &allowedLogLevels);
-        TCLAP::ValuesConstraint<std::string> allowedBackends({
-            "memory", "default"
-        });
-        TCLAP::ValueArg<std::string> backendType(
-                "b", "backend", "Backend",
-                false, "memory", &allowedBackends);
-        cmd.add(groupFileArg);
-        cmd.add(protocolArg);
-        cmd.add(logLevel);
-        cmd.add(backendType);
-        cmd.parse(argc, argv);
-        g_group_file   = groupFileArg.getValue();
-        g_protocol     = protocolArg.getValue();
-        g_log_level    = logLevel.getValue();
-        g_backend_type = backendType.getValue();
-    } catch(TCLAP::ArgException &e) {
-        std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
-        exit(-1);
-    }
 }
