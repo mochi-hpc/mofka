@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
         diaspora::PartitionSelector selector;
         driver.createTopic("mytopic", diaspora::Metadata{}, validator, selector, serializer);
 
-        driver.as<mofka::MofkaDriver>().addDefaultPartition("mytopic", 0);
+        driver.as<mofka::MofkaDriver>().addLegacyPartition("mytopic", 0);
 
         diaspora::TopicHandle topic = driver.openTopic("mytopic");
 

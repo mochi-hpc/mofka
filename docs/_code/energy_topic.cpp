@@ -52,14 +52,14 @@ int main(int argc, char** argv) {
         auto& diaspora_driver = driver.as<mofka::MofkaDriver>();
         // add an in-memory partition
         diaspora_driver.addMemoryPartition("collisions", 0);
-        // add a default partition (all arguments specified)
-        diaspora_driver.addDefaultPartition(
+        // add a legacy partition (all arguments specified)
+        diaspora_driver.addLegacyPartition(
                 "collisions", 0,
                 "my_metadata_provider@local",
                 "my_data_provider@local",
                 {}, "__primary__");
         // add a default partition (discover providers automatically)
-        diaspora_driver.addDefaultPartition("collisions", 0);
+        diaspora_driver.addLegacyPartition("collisions", 0);
         // END ADD PARTITION
 
         // START ADD PROVIDERS
@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
                 }
             }
         })"};
-        auto metadata_provider = diaspora_driver.addDefaultMetadataProvider(0, metadata_config);
+        auto metadata_provider = diaspora_driver.addYokanMetadataProvider(0, metadata_config);
         // add a data provider
         auto data_config = diaspora::Metadata{R"({
             "target": {
@@ -84,9 +84,9 @@ int main(int argc, char** argv) {
                 }
             }
         })"};
-        auto data_provider = diaspora_driver.addDefaultDataProvider(0, data_config);
+        auto data_provider = diaspora_driver.addWarabiDataProvider(0, data_config);
         // create a partition that uses these providers
-        diaspora_driver.addDefaultPartition("collisions", 0, metadata_provider, data_provider);
+        diaspora_driver.addLegacyPartition("collisions", 0, metadata_provider, data_provider);
         // END ADD PROVIDERS
         {
         // START PRODUCER

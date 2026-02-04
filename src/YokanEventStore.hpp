@@ -72,7 +72,7 @@ class YokanEventStore {
                 ex.what());
         }
 
-        result.value() = ids[0] - 1; // IDs start at 1 in the underlying DB
+        result.value() = ids[0];
         {
             auto g = std::unique_lock{m_count_mtx};
             m_metadata_count += count;
@@ -107,7 +107,7 @@ class YokanEventStore {
         if(offset > 0) {
 
             std::vector<yk_id_t> ids(count);
-            for(size_t i = 0; i < count; ++i) ids[i] = firstID + 1 + i;
+            for(size_t i = 0; i < count; ++i) ids[i] = firstID + i;
 
             try {
                 m_descriptors_coll.updatePacked(
@@ -232,8 +232,7 @@ class YokanEventStore {
             }
             if(should_stop) break;
 
-            if(num_available_events == 0) { // m_is_marked_complete must be true
-                                            // feed consumer 0 events with first_id = NoMoreEvents to indicate
+            if(num_available_events == 0) { // feed consumer 0 events with first_id = NoMoreEvents to indicate
                                             // that there are no more events to consume from this partition
                 if(lastFeed) lastFeed.wait(-1);
                 lastFeed = consumerHandle.feed(
@@ -243,7 +242,7 @@ class YokanEventStore {
 
             // list metadata documents
             m_metadata_coll.listBulk(
-                    firstID+1, 0, b1->local_metadata_bulk.get_bulk(),
+                    firstID, 0, b1->local_metadata_bulk.get_bulk(),
                     0, b1->metadata_buffer.size(), true, batchSize.value);
 
             // check how many we actually pulled
@@ -300,8 +299,7 @@ class YokanEventStore {
         yokan::Database db,
         yokan::Collection metadata_coll,
         yokan::Collection descriptors_coll,
-        size_t num_events,
-        bool marked_as_complete)
+        size_t num_events)
     : m_engine(std::move(engine))
     , m_topic_name(std::move(topic_name))
     , m_yokan_client(std::move(yokan_client))
@@ -322,27 +320,15 @@ class YokanEventStore {
 
         auto metadataCollName = topic_name + "--" + partition_uuid.to_string() + "--md";
         auto descriptorsCollName = topic_name + "--" + partition_uuid.to_string() + "--dd";
-        bool init_collection= false;
         if(!database.collectionExists(metadataCollName.c_str())) {
             database.createCollection(metadataCollName.c_str());
-            init_collection = true;
         }
         if(!database.collectionExists(descriptorsCollName.c_str())) {
             database.createCollection(descriptorsCollName.c_str());
         }
         auto metadata_coll = yokan::Collection{metadataCollName.c_str(), database};
         auto descriptors_coll = yokan::Collection{descriptorsCollName.c_str(), database};
-        auto marked_as_complete = false;
-        if(init_collection) {
-            metadata_coll.store("F", 1, YOKAN_MODE_NO_RDMA);    // marked as completed
-            descriptors_coll.store("F", 1, YOKAN_MODE_NO_RDMA); // marked as completed
-        } else {
-            std::string tmp(1, '\0');
-            size_t s = 1;
-            metadata_coll.load(0, tmp.data(), &s);
-            if(tmp == "T") marked_as_complete = true;
-        }
-        auto num_events = metadata_coll.size() - 1;
+        auto num_events = metadata_coll.size();
         return std::make_unique<YokanEventStore>(
             std::move(engine),
             std::move(topic_name),
@@ -350,8 +336,7 @@ class YokanEventStore {
             std::move(database),
             std::move(metadata_coll),
             std::move(descriptors_coll),
-            num_events,
-            marked_as_complete);
+            num_events);
     }
 
 };

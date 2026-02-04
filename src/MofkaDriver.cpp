@@ -463,12 +463,12 @@ void MofkaDriver::addMemoryPartition(std::string_view topic_name,
     addCustomPartition(topic_name, server_rank, "memory", {}, {}, pool_name);
 }
 
-void MofkaDriver::addDefaultPartition(std::string_view topic_name,
-                                        size_t server_rank,
-                                        std::string_view metadata_provider,
-                                        std::string_view data_provider,
-                                        const diaspora::Metadata& config,
-                                        std::string_view pool_name) {
+void MofkaDriver::addLegacyPartition(std::string_view topic_name,
+                                     size_t server_rank,
+                                     std::string_view metadata_provider,
+                                     std::string_view data_provider,
+                                     const diaspora::Metadata& config,
+                                     std::string_view pool_name) {
     Dependencies dependencies = {
         {"metadata", {std::string{metadata_provider.data(), metadata_provider.size()}}},
         {"data", {std::string{data_provider.data(), data_provider.size()}}}
@@ -534,7 +534,7 @@ void MofkaDriver::addDefaultPartition(std::string_view topic_name,
         }
     }
 
-    addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name);
+    addCustomPartition(topic_name, server_rank, "legacy", config, dependencies, pool_name);
 }
 
 void MofkaDriver::addCustomPartition(
@@ -597,7 +597,7 @@ void MofkaDriver::addCustomPartition(
     }
 }
 
-std::string MofkaDriver::addDefaultMetadataProvider(
+std::string MofkaDriver::addYokanMetadataProvider(
           size_t server_rank,
           const diaspora::Metadata& config,
           const Dependencies& dependencies) {
@@ -626,7 +626,7 @@ std::string MofkaDriver::addDefaultMetadataProvider(
     }
 }
 
-std::string MofkaDriver::addDefaultDataProvider(
+std::string MofkaDriver::addWarabiDataProvider(
           size_t server_rank,
           const diaspora::Metadata& config,
           const Dependencies& dependencies) {
