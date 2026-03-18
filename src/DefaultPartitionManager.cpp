@@ -92,34 +92,66 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
     (void)producer_name;
     Result<diaspora::EventID> result;
 
-    // --------- transfer the metadata sizes and content into local buffers
+    // --------- transfer the metadata and data into local buffers, then write to chunk files
     auto metadata_content_size = metadata_bulk.size - num_events*sizeof(size_t);
-    std::vector<size_t> metadata_sizes(num_events);
-    std::vector<char>   metadata_content(metadata_content_size);
-
-    auto local_metadata_bulk = m_engine.expose(
-        {{(char*)metadata_sizes.data(), num_events*sizeof(size_t)},
-         {metadata_content.data(), metadata_content_size}},
-        thallium::bulk_mode::write_only);
-    local_metadata_bulk << metadata_bulk.handle.on(sender).select(
-        metadata_bulk.offset, metadata_bulk.size);
-
-    // --------- transfer the data sizes and content into local buffers
     auto data_content_size = data_bulk.size - num_events*sizeof(size_t);
-    std::vector<size_t> data_sizes(num_events);
-    std::vector<char>   data_content(data_content_size);
 
-    auto local_data_bulk = m_engine.expose(
-        {{(char*)data_sizes.data(), num_events*sizeof(size_t)},
-         {data_content.data(), data_content_size}},
-        thallium::bulk_mode::write_only);
-    local_data_bulk << data_bulk.handle.on(sender).select(
-        data_bulk.offset, data_bulk.size);
-
-    // --------- lock and write to chunk files
     diaspora::EventID first_id;
     {
         auto g = std::unique_lock<thallium::mutex>{m_write_mtx};
+
+        // --- RDMA transfer of metadata and data ---
+        // Fallback vectors (only used when cache is disabled)
+        std::vector<size_t> fb_metadata_sizes;
+        std::vector<char>   fb_metadata_content;
+        std::vector<size_t> fb_data_sizes;
+        std::vector<char>   fb_data_content;
+
+        size_t* metadata_sizes_ptr;
+        char*   metadata_content_ptr;
+        size_t* data_sizes_ptr;
+        char*   data_content_ptr;
+
+        if(m_bulk_cache_enabled) {
+            m_recv_metadata_cache.prepare(num_events, metadata_content_size);
+            metadata_sizes_ptr = m_recv_metadata_cache.sizes_data();
+            metadata_content_ptr = m_recv_metadata_cache.content_data();
+            auto local_metadata_bulk = m_recv_metadata_cache.bulk().select(
+                0, num_events*sizeof(size_t) + metadata_content_size);
+            local_metadata_bulk << metadata_bulk.handle.on(sender).select(
+                metadata_bulk.offset, metadata_bulk.size);
+
+            m_recv_data_cache.prepare(num_events, data_content_size);
+            data_sizes_ptr = m_recv_data_cache.sizes_data();
+            data_content_ptr = m_recv_data_cache.content_data();
+            auto local_data_bulk = m_recv_data_cache.bulk().select(
+                0, num_events*sizeof(size_t) + data_content_size);
+            local_data_bulk << data_bulk.handle.on(sender).select(
+                data_bulk.offset, data_bulk.size);
+        } else {
+            fb_metadata_sizes.resize(num_events);
+            fb_metadata_content.resize(metadata_content_size);
+            auto local_metadata_bulk = m_engine.expose(
+                {{(char*)fb_metadata_sizes.data(), num_events*sizeof(size_t)},
+                 {fb_metadata_content.data(), metadata_content_size}},
+                thallium::bulk_mode::write_only);
+            local_metadata_bulk << metadata_bulk.handle.on(sender).select(
+                metadata_bulk.offset, metadata_bulk.size);
+            metadata_sizes_ptr = fb_metadata_sizes.data();
+            metadata_content_ptr = fb_metadata_content.data();
+
+            fb_data_sizes.resize(num_events);
+            fb_data_content.resize(data_content_size);
+            auto local_data_bulk = m_engine.expose(
+                {{(char*)fb_data_sizes.data(), num_events*sizeof(size_t)},
+                 {fb_data_content.data(), data_content_size}},
+                thallium::bulk_mode::write_only);
+            local_data_bulk << data_bulk.handle.on(sender).select(
+                data_bulk.offset, data_bulk.size);
+            data_sizes_ptr = fb_data_sizes.data();
+            data_content_ptr = fb_data_content.data();
+        }
+
         first_id = m_total_events;
 
         // Compute per-event offsets relative to the current chunk position
@@ -138,16 +170,16 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
             diaspora::BufferWrapperOutputArchive output_archive{desc_buf};
             for(size_t i = 0; i < num_events; ++i) {
                 batch_records[i].metadata_offset = meta_off;
-                batch_records[i].metadata_size   = static_cast<uint32_t>(metadata_sizes[i]);
+                batch_records[i].metadata_size   = static_cast<uint32_t>(metadata_sizes_ptr[i]);
                 batch_records[i].data_offset     = data_off;
-                batch_records[i].data_size       = static_cast<uint32_t>(data_sizes[i]);
+                batch_records[i].data_size       = static_cast<uint32_t>(data_sizes_ptr[i]);
                 batch_records[i].data_desc_offset = m_desc_offset;
 
                 // Build FileDataDescriptor for this event
                 FileDataDescriptor fdd;
                 fdd.chunk_id = m_current_chunk_id;
                 fdd.offset   = data_off;
-                fdd.size     = static_cast<uint32_t>(data_sizes[i]);
+                fdd.size     = static_cast<uint32_t>(data_sizes_ptr[i]);
 
                 auto data_descriptor = diaspora::DataDescriptor(fdd.toString(), fdd.size);
                 size_t desc_buf_before = desc_buf.size();
@@ -158,19 +190,19 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
                 desc_offsets[i] = m_desc_offset;
                 batch_records[i].data_desc_size = static_cast<uint32_t>(desc_size);
 
-                meta_off += metadata_sizes[i];
-                data_off += data_sizes[i];
+                meta_off += metadata_sizes_ptr[i];
+                data_off += data_sizes_ptr[i];
                 m_desc_offset += desc_size;
 
-                event_meta_cursor += metadata_sizes[i];
-                event_data_cursor += data_sizes[i];
+                event_meta_cursor += metadata_sizes_ptr[i];
+                event_data_cursor += data_sizes_ptr[i];
             }
         }
 
         // Write metadata to .meta
         if(metadata_content_size > 0) {
             ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_meta,
-                metadata_content.data(), metadata_content_size, m_meta_offset);
+                metadata_content_ptr, metadata_content_size, m_meta_offset);
             if(ret < 0) {
                 result.success() = false;
                 result.error() = fmt::format("Failed to write metadata: {}", strerror(-ret));
@@ -181,7 +213,7 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
         // Write data to .data
         if(data_content_size > 0) {
             ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_data,
-                data_content.data(), data_content_size, m_data_offset);
+                data_content_ptr, data_content_size, m_data_offset);
             if(ret < 0) {
                 result.success() = false;
                 result.error() = fmt::format("Failed to write data: {}", strerror(-ret));
@@ -284,24 +316,55 @@ Result<void> DefaultPartitionManager::feedConsumer(
             }
 
             // Compute metadata sizes from in-memory index
-            std::vector<size_t> metadata_sizes(num_events_to_send);
             size_t total_metadata_size = 0;
+            size_t total_desc_size = 0;
             for(size_t i = 0; i < num_events_to_send; ++i) {
-                metadata_sizes[i] = m_index[first_id + i].metadata_size;
-                total_metadata_size += metadata_sizes[i];
+                total_metadata_size += m_index[first_id + i].metadata_size;
+                total_desc_size += m_index[first_id + i].data_desc_size;
             }
 
-            // Read metadata content from chunk files
-            std::vector<char> metadata_content(total_metadata_size);
+            // Fallback vectors (only used when cache is disabled)
+            std::vector<size_t> fb_metadata_sizes;
+            std::vector<char>   fb_metadata_content;
+            std::vector<size_t> fb_desc_sizes;
+            std::vector<char>   fb_desc_content;
+
+            size_t* metadata_sizes_ptr;
+            char*   metadata_content_ptr;
+            size_t* desc_sizes_ptr;
+            char*   desc_content_ptr;
+
+            if(m_bulk_cache_enabled) {
+                m_feed_metadata_cache.prepare(num_events_to_send, total_metadata_size);
+                metadata_sizes_ptr = m_feed_metadata_cache.sizes_data();
+                metadata_content_ptr = m_feed_metadata_cache.content_data();
+
+                m_feed_desc_cache.prepare(num_events_to_send, total_desc_size);
+                desc_sizes_ptr = m_feed_desc_cache.sizes_data();
+                desc_content_ptr = m_feed_desc_cache.content_data();
+            } else {
+                fb_metadata_sizes.resize(num_events_to_send);
+                fb_metadata_content.resize(total_metadata_size);
+                metadata_sizes_ptr = fb_metadata_sizes.data();
+                metadata_content_ptr = fb_metadata_content.data();
+
+                fb_desc_sizes.resize(num_events_to_send);
+                fb_desc_content.resize(total_desc_size);
+                desc_sizes_ptr = fb_desc_sizes.data();
+                desc_content_ptr = fb_desc_content.data();
+            }
+
+            // Fill metadata sizes and read metadata content from chunk files
             {
                 size_t buf_offset = 0;
                 for(size_t i = 0; i < num_events_to_send; ++i) {
                     auto& rec = m_index[first_id + i];
+                    metadata_sizes_ptr[i] = rec.metadata_size;
                     auto chunk_id = m_event_chunk_ids[first_id + i];
                     auto path = chunkPath(chunk_id, "meta");
                     int fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
                     if(fd >= 0) {
-                        abt_io_pread(m_abt_io, fd, metadata_content.data() + buf_offset,
+                        abt_io_pread(m_abt_io, fd, metadata_content_ptr + buf_offset,
                                      rec.metadata_size, rec.metadata_offset);
                         abt_io_close(m_abt_io, fd);
                     }
@@ -309,25 +372,17 @@ Result<void> DefaultPartitionManager::feedConsumer(
                 }
             }
 
-            // Compute descriptor sizes from in-memory index
-            std::vector<size_t> desc_sizes(num_events_to_send);
-            size_t total_desc_size = 0;
-            for(size_t i = 0; i < num_events_to_send; ++i) {
-                desc_sizes[i] = m_index[first_id + i].data_desc_size;
-                total_desc_size += desc_sizes[i];
-            }
-
-            // Read descriptor content from chunk files
-            std::vector<char> desc_content(total_desc_size);
+            // Fill descriptor sizes and read descriptor content from chunk files
             {
                 size_t buf_offset = 0;
                 for(size_t i = 0; i < num_events_to_send; ++i) {
                     auto& rec = m_index[first_id + i];
+                    desc_sizes_ptr[i] = rec.data_desc_size;
                     auto chunk_id = m_event_chunk_ids[first_id + i];
                     auto path = chunkPath(chunk_id, "desc");
                     int fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
                     if(fd >= 0) {
-                        abt_io_pread(m_abt_io, fd, desc_content.data() + buf_offset,
+                        abt_io_pread(m_abt_io, fd, desc_content_ptr + buf_offset,
                                      rec.data_desc_size, rec.data_desc_offset);
                         abt_io_close(m_abt_io, fd);
                     }
@@ -335,23 +390,33 @@ Result<void> DefaultPartitionManager::feedConsumer(
                 }
             }
 
-            // Expose metadata as bulk
-            auto metadata_bulk = m_engine.expose(
-                    {{metadata_sizes.data(), num_events_to_send*sizeof(size_t)},
-                     {metadata_content.data(), total_metadata_size}},
+            // Expose metadata as bulk (cached or per-call)
+            thallium::bulk metadata_bulk_handle;
+            if(m_bulk_cache_enabled) {
+                metadata_bulk_handle = m_feed_metadata_cache.bulk();
+            } else {
+                metadata_bulk_handle = m_engine.expose(
+                    {{(char*)metadata_sizes_ptr, num_events_to_send*sizeof(size_t)},
+                     {metadata_content_ptr, total_metadata_size}},
                     thallium::bulk_mode::read_only);
+            }
             auto metadata_size_bulk_ref = BulkRef{
-                metadata_bulk, 0, num_events_to_send*sizeof(size_t), self_addr
+                metadata_bulk_handle, 0, num_events_to_send*sizeof(size_t), self_addr
             };
             auto metadata_bulk_ref = BulkRef{
-                metadata_bulk, num_events_to_send*sizeof(size_t), total_metadata_size, self_addr
+                metadata_bulk_handle, num_events_to_send*sizeof(size_t), total_metadata_size, self_addr
             };
 
-            // Expose descriptors as bulk
-            auto data_descriptors_bulk = m_engine.expose(
-                    {{desc_sizes.data(), num_events_to_send*sizeof(size_t)},
-                     {desc_content.data(), total_desc_size}},
+            // Expose descriptors as bulk (cached or per-call)
+            thallium::bulk data_descriptors_bulk;
+            if(m_bulk_cache_enabled) {
+                data_descriptors_bulk = m_feed_desc_cache.bulk();
+            } else {
+                data_descriptors_bulk = m_engine.expose(
+                    {{(char*)desc_sizes_ptr, num_events_to_send*sizeof(size_t)},
+                     {desc_content_ptr, total_desc_size}},
                     thallium::bulk_mode::read_only);
+            }
             auto data_desc_size_bulk_ref = BulkRef{
                 data_descriptors_bulk, 0, num_events_to_send*sizeof(size_t), self_addr
             };
@@ -393,6 +458,8 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
 
     auto client_address = m_engine.lookup(bulk.address);
 
+    auto g = std::unique_lock<thallium::mutex>{m_getdata_mtx};
+
     std::vector<std::pair<void*, size_t>> local_segments;
     // Calculate total size needed based on actual file data sizes
     size_t total_data_size = 0;
@@ -402,7 +469,15 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
         total_data_size += fdd.size;
     }
 
-    std::vector<char> data_buffer(total_data_size);
+    // Use cached buffer to avoid per-call allocation
+    char* data_buffer_ptr;
+    std::vector<char> fb_data_buffer;
+    if(m_bulk_cache_enabled) {
+        data_buffer_ptr = m_getdata_cache.resize(total_data_size);
+    } else {
+        fb_data_buffer.resize(total_data_size);
+        data_buffer_ptr = fb_data_buffer.data();
+    }
     size_t buffer_cursor = 0;
 
     for(size_t i = 0; i < descriptors.size(); ++i) {
@@ -421,7 +496,7 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
             continue;
         }
 
-        abt_io_pread(m_abt_io, fd, data_buffer.data() + buffer_cursor,
+        abt_io_pread(m_abt_io, fd, data_buffer_ptr + buffer_cursor,
                      fdd.size, fdd.offset);
         abt_io_close(m_abt_io, fd);
 
@@ -429,7 +504,7 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
         auto flat = desc.flatten();
         for(auto& seg : flat) {
             local_segments.push_back({
-                data_buffer.data() + buffer_cursor + seg.offset,
+                data_buffer_ptr + buffer_cursor + seg.offset,
                 seg.size
             });
         }
@@ -465,7 +540,14 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             "path": {"type": "string"},
             "max_chunk_size": {"type": "integer"},
             "max_events_per_chunk": {"type": "integer"},
-            "sync": {"type": "boolean"}
+            "sync": {"type": "boolean"},
+            "bulk_cache": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "initial_buffer_size": {"type": "integer", "minimum": 0}
+                }
+            }
         },
         "required": ["path"]
     }
@@ -491,6 +573,15 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     size_t max_chunk_size = json.value("max_chunk_size", (size_t)(64 * 1024 * 1024));
     size_t max_events_per_chunk = json.value("max_events_per_chunk", (size_t)1000000);
     bool sync = json.value("sync", true);
+
+    /* Parse bulk_cache config */
+    bool bulk_cache_enabled = true;
+    size_t initial_buffer_size = 0;
+    if(json.contains("bulk_cache")) {
+        auto& bc = json["bulk_cache"];
+        bulk_cache_enabled = bc.value("enabled", true);
+        initial_buffer_size = bc.value("initial_buffer_size", (size_t)0);
+    }
 
     /* Create directory: <path>/<topic_name>-<uuid>/ */
     std::string partition_path = base_path + "/" + topic_name + "-" + partition_uuid.to_string();
@@ -558,7 +649,8 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     auto manager = std::unique_ptr<DefaultPartitionManager>(
         new DefaultPartitionManager(
             partition_path, max_chunk_size, max_events_per_chunk,
-            sync, abt_io, engine));
+            sync, abt_io, engine,
+            bulk_cache_enabled, initial_buffer_size));
 
     manager->m_current_chunk_id = current_chunk_id;
     manager->m_total_events = total_events;

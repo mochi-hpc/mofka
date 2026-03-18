@@ -15,6 +15,94 @@
 namespace mofka {
 
 /**
+ * Grow-only buffer cache that reuses an already-registered thallium::bulk handle.
+ * Re-registers only when the underlying std::vector reallocates (capacity grows).
+ */
+class BulkCache {
+
+    std::vector<char>    m_buffer;
+    thallium::bulk       m_bulk;
+    size_t               m_registered_capacity = 0;
+    thallium::engine     m_engine;
+
+public:
+
+    BulkCache() = default;
+
+    BulkCache(thallium::engine engine)
+    : m_engine(std::move(engine))
+    {}
+
+    // Ensure buffer is at least `size` bytes. Returns pointer to buffer.
+    // No bulk registration — used as a simple buffer cache for getData.
+    char* resize(size_t size) {
+        m_buffer.resize(size);
+        return m_buffer.data();
+    }
+
+    char* data() { return m_buffer.data(); }
+    size_t size() const { return m_buffer.size(); }
+};
+
+/**
+ * Dual-segment grow-only buffer cache for sizes array + content buffer.
+ * Maintains a combined two-segment thallium::bulk handle and re-registers
+ * only when either vector's capacity grows.
+ */
+class DualBulkCache {
+
+    std::vector<size_t>  m_sizes;
+    std::vector<char>    m_content;
+    thallium::bulk       m_bulk;
+    size_t               m_registered_sizes_cap = 0;
+    size_t               m_registered_content_cap = 0;
+    thallium::engine     m_engine;
+    thallium::bulk_mode  m_mode;
+
+public:
+
+    DualBulkCache() = default;
+
+    DualBulkCache(thallium::engine engine, thallium::bulk_mode mode)
+    : m_engine(std::move(engine))
+    , m_mode(mode)
+    {}
+
+    /**
+     * Prepare sizes array for num_events and content buffer for content_size bytes.
+     * Re-registers the combined bulk only if either vector grew beyond registered capacity.
+     */
+    void prepare(size_t num_events, size_t content_size) {
+        m_sizes.resize(num_events);
+        // Ensure content has at least 1 byte so the two-segment bulk always
+        // has valid memory for both segments.
+        m_content.resize(std::max(content_size, (size_t)1));
+
+        bool needs_reregister =
+            (m_sizes.capacity() * sizeof(size_t) > m_registered_sizes_cap) ||
+            (m_content.capacity() > m_registered_content_cap);
+
+        if(needs_reregister && num_events > 0) {
+            auto sizes_bytes = m_sizes.capacity() * sizeof(size_t);
+            auto content_bytes = m_content.capacity();
+            m_bulk = m_engine.expose(
+                {{(char*)m_sizes.data(), sizes_bytes},
+                 {m_content.data(), content_bytes}},
+                m_mode);
+            m_registered_sizes_cap = sizes_bytes;
+            m_registered_content_cap = content_bytes;
+        }
+    }
+
+    size_t* sizes_data() { return m_sizes.data(); }
+    char* content_data() { return m_content.data(); }
+    const thallium::bulk& bulk() const { return m_bulk; }
+
+    size_t sizes_bytes() const { return m_sizes.size() * sizeof(size_t); }
+    size_t content_bytes() const { return m_content.size(); }
+};
+
+/**
  * Default file-based implementation of a mofka PartitionManager.
  * Stores events in append-only chunk files using ABT-IO.
  */
@@ -88,6 +176,22 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     // Write lock
     thallium::mutex              m_write_mtx;
 
+    // Bulk cache config
+    bool                         m_bulk_cache_enabled = true;
+    size_t                       m_initial_buffer_size = 0;
+
+    // Buffer caches for receiveBatch (write-only: receiving from producer via RDMA pull)
+    DualBulkCache                m_recv_metadata_cache;
+    DualBulkCache                m_recv_data_cache;
+
+    // Buffer caches for feedConsumer (read-only: sending to consumer)
+    DualBulkCache                m_feed_metadata_cache;
+    DualBulkCache                m_feed_desc_cache;
+
+    // Buffer cache for getData (buffer only, no bulk caching)
+    BulkCache                    m_getdata_cache;
+    thallium::mutex              m_getdata_mtx;
+
     // Helpers
     std::string chunkPath(uint32_t chunk_id, const std::string& ext) const;
     void openChunk(uint32_t chunk_id);
@@ -103,14 +207,31 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         size_t max_events_per_chunk,
         bool sync,
         abt_io_instance_id abt_io,
-        thallium::engine engine)
+        thallium::engine engine,
+        bool bulk_cache_enabled = true,
+        size_t initial_buffer_size = 0)
     : m_path(std::move(path))
     , m_max_chunk_size(max_chunk_size)
     , m_max_events_per_chunk(max_events_per_chunk)
     , m_sync(sync)
     , m_abt_io(abt_io)
     , m_engine(std::move(engine))
-    {}
+    , m_bulk_cache_enabled(bulk_cache_enabled)
+    , m_initial_buffer_size(initial_buffer_size)
+    , m_recv_metadata_cache(m_engine, thallium::bulk_mode::write_only)
+    , m_recv_data_cache(m_engine, thallium::bulk_mode::write_only)
+    , m_feed_metadata_cache(m_engine, thallium::bulk_mode::read_only)
+    , m_feed_desc_cache(m_engine, thallium::bulk_mode::read_only)
+    , m_getdata_cache(m_engine)
+    {
+        if(m_bulk_cache_enabled && m_initial_buffer_size > 0) {
+            m_recv_metadata_cache.prepare(0, m_initial_buffer_size);
+            m_recv_data_cache.prepare(0, m_initial_buffer_size);
+            m_feed_metadata_cache.prepare(0, m_initial_buffer_size);
+            m_feed_desc_cache.prepare(0, m_initial_buffer_size);
+            m_getdata_cache.resize(m_initial_buffer_size);
+        }
+    }
 
     DefaultPartitionManager(DefaultPartitionManager&&) = default;
     DefaultPartitionManager(const DefaultPartitionManager&) = delete;
