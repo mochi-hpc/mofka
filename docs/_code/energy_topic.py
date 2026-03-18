@@ -35,16 +35,16 @@ def main(group_file: str):
     driver.add_memory_partition(
         topic_name="collisions",
         server_rank=0)
-    # add a default partition (all arguments specified)
-    driver.add_default_partition(
+    # add a legacy partition (all arguments specified)
+    driver.add_legacy_partition(
         topic_name="collisions",
         server_rank=0,
         metadata_provider="my_metadata_provider@local",
         data_provider="my_data_provider@local",
         partition_config={},
         pool_name="__primary__")
-    # add a default partition (discover providers automatically)
-    driver.add_default_partition(
+    # add a legacy partition (discover providers automatically)
+    driver.add_legacy_partition(
         topic_name="collisions",
         server_rank=0)
     # END ADD PARTITION
@@ -64,7 +64,7 @@ def main(group_file: str):
             "path": "/tmp/mofka-data",
             "create_if_missing": True
         })
-    driver.add_default_partition(
+    driver.add_legacy_partition(
         topic_name="collisions",
         server_rank=0,
         metadata_provider=metadata_provider,

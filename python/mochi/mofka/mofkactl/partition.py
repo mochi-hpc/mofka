@@ -18,16 +18,16 @@ def add(
                               help="Rank of the server in which to add the partition")],
         type: Annotated[
             str, typer.Option("-t", "--type",
-                              help="Type of partition manager")] = "default",
+                              help="Type of partition manager")] = "legacy",
         pool: Annotated[
             str, typer.Option("-p", "--pool",
                               help="Pool for the partition manager to use")] = "__primary__",
         metadata: Annotated[
             str, typer.Option("-m", "--metadata",
-                              help="Metadata provider (default partition manager only)")] = "",
+                              help="Metadata provider (legacy partition manager only)")] = "",
         data: Annotated[
             str, typer.Option("-d", "--data",
-                              help="Data provider (default partition manager only)")] = "",
+                              help="Data provider (legacy partition manager only)")] = "",
         groupfile: Annotated[
             str, typer.Option("-g", "--groupfile",
                               help="Flock group file of the service")] = "./mofka.json"
@@ -61,8 +61,8 @@ def add(
                     topic_name=name,
                     server_rank=rank,
                     pool_name=pool)
-            elif type == "default":
-                service.add_default_partition(
+            elif type == "legacy":
+                service.add_legacy_partition(
                     topic_name=name,
                     server_rank=rank,
                     metadata_provider=metadata,
@@ -70,7 +70,7 @@ def add(
                     partition_config=partition_config,
                     pool_name=pool)
             else:
-                service.add_default_partition(
+                service.add_custom_partition(
                     topic_name=name,
                     server_rank=rank,
                     partition_type=type,

@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef DEFAULT_TOPIC_MANAGER_HPP
-#define DEFAULT_TOPIC_MANAGER_HPP
+#ifndef LEGACY_TOPIC_MANAGER_HPP
+#define LEGACY_TOPIC_MANAGER_HPP
 
 #include <mofka/UUID.hpp>
 #include "PartitionManager.hpp"
@@ -14,9 +14,9 @@
 namespace mofka {
 
 /**
- * Default implementation of a mofka PartitionManager.
+ * Legacy implementation of a mofka PartitionManager.
  */
-class DefaultPartitionManager : public mofka::PartitionManager {
+class LegacyPartitionManager : public mofka::PartitionManager {
 
     diaspora::Metadata m_config;
 
@@ -33,7 +33,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     /**
      * @brief Constructor.
      */
-    DefaultPartitionManager(
+    LegacyPartitionManager(
         const diaspora::Metadata& config,
         std::unique_ptr<WarabiDataStore> data_store,
         std::unique_ptr<YokanEventStore> event_store,
@@ -46,27 +46,27 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     /**
      * @brief Move-constructor.
      */
-    DefaultPartitionManager(DefaultPartitionManager&&) = default;
+    LegacyPartitionManager(LegacyPartitionManager&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    DefaultPartitionManager(const DefaultPartitionManager&) = delete;
+    LegacyPartitionManager(const LegacyPartitionManager&) = delete;
 
     /**
      * @brief Move-assignment operator.
      */
-    DefaultPartitionManager& operator=(DefaultPartitionManager&&) = default;
+    LegacyPartitionManager& operator=(LegacyPartitionManager&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    DefaultPartitionManager& operator=(const DefaultPartitionManager&) = delete;
+    LegacyPartitionManager& operator=(const LegacyPartitionManager&) = delete;
 
     /**
      * @brief Destructor.
      */
-    virtual ~DefaultPartitionManager() = default;
+    virtual ~LegacyPartitionManager() = default;
 
     /**
      * @brief Receives a batch.
@@ -114,7 +114,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     /**
      * @brief Static factory function used by the TopicFactory to
-     * create a DefaultPartitionManager.
+     * create a LegacyPartitionManager.
      *
      * @param engine Thallium engine.
      * @param topic_name Topic name.

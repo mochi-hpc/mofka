@@ -463,7 +463,7 @@ void MofkaDriver::addMemoryPartition(std::string_view topic_name,
     addCustomPartition(topic_name, server_rank, "memory", {}, {}, pool_name);
 }
 
-void MofkaDriver::addDefaultPartition(std::string_view topic_name,
+void MofkaDriver::addLegacyPartition(std::string_view topic_name,
                                         size_t server_rank,
                                         std::string_view metadata_provider,
                                         std::string_view data_provider,
@@ -534,7 +534,7 @@ void MofkaDriver::addDefaultPartition(std::string_view topic_name,
         }
     }
 
-    addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name);
+    addCustomPartition(topic_name, server_rank, "legacy", config, dependencies, pool_name);
 }
 
 void MofkaDriver::addCustomPartition(

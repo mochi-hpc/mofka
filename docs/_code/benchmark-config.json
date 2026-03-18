@@ -124,12 +124,12 @@
             },
             "partitions": [
                 {
-                    "type":"default",
+                    "type":"legacy",
                     "rank": 0,
                     "pool": "__primary__"
                 },
                 {
-                    "type":"default",
+                    "type":"legacy",
                     "rank": 0,
                     "pool": "__primary__"
                 }

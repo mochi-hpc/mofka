@@ -28,7 +28,7 @@ PYBIND11_MODULE(pymofka_client, m) {
         }))
         .def_property_readonly("num_servers", &mofka::MofkaDriver::numServers)
         .def("start_progress_thread", &mofka::MofkaDriver::startProgressThread)
-        .def("add_default_partition",
+        .def("add_legacy_partition",
             [](mofka::MofkaDriver& service,
                std::string_view topic_name,
                size_t server_rank,
@@ -36,7 +36,7 @@ PYBIND11_MODULE(pymofka_client, m) {
                std::string_view data_provider,
                const nlohmann::json& partition_config,
                const std::string& pool_name) {
-                service.addDefaultPartition(
+                service.addLegacyPartition(
                     topic_name, server_rank,
                     metadata_provider,
                     data_provider,

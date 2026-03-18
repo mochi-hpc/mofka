@@ -1,6 +1,6 @@
 {
     "partitions":1,
-    "partitions_type":"default",
+    "partitions_type":"legacy",
     "partitions_config": {},
     "partitions_dependencies": {
         "metadata": "metadata@local",

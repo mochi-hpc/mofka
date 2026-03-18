@@ -181,7 +181,7 @@ Mofka already comes with two implementations.
   doesn't have any dependency and is easy to use for testing, for instance, but it
   won't provide persistence and will be limited by the amount of memory available
   on the node.
-* **Default**: The *"default"* partition manager is a manager that relies on a
+* **Legacy**: The *"legacy"* partition manager is a manager that relies on a
   `Yokan <https://mochi.readthedocs.io/en/latest/yokan.html>`_ provider for storing
   metadata and on a `Warabi <https://github.com/mochi-hpc/mochi-warabi>`_
   provider for storing data. Yokan is a key/value storage component with a number
@@ -190,7 +190,7 @@ Mofka already comes with two implementations.
   including Pmem.
 
 A "memory" partition manager was used in the :ref:`Getting started` example. In the following
-we will deploy a "memory" partition manager as well as a "default" partition manager.
+we will deploy a "memory" partition manager as well as a "legacy" partition manager.
 
 The configuration we are using with Bedrock instantiates four providers: a Flock provider,
 two Yokan providers and a Warabi provider. The first Yokan provider is used to store information
@@ -224,9 +224,9 @@ We can now add a partition that uses these providers.
          :dedent: 8
 
       Adding a partition is done via the :code:`MofkaDriver` instance by calling
-      :code:`addMemoryPartition()` or :code:`addDefaultPartition()`. We first need to cast
+      :code:`addMemoryPartition()` or :code:`addLegacyPartition()`. We first need to cast
       our Diaspora Driver into a MofkaDriver using :code:`as<mofka::MofkaDriver>()`. The
-      :code:`addMemoryPartition()` and :code:`addDefaultPartition()` functions
+      :code:`addMemoryPartition()` and :code:`addLegacyPartition()` functions
       take at least two arguments: the topic name, and the rank of the server in which
       to add the partition. Servers are numbered contiguously from :code:`0` to :code:`N-1`
       where `N` can be obtained by calling :code:`sh.numServers()`.
@@ -243,7 +243,7 @@ We can now add a partition that uses these providers.
          :dedent: 4
 
       Adding a partition is done via the :code:`MofkaDriver` instance by calling
-      :code:`add_memory_partition()` or :code:`add_default_partition()`. Note that to have
+      :code:`add_memory_partition()` or :code:`add_legacy_partition()`. Note that to have
       access to these methods, we are instantiating a :code:`MofkaDriver` directly
       instead of calling :code:`Driver.new` from the Diaspora API. These functions
       take at least two arguments: the topic name, and the rank of the server in which
@@ -257,7 +257,7 @@ Two required arguments when adding partitions are the name of the topic and the 
 of the server to which the partition should be added. Here because we only have one
 server, the rank is 0.
 
-With a default partition manager, we can specify the metadata provider in the form
+With a legacy partition manager, we can specify the metadata provider in the form
 of an "address" interpretable by Bedrock. Here *"my_metadata_provider@local"* asks
 Bedrock to look for a provider named *"my_metadata_provider"* in the same process as
 the partition manager. In :ref:`Deployment` we will see that we could easily run these
@@ -284,7 +284,7 @@ Creating Metadata and Data providers
 ------------------------------------
 
 In the above programs, our initial configuration already had a Yokan provider and a Warabi
-providers that we could use as metadata and data providers respectively for the default
+providers that we could use as metadata and data providers respectively for the legacy
 partition. In practice, you may want to create such providers at the same time as you
 create your partitions. This can be done as shown in the following code examples.
 

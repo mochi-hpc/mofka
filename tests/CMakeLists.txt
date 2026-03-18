@@ -14,7 +14,7 @@ endif ()
 
 set (MOFKA_TEST_BACKEND_ARGS
      "{\"group_file\":\"mofka.json\",\"margo\":{\"use_progress_thread\":true}}")
-file (READ mofka-default-topic-args.json MOFKA_TEST_DEFAULT_TOPIC_ARGS)
+file (READ mofka-legacy-topic-args.json MOFKA_TEST_LEGACY_TOPIC_ARGS)
 file (READ mofka-memory-topic-args.json MOFKA_TEST_MEMORY_TOPIC_ARGS)
 
 execute_process (
@@ -35,9 +35,9 @@ if (DIASPORA_PYTHON_TESTS)
     string (REPLACE "\n" ";" DIASPORA_PYTHON_TESTS "${DIASPORA_PYTHON_TESTS}")
 endif ()
 
-foreach (partition_suffix IN ITEMS Default Memory)
-    if (partition_suffix STREQUAL "Default")
-        set (topic_args "${MOFKA_TEST_DEFAULT_TOPIC_ARGS}")
+foreach (partition_suffix IN ITEMS Legacy Memory)
+    if (partition_suffix STREQUAL "Legacy")
+        set (topic_args "${MOFKA_TEST_LEGACY_TOPIC_ARGS}")
     else ()
         set (topic_args "${MOFKA_TEST_MEMORY_TOPIC_ARGS}")
     endif ()
