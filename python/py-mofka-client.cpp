@@ -103,6 +103,21 @@ PYBIND11_MODULE(pymofka_client, m) {
                 service.addMemoryPartition(topic_name, server_rank, pool_name);
             },
             "topic_name"_a, "server_rank"_a, "pool_name"_a="")
+        .def("add_default_partition",
+            [](mofka::MofkaDriver& service,
+               std::string_view topic_name,
+               size_t server_rank,
+               std::string_view abt_io_instance,
+               const nlohmann::json& partition_config,
+               const std::string& pool_name) {
+                service.addDefaultPartition(
+                    topic_name, server_rank, abt_io_instance,
+                    diaspora::Metadata{partition_config}, pool_name);
+            },
+            "topic_name"_a, "server_rank"_a,
+            "abt_io_instance"_a=std::string_view{},
+            "partition_config"_a=nlohmann::json::object(),
+            "pool_name"_a="")
         .def("add_default_data_provider",
             [](mofka::MofkaDriver& service,
                size_t server_rank,

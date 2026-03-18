@@ -256,6 +256,24 @@ class MofkaDriver : public diaspora::DriverInterface,
                              const diaspora::Metadata& config = {},
                              std::string_view pool_name = "");
 
+    /**
+     * @brief Add a partition backed by Mofka's default partition manager.
+     * This partition manager stores events in append-only log files using
+     * ABT-IO for I/O operations.
+     *
+     * @param topic_name Topic name.
+     * @param server_rank Rank of the server.
+     * @param abt_io_instance Locator of the ABT-IO instance (e.g. "my_abt_io@local").
+     *                        If empty, searches for an ABT-IO component in the server.
+     * @param config Partition configuration (path, max_chunk_size, etc.).
+     * @param pool_name Pool name in the server.
+     */
+    void addDefaultPartition(std::string_view topic_name,
+                             size_t server_rank,
+                             std::string_view abt_io_instance = {},
+                             const diaspora::Metadata& config = {},
+                             std::string_view pool_name = "");
+
 };
 
 }

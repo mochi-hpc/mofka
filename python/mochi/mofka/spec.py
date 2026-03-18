@@ -215,7 +215,7 @@ class BenchmarkTopicPartitionSpec:
         partition = {
             'rank': rank,
             'pool': '__primary__' if pool_index == 0 else f'__pool_{pool_index}__',
-            'type': 'legacy',
+            'type': 'default',
             'metadata_provider': metadata_provider_weights[-1][1],
             'data_provider': data_provider_weights[-1][1]
         }

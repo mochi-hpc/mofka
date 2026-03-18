@@ -1,0 +1,10 @@
+{
+    "partitions": 1,
+    "partitions_type": "default",
+    "partitions_config": {
+        "path": "/tmp/mofka-default-test"
+    },
+    "partitions_dependencies": {
+        "abt_io": "my_abt_io"
+    }
+}

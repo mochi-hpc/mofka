@@ -13,7 +13,8 @@ static inline const char* config = R"(
         "libmofka-bedrock-module.so",
         "libflock-bedrock-module.so",
         "libwarabi-bedrock-module.so",
-        "libyokan-bedrock-module.so"
+        "libyokan-bedrock-module.so",
+        "libabt-io-bedrock-module.so"
     ],
     "providers" : [
         {
@@ -65,6 +66,15 @@ static inline const char* config = R"(
                     }
                 }
             }
+        },
+        {
+            "name" : "my_abt_io",
+            "type" : "abt_io",
+            "provider_id" : 5,
+            "config" : {},
+            "dependencies": {
+                "pool": "__primary__"
+            }
         }
     ]
 }
@@ -83,5 +93,8 @@ static inline void getPartitionArguments(
             {"metadata", {"my_yokan_metadata_provider@local"}}
         };
         partition_config = diaspora::Metadata{"{}"};
+    } else if(partition_type == "default") {
+        dependencies = {{"abt_io", {"my_abt_io"}}};
+        partition_config = diaspora::Metadata{R"({"path":"/tmp/mofka-default-test"})"};
     }
 }

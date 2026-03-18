@@ -537,6 +537,51 @@ void MofkaDriver::addLegacyPartition(std::string_view topic_name,
     addCustomPartition(topic_name, server_rank, "legacy", config, dependencies, pool_name);
 }
 
+void MofkaDriver::addDefaultPartition(std::string_view topic_name,
+                                        size_t server_rank,
+                                        std::string_view abt_io_instance,
+                                        const diaspora::Metadata& config,
+                                        std::string_view pool_name) {
+    Dependencies dependencies = {
+        {"abt_io", {std::string{abt_io_instance.data(), abt_io_instance.size()}}}
+    };
+    if(abt_io_instance.empty()) {
+        try {
+            auto server = m_bsgh[server_rank];
+            auto get_candidate_script = R"(
+            $result = {};
+            $result["address"] = $__config__.margo.mercury.address;
+            foreach($__config__.providers as $p) {
+                if($p.type != "abt_io") continue;
+                $result["abt_io"] = $p.name;
+                break;
+            }
+            return $result;
+            )";
+            std::string script_result;
+            server.queryConfig(get_candidate_script, &script_result);
+
+            auto candidates = nlohmann::json::parse(script_result);
+
+            if(candidates.contains("abt_io")) {
+                dependencies["abt_io"] = {
+                    candidates["abt_io"].get<std::string>()};
+            } else {
+                throw diaspora::Exception(
+                    "No ABT-IO provider provided or found in server. "
+                    "Please provide one or make sure an abt_io provider exists "
+                    "in the server.");
+            }
+        } catch(const bedrock::Exception& ex) {
+            throw diaspora::Exception{
+                fmt::format("Error when querying server configuration: {}", ex.what())
+            };
+        }
+    }
+
+    addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name);
+}
+
 void MofkaDriver::addCustomPartition(
     std::string_view topic_name,
     size_t server_rank,
@@ -563,7 +608,7 @@ void MofkaDriver::addCustomPartition(
         provider_desciption["config"]["uuid"]      = partition_uuid.to_string();
         provider_desciption["config"]["partition"] = partition_config.json();
         provider_desciption["tags"] = nlohmann::json::array();
-        provider_desciption["tags"].push_back("morka:partition");
+        provider_desciption["tags"].push_back("mofka:partition");
         provider_desciption["dependencies"] = dependencies;
         if(!provider_desciption["dependencies"].contains("pool")) {
             provider_desciption["dependencies"]["pool"] = pool_name.size() ? pool_name : "__primary__";

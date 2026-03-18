@@ -84,6 +84,8 @@ find_package (warabi REQUIRED)
 find_package (yokan REQUIRED)
 # search for flock
 find_package (flock REQUIRED)
+# search for abt-io
+pkg_check_modules (abt_io REQUIRED IMPORTED_TARGET abt-io)
 
 if (ENABLE_PYTHON)
     find_package (Python3 COMPONENTS Interpreter Development REQUIRED)

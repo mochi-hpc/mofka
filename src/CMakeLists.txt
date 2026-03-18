@@ -2,7 +2,8 @@
 set (server-src-files
      Provider.cpp
      LegacyPartitionManager.cpp
-     MemoryPartitionManager.cpp)
+     MemoryPartitionManager.cpp
+     DefaultPartitionManager.cpp)
 
 set (client-src-files
      MofkaDriver.cpp
@@ -65,6 +66,7 @@ target_link_libraries (mofka-server
     mofka
     PRIVATE
     warabi-client
+    PkgConfig::abt_io
     spdlog::spdlog
     coverage_config
     warnings_config)
