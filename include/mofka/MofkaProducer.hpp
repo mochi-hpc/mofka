@@ -38,6 +38,7 @@ class MofkaProducer : public diaspora::ProducerInterface {
     std::shared_ptr<MofkaThreadPool>  m_thread_pool;
     std::shared_ptr<MofkaTopicHandle> m_topic;
     tl::remote_procedure              m_producer_send_batch;
+    bool                              m_ack_early = false;
 
     std::vector<std::shared_ptr<ActiveProducerBatchQueue>> m_batch_queues;
     thallium::mutex                                        m_batch_queues_mtx;
@@ -50,7 +51,8 @@ class MofkaProducer : public diaspora::ProducerInterface {
                   diaspora::MaxNumBatches max_batch,
                   diaspora::Ordering ordering,
                   std::shared_ptr<MofkaThreadPool> thread_pool,
-                  std::shared_ptr<MofkaTopicHandle> topic);
+                  std::shared_ptr<MofkaTopicHandle> topic,
+                  bool ack_early = false);
 
     ~MofkaProducer();
 

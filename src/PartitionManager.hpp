@@ -94,6 +94,25 @@ class PartitionManager {
         const BulkRef& data_bulk) = 0;
 
     /**
+     * @brief Whether this partition manager supports early acknowledgment.
+     */
+    virtual bool supportsAckEarly() const { return false; }
+
+    /**
+     * @brief Receive a batch with early acknowledgment: RDMA pull and
+     * ID assignment happen synchronously, file writes are deferred.
+     * Default implementation falls back to synchronous receiveBatch.
+     */
+    virtual Result<diaspora::EventID> receiveBatchAckEarly(
+        const thallium::endpoint& sender,
+        const std::string& producer_name,
+        size_t num_events,
+        const BulkRef& metadata_bulk,
+        const BulkRef& data_bulk) {
+        return receiveBatch(sender, producer_name, num_events, metadata_bulk, data_bulk);
+    }
+
+    /**
      * @brief This function is used to wake up the topic manager to make
      * if check again the shouldStop() function of blocked ConsumerHandles.
      */

@@ -11,6 +11,8 @@
 #include <abt-io.h>
 #include <cstdint>
 #include <string>
+#include <queue>
+#include <atomic>
 
 namespace mofka {
 
@@ -143,6 +145,10 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     size_t              m_max_events_per_chunk;
     bool                m_sync;
 
+    // ack_early config
+    bool                m_ack_early = false;
+    size_t              m_max_pending_batches = 8;
+
     // ABT-IO
     abt_io_instance_id  m_abt_io;
 
@@ -175,6 +181,26 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     // Write lock
     thallium::mutex              m_write_mtx;
+
+    // ID assignment (atomic, advances before writes when ack_early is enabled)
+    std::atomic<size_t>          m_assigned_events{0};
+
+    // Pending write queue for ack_early
+    struct PendingWrite {
+        std::vector<size_t> metadata_sizes;
+        std::vector<char>   metadata_content;
+        std::vector<size_t> data_sizes;
+        std::vector<char>   data_content;
+        size_t              num_events;
+        diaspora::EventID   first_id;
+    };
+
+    std::queue<PendingWrite>         m_pending_writes;
+    thallium::mutex                  m_pending_writes_mtx;
+    thallium::condition_variable     m_pending_writes_cv;       // backpressure
+    thallium::condition_variable     m_pending_writes_ready_cv; // signal writer
+    bool                             m_writer_stop = false;
+    thallium::eventual<void>         m_writer_done;
 
     // Bulk cache config
     bool                         m_bulk_cache_enabled = true;
@@ -246,6 +272,18 @@ class DefaultPartitionManager : public mofka::PartitionManager {
             size_t num_events,
             const BulkRef& metadata_bulk,
             const BulkRef& data_bulk) override;
+
+    bool supportsAckEarly() const override { return m_ack_early; }
+
+    Result<diaspora::EventID> receiveBatchAckEarly(
+            const thallium::endpoint& sender,
+            const std::string& producer_name,
+            size_t num_events,
+            const BulkRef& metadata_bulk,
+            const BulkRef& data_bulk) override;
+
+    void backgroundWriterLoop();
+    void processPendingWrite(PendingWrite& pw);
 
     void wakeUp() override;
 

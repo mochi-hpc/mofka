@@ -126,18 +126,34 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void receiveBatch(const tl::request& req,
                       const std::string& producer_name,
                       size_t count,
+                      bool ack_early_requested,
                       const BulkRef& metadata,
                       const BulkRef& data) {
-        spdlog::trace("[mofka:{}] Received receiveBatch request (topic: {}, count:{})", id(), m_topic, count);
+        spdlog::trace("[mofka:{}] Received receiveBatch request (topic: {}, count:{}, ack_early:{})",
+                      id(), m_topic, count, ack_early_requested);
         Result<diaspora::EventID> result;
-        tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        try {
-            ENSURE_VALID_PARTITION_MANAGER(result);
-            result = m_partition_manager->receiveBatch(
-                req.get_endpoint(), producer_name, count, metadata, data);
-        } catch(const std::exception& ex) {
-            result.error() = ex.what();
-            result.success() = false;
+        bool use_ack_early = ack_early_requested
+                          && m_partition_manager
+                          && m_partition_manager->supportsAckEarly();
+        if(use_ack_early) {
+            try {
+                result = m_partition_manager->receiveBatchAckEarly(
+                    req.get_endpoint(), producer_name, count, metadata, data);
+            } catch(const diaspora::Exception& ex) {
+                result.error() = ex.what();
+                result.success() = false;
+            }
+            req.respond(result);
+        } else {
+            tl::auto_respond<decltype(result)> ensureResponse(req, result);
+            try {
+                ENSURE_VALID_PARTITION_MANAGER(result);
+                result = m_partition_manager->receiveBatch(
+                    req.get_endpoint(), producer_name, count, metadata, data);
+            } catch(const std::exception& ex) {
+                result.error() = ex.what();
+                result.success() = false;
+            }
         }
         spdlog::trace("[mofka:{}] Done executing receiveBatch", id());
     }

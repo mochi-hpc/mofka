@@ -54,10 +54,13 @@ void DefaultPartitionManager::openChunk(uint32_t chunk_id) {
 }
 
 void DefaultPartitionManager::closeCurrentChunk() {
-    if(m_fd_meta >= 0) { abt_io_close(m_abt_io, m_fd_meta); m_fd_meta = -1; }
-    if(m_fd_data >= 0) { abt_io_close(m_abt_io, m_fd_data); m_fd_data = -1; }
-    if(m_fd_desc >= 0) { abt_io_close(m_abt_io, m_fd_desc); m_fd_desc = -1; }
-    if(m_fd_idx  >= 0) { abt_io_close(m_abt_io, m_fd_idx);  m_fd_idx  = -1; }
+    // Use POSIX close() instead of abt_io_close() because this may be called
+    // during destructor teardown when ABT pools are already destroyed.
+    // All data has been flushed via abt_io_fdatasync() during normal operation.
+    if(m_fd_meta >= 0) { ::close(m_fd_meta); m_fd_meta = -1; }
+    if(m_fd_data >= 0) { ::close(m_fd_data); m_fd_data = -1; }
+    if(m_fd_desc >= 0) { ::close(m_fd_desc); m_fd_desc = -1; }
+    if(m_fd_idx  >= 0) { ::close(m_fd_idx);  m_fd_idx  = -1; }
 }
 
 void DefaultPartitionManager::rotateChunk() {
@@ -79,6 +82,14 @@ bool DefaultPartitionManager::shouldRotate() const {
 }
 
 DefaultPartitionManager::~DefaultPartitionManager() {
+    if(m_ack_early) {
+        {
+            auto g = std::unique_lock<thallium::mutex>{m_pending_writes_mtx};
+            m_writer_stop = true;
+        }
+        m_pending_writes_ready_cv.notify_all();
+        m_writer_done.wait();
+    }
     closeCurrentChunk();
 }
 
@@ -152,7 +163,11 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
             data_content_ptr = fb_data_content.data();
         }
 
-        first_id = m_total_events;
+        if(m_ack_early) {
+            first_id = m_assigned_events.fetch_add(num_events);
+        } else {
+            first_id = m_total_events;
+        }
 
         // Compute per-event offsets relative to the current chunk position
         std::vector<IndexRecord> batch_records(num_events);
@@ -274,6 +289,209 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
     m_events_cv.notify_all();
     result.value() = first_id;
     return result;
+}
+
+Result<diaspora::EventID> DefaultPartitionManager::receiveBatchAckEarly(
+          const thallium::endpoint& sender,
+          const std::string& producer_name,
+          size_t num_events,
+          const BulkRef& metadata_bulk,
+          const BulkRef& data_bulk)
+{
+    (void)producer_name;
+    Result<diaspora::EventID> result;
+
+    auto metadata_content_size = metadata_bulk.size - num_events*sizeof(size_t);
+    auto data_content_size = data_bulk.size - num_events*sizeof(size_t);
+
+    // Wait for backpressure
+    {
+        auto g = std::unique_lock<thallium::mutex>{m_pending_writes_mtx};
+        m_pending_writes_cv.wait(g, [this]() {
+            return m_pending_writes.size() < m_max_pending_batches;
+        });
+    }
+
+    // RDMA pull into owned vectors (must complete before returning,
+    // since producer's bulk handles become invalid after RPC responds)
+    PendingWrite pw;
+    pw.num_events = num_events;
+    pw.metadata_sizes.resize(num_events);
+    pw.metadata_content.resize(std::max(metadata_content_size, (size_t)1));
+    pw.data_sizes.resize(num_events);
+    pw.data_content.resize(std::max(data_content_size, (size_t)1));
+
+    {
+        auto local_metadata_bulk = m_engine.expose(
+            {{(char*)pw.metadata_sizes.data(), num_events*sizeof(size_t)},
+             {pw.metadata_content.data(), pw.metadata_content.size()}},
+            thallium::bulk_mode::write_only);
+        local_metadata_bulk << metadata_bulk.handle.on(sender).select(
+            metadata_bulk.offset, metadata_bulk.size);
+
+        auto local_data_bulk = m_engine.expose(
+            {{(char*)pw.data_sizes.data(), num_events*sizeof(size_t)},
+             {pw.data_content.data(), pw.data_content.size()}},
+            thallium::bulk_mode::write_only);
+        local_data_bulk << data_bulk.handle.on(sender).select(
+            data_bulk.offset, data_bulk.size);
+    }
+
+    // Resize content to actual size (we used max(size,1) for bulk registration)
+    pw.metadata_content.resize(metadata_content_size);
+    pw.data_content.resize(data_content_size);
+
+    // Assign EventID atomically
+    pw.first_id = m_assigned_events.fetch_add(num_events);
+    diaspora::EventID first_id = pw.first_id;
+
+    // Enqueue
+    {
+        auto g = std::unique_lock<thallium::mutex>{m_pending_writes_mtx};
+        m_pending_writes.push(std::move(pw));
+    }
+    m_pending_writes_ready_cv.notify_one();
+
+    result.value() = first_id;
+    return result;
+}
+
+void DefaultPartitionManager::processPendingWrite(PendingWrite& pw) {
+    size_t num_events = pw.num_events;
+    size_t metadata_content_size = pw.metadata_content.size();
+    size_t data_content_size = pw.data_content.size();
+
+    size_t* metadata_sizes_ptr = pw.metadata_sizes.data();
+    char*   metadata_content_ptr = pw.metadata_content.data();
+    size_t* data_sizes_ptr = pw.data_sizes.data();
+    char*   data_content_ptr = pw.data_content.data();
+
+    // Compute per-event offsets relative to the current chunk position
+    std::vector<IndexRecord> batch_records(num_events);
+    uint64_t meta_off = m_meta_offset;
+    uint64_t data_off = m_data_offset;
+
+    // Serialize DataDescriptors
+    std::vector<char> desc_buf;
+    std::vector<size_t> desc_sizes(num_events);
+
+    {
+        diaspora::BufferWrapperOutputArchive output_archive{desc_buf};
+        for(size_t i = 0; i < num_events; ++i) {
+            batch_records[i].metadata_offset = meta_off;
+            batch_records[i].metadata_size   = static_cast<uint32_t>(metadata_sizes_ptr[i]);
+            batch_records[i].data_offset     = data_off;
+            batch_records[i].data_size       = static_cast<uint32_t>(data_sizes_ptr[i]);
+            batch_records[i].data_desc_offset = m_desc_offset;
+
+            FileDataDescriptor fdd;
+            fdd.chunk_id = m_current_chunk_id;
+            fdd.offset   = data_off;
+            fdd.size     = static_cast<uint32_t>(data_sizes_ptr[i]);
+
+            auto data_descriptor = diaspora::DataDescriptor(fdd.toString(), fdd.size);
+            size_t desc_buf_before = desc_buf.size();
+            data_descriptor.save(output_archive);
+            size_t desc_size = desc_buf.size() - desc_buf_before;
+
+            desc_sizes[i] = desc_size;
+            batch_records[i].data_desc_size = static_cast<uint32_t>(desc_size);
+
+            meta_off += metadata_sizes_ptr[i];
+            data_off += data_sizes_ptr[i];
+            m_desc_offset += desc_size;
+        }
+    }
+
+    // Write metadata to .meta
+    if(metadata_content_size > 0) {
+        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_meta,
+            metadata_content_ptr, metadata_content_size, m_meta_offset);
+        if(ret < 0) {
+            spdlog::error("[mofka] Background write failed for metadata: {}", strerror(-ret));
+            return;
+        }
+    }
+
+    // Write data to .data
+    if(data_content_size > 0) {
+        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_data,
+            data_content_ptr, data_content_size, m_data_offset);
+        if(ret < 0) {
+            spdlog::error("[mofka] Background write failed for data: {}", strerror(-ret));
+            return;
+        }
+    }
+
+    // Write descriptors to .desc
+    if(!desc_buf.empty()) {
+        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_desc,
+            desc_buf.data(), desc_buf.size(),
+            m_desc_offset - desc_buf.size());
+        if(ret < 0) {
+            spdlog::error("[mofka] Background write failed for descriptors: {}", strerror(-ret));
+            return;
+        }
+    }
+
+    // Write index records to .idx
+    {
+        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_idx,
+            batch_records.data(),
+            num_events * sizeof(IndexRecord),
+            m_events_in_current_chunk * sizeof(IndexRecord));
+        if(ret < 0) {
+            spdlog::error("[mofka] Background write failed for index: {}", strerror(-ret));
+            return;
+        }
+    }
+
+    // Sync if configured
+    if(m_sync) {
+        abt_io_fdatasync(m_abt_io, m_fd_meta);
+        abt_io_fdatasync(m_abt_io, m_fd_data);
+        abt_io_fdatasync(m_abt_io, m_fd_desc);
+        abt_io_fdatasync(m_abt_io, m_fd_idx);
+    }
+
+    // Update in-memory state
+    m_meta_offset = meta_off;
+    m_data_offset = data_off;
+    m_events_in_current_chunk += num_events;
+
+    for(size_t i = 0; i < num_events; ++i) {
+        m_index.push_back(batch_records[i]);
+        m_event_chunk_ids.push_back(m_current_chunk_id);
+    }
+    m_total_events += num_events;
+
+    if(shouldRotate()) {
+        rotateChunk();
+    }
+}
+
+void DefaultPartitionManager::backgroundWriterLoop() {
+    while(true) {
+        PendingWrite pw;
+        {
+            auto g = std::unique_lock<thallium::mutex>{m_pending_writes_mtx};
+            m_pending_writes_ready_cv.wait(g, [this]() {
+                return !m_pending_writes.empty() || m_writer_stop;
+            });
+            if(m_writer_stop && m_pending_writes.empty()) break;
+            pw = std::move(m_pending_writes.front());
+            m_pending_writes.pop();
+        }
+        m_pending_writes_cv.notify_all();
+
+        {
+            auto g = std::unique_lock<thallium::mutex>{m_write_mtx};
+            processPendingWrite(pw);
+        }
+
+        m_events_cv.notify_all();
+    }
+    m_writer_done.set_value();
 }
 
 void DefaultPartitionManager::wakeUp() {
@@ -547,6 +765,13 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
                     "enabled": {"type": "boolean"},
                     "initial_buffer_size": {"type": "integer", "minimum": 0}
                 }
+            },
+            "ack_early": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "max_pending_batches": {"type": "integer", "minimum": 1}
+                }
             }
         },
         "required": ["path"]
@@ -581,6 +806,15 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
         auto& bc = json["bulk_cache"];
         bulk_cache_enabled = bc.value("enabled", true);
         initial_buffer_size = bc.value("initial_buffer_size", (size_t)0);
+    }
+
+    /* Parse ack_early config */
+    bool ack_early_enabled = false;
+    size_t max_pending_batches = 8;
+    if(json.contains("ack_early")) {
+        auto& ae = json["ack_early"];
+        ack_early_enabled = ae.value("enabled", false);
+        max_pending_batches = ae.value("max_pending_batches", (size_t)8);
     }
 
     /* Create directory: <path>/<topic_name>-<uuid>/ */
@@ -654,15 +888,26 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
 
     manager->m_current_chunk_id = current_chunk_id;
     manager->m_total_events = total_events;
+    manager->m_assigned_events.store(total_events);
     manager->m_index = std::move(index);
     manager->m_event_chunk_ids = std::move(event_chunk_ids);
     manager->m_meta_offset = meta_offset;
     manager->m_data_offset = data_offset;
     manager->m_desc_offset = desc_offset;
     manager->m_events_in_current_chunk = events_in_current_chunk;
+    manager->m_ack_early = ack_early_enabled;
+    manager->m_max_pending_batches = max_pending_batches;
 
     /* Open current chunk files */
     manager->openChunk(current_chunk_id);
+
+    /* Start background writer ULT if ack_early is enabled */
+    if(ack_early_enabled) {
+        auto mgr = manager.get();
+        thallium::pool(engine.get_handler_pool()).make_thread(
+            [mgr]() { mgr->backgroundWriterLoop(); },
+            thallium::anonymous{});
+    }
 
     return manager;
 }

@@ -46,6 +46,7 @@ class ProducerBatch {
     diaspora::Serializer       m_serializer;
     thallium::provider_handle  m_partition_ph;
     thallium::remote_procedure m_send_batch_rpc;
+    bool                       m_ack_early = false;
 
     std::vector<Entry> m_entries;
 
@@ -64,12 +65,14 @@ class ProducerBatch {
         thallium::engine engine,
         diaspora::Serializer serializer,
         thallium::provider_handle partition_ph,
-        thallium::remote_procedure send_batch)
+        thallium::remote_procedure send_batch,
+        bool ack_early = false)
     : m_producer_name{std::move(producer_name)}
     , m_engine{std::move(engine)}
     , m_serializer{std::move(serializer)}
     , m_partition_ph{std::move(partition_ph)}
     , m_send_batch_rpc{std::move(send_batch)}
+    , m_ack_early{ack_early}
     {}
 
     void push(diaspora::Metadata metadata,
@@ -117,7 +120,7 @@ class ProducerBatch {
         try {
             auto self_addr = static_cast<std::string>(m_engine.self());
             Result<diaspora::EventID> result = m_send_batch_rpc.on(m_partition_ph)(
-                m_producer_name, count(),
+                m_producer_name, count(), m_ack_early,
                 BulkRef{m_meta_bulk, 0, m_meta_bulk.size(), self_addr},
                 BulkRef{data_bulk, 0, data_bulk.size(), self_addr});
             if(result.success()) {

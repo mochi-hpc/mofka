@@ -27,12 +27,14 @@ std::shared_ptr<diaspora::ProducerInterface> MofkaTopicHandle::makeProducer(
         diaspora::Metadata options) {
     (void)options;
     if(!thread_pool) thread_pool = m_driver->defaultThreadPool();
+    bool ack_early = options.json().contains("ack_early")
+                  && options.json()["ack_early"].get<bool>();
     auto mofka_thread_pool = std::dynamic_pointer_cast<MofkaThreadPool>(thread_pool);
     if(!mofka_thread_pool)
         throw diaspora::Exception{"ThreadPool should be an instance of MofkaThreadPool"};
     return std::make_shared<MofkaProducer>(
         m_engine, name, batch_size, max_batch, ordering, std::move(mofka_thread_pool),
-        shared_from_this());
+        shared_from_this(), ack_early);
 }
 
 std::shared_ptr<diaspora::ConsumerInterface> MofkaTopicHandle::makeConsumer(

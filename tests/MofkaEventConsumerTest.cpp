@@ -135,3 +135,4 @@ TEST_CASE("Event consumer test", "[event-consumer]") {
         }
     }
 }
+
