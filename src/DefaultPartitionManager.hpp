@@ -12,6 +12,9 @@
 #include <cstdint>
 #include <string>
 #include <queue>
+#include <deque>
+#include <memory>
+#include <algorithm>
 #include <atomic>
 
 namespace mofka {
@@ -137,6 +140,103 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         }
     };
 
+    struct CachedBatch {
+        diaspora::EventID        first_id;
+        size_t                   num_events;
+        uint32_t                 chunk_id;
+        std::vector<size_t>      metadata_sizes;
+        std::vector<char>        metadata_content;
+        std::vector<size_t>      data_sizes;
+        std::vector<char>        data_content;
+        std::vector<char>        desc_content;
+        std::vector<size_t>      desc_sizes;
+        std::vector<IndexRecord> index_records;
+
+        size_t memoryUsage() const {
+            return metadata_sizes.capacity() * sizeof(size_t)
+                 + metadata_content.capacity()
+                 + data_sizes.capacity() * sizeof(size_t)
+                 + data_content.capacity()
+                 + desc_content.capacity()
+                 + desc_sizes.capacity() * sizeof(size_t)
+                 + index_records.capacity() * sizeof(IndexRecord);
+        }
+    };
+
+    class WriteCache {
+        std::deque<std::shared_ptr<CachedBatch>> m_batches;
+        size_t m_max_batches;
+        size_t m_max_memory;
+        size_t m_current_memory = 0;
+
+    public:
+        WriteCache(size_t max_batches = 16, size_t max_memory = 64*1024*1024)
+        : m_max_batches(max_batches)
+        , m_max_memory(max_memory)
+        {}
+
+        void insert(CachedBatch batch) {
+            auto ptr = std::make_shared<CachedBatch>(std::move(batch));
+            m_current_memory += ptr->memoryUsage();
+            m_batches.push_back(std::move(ptr));
+            while(m_batches.size() > m_max_batches || m_current_memory > m_max_memory) {
+                if(m_batches.empty()) break;
+                m_current_memory -= m_batches.front()->memoryUsage();
+                m_batches.pop_front();
+            }
+        }
+
+        void clear() {
+            m_batches.clear();
+            m_current_memory = 0;
+        }
+
+        std::vector<std::shared_ptr<const CachedBatch>> findOverlapping(
+                diaspora::EventID first_id, size_t count) const {
+            std::vector<std::shared_ptr<const CachedBatch>> result;
+            diaspora::EventID last_id = first_id + count;
+            for(auto& b : m_batches) {
+                diaspora::EventID b_first = b->first_id;
+                diaspora::EventID b_last = b->first_id + b->num_events;
+                if(b_first < last_id && b_last > first_id) {
+                    result.push_back(b);
+                }
+            }
+            return result;
+        }
+
+        bool coversRange(diaspora::EventID first_id, size_t count) const {
+            if(count == 0) return true;
+            auto hits = findOverlapping(first_id, count);
+            if(hits.empty()) return false;
+            // Check that hits fully cover [first_id, first_id + count)
+            diaspora::EventID cursor = first_id;
+            diaspora::EventID end = first_id + count;
+            for(auto& b : hits) {
+                if(b->first_id > cursor) return false;
+                diaspora::EventID b_end = b->first_id + b->num_events;
+                if(b_end > cursor) cursor = b_end;
+                if(cursor >= end) return true;
+            }
+            return cursor >= end;
+        }
+
+        std::pair<const char*, std::shared_ptr<const CachedBatch>>
+        findDataByLocation(uint32_t chunk_id, uint64_t offset, uint32_t size) const {
+            for(auto& b : m_batches) {
+                if(b->chunk_id != chunk_id) continue;
+                // Compute the base data offset of this batch from index_records
+                if(b->index_records.empty()) continue;
+                uint64_t batch_data_base = b->index_records[0].data_offset;
+                if(offset < batch_data_base) continue;
+                uint64_t rel_offset = offset - batch_data_base;
+                if(rel_offset + size > b->data_content.size()) continue;
+                return {b->data_content.data() + rel_offset, b};
+            }
+            return {nullptr, nullptr};
+        }
+    };
+
     private:
 
     // Config
@@ -218,12 +318,43 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     BulkCache                    m_getdata_cache;
     thallium::mutex              m_getdata_mtx;
 
+    // Write-through cache
+    bool                         m_write_cache_enabled = true;
+    WriteCache                   m_write_cache;
+    thallium::mutex              m_write_cache_mtx;
+    std::atomic<size_t>          m_feed_cache_hits{0};
+    std::atomic<size_t>          m_feed_cache_misses{0};
+    std::atomic<size_t>          m_getdata_cache_hits{0};
+    std::atomic<size_t>          m_getdata_cache_misses{0};
+
     // Helpers
     std::string chunkPath(uint32_t chunk_id, const std::string& ext) const;
     void openChunk(uint32_t chunk_id);
     void closeCurrentChunk();
     void rotateChunk();
     bool shouldRotate() const;
+
+    struct WriteBatchResult {
+        std::vector<IndexRecord> records;
+        std::vector<char>        desc_buf;
+        std::vector<size_t>      desc_sizes;
+        uint32_t                 chunk_id;
+        bool                     success = true;
+        std::string              error;
+    };
+
+    WriteBatchResult writeBatchToFiles(
+        size_t num_events,
+        const size_t* metadata_sizes, const char* metadata_content, size_t metadata_content_size,
+        const size_t* data_sizes, const char* data_content, size_t data_content_size);
+
+    void readMetadataFromDisk(diaspora::EventID first_id, size_t count,
+                              size_t* sizes_out, char* content_out);
+    void readDescriptorsFromDisk(diaspora::EventID first_id, size_t count,
+                                 size_t* sizes_out, char* content_out);
+    void readDataFromDisk(const std::vector<diaspora::DataDescriptor>& descriptors,
+                          char* buffer, size_t total_size,
+                          std::vector<Result<void>>& results);
 
     public:
 

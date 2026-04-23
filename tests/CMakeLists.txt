@@ -88,6 +88,14 @@ add_test (NAME MofkaAckEarlyTest COMMAND
 set_property (TEST MofkaAckEarlyTest PROPERTY
               ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/src:$ENV{LD_LIBRARY_PATH}")
 
+add_executable (MofkaWriteCacheTest ${CMAKE_CURRENT_SOURCE_DIR}/MofkaWriteCacheTest.cpp)
+target_link_libraries (MofkaWriteCacheTest
+    PRIVATE Catch2::Catch2WithMain bedrock-server mofka coverage_config warnings_config)
+add_test (NAME MofkaWriteCacheTest COMMAND
+          ${CMAKE_CURRENT_SOURCE_DIR}/run-test-with-mofka.sh ./MofkaWriteCacheTest)
+set_property (TEST MofkaWriteCacheTest PROPERTY
+              ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/src:$ENV{LD_LIBRARY_PATH}")
+
 add_test (NAME MofkaBenchmark COMMAND
           ${CMAKE_CURRENT_SOURCE_DIR}/run-benchmark.sh)
 set_property (TEST MofkaBenchmark PROPERTY

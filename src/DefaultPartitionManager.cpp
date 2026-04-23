@@ -91,6 +91,127 @@ DefaultPartitionManager::~DefaultPartitionManager() {
         m_writer_done.wait();
     }
     closeCurrentChunk();
+    if(m_write_cache_enabled) {
+        spdlog::info("[mofka] Write cache stats: feed hits={}, feed misses={}, "
+                     "getData hits={}, getData misses={}",
+                     m_feed_cache_hits.load(), m_feed_cache_misses.load(),
+                     m_getdata_cache_hits.load(), m_getdata_cache_misses.load());
+    }
+}
+
+DefaultPartitionManager::WriteBatchResult DefaultPartitionManager::writeBatchToFiles(
+        size_t num_events,
+        const size_t* metadata_sizes, const char* metadata_content, size_t metadata_content_size,
+        const size_t* data_sizes, const char* data_content, size_t data_content_size)
+{
+    WriteBatchResult wb;
+    wb.chunk_id = m_current_chunk_id;
+    wb.records.resize(num_events);
+    wb.desc_sizes.resize(num_events);
+
+    uint64_t meta_off = m_meta_offset;
+    uint64_t data_off = m_data_offset;
+
+    {
+        diaspora::BufferWrapperOutputArchive output_archive{wb.desc_buf};
+        for(size_t i = 0; i < num_events; ++i) {
+            wb.records[i].metadata_offset = meta_off;
+            wb.records[i].metadata_size   = static_cast<uint32_t>(metadata_sizes[i]);
+            wb.records[i].data_offset     = data_off;
+            wb.records[i].data_size       = static_cast<uint32_t>(data_sizes[i]);
+            wb.records[i].data_desc_offset = m_desc_offset;
+
+            FileDataDescriptor fdd;
+            fdd.chunk_id = m_current_chunk_id;
+            fdd.offset   = data_off;
+            fdd.size     = static_cast<uint32_t>(data_sizes[i]);
+
+            auto data_descriptor = diaspora::DataDescriptor(fdd.toString(), fdd.size);
+            size_t desc_buf_before = wb.desc_buf.size();
+            data_descriptor.save(output_archive);
+            size_t desc_size = wb.desc_buf.size() - desc_buf_before;
+
+            wb.desc_sizes[i] = desc_size;
+            wb.records[i].data_desc_size = static_cast<uint32_t>(desc_size);
+
+            meta_off += metadata_sizes[i];
+            data_off += data_sizes[i];
+            m_desc_offset += desc_size;
+        }
+    }
+
+    // Write metadata to .meta
+    if(metadata_content_size > 0) {
+        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_meta,
+            metadata_content, metadata_content_size, m_meta_offset);
+        if(ret < 0) {
+            wb.success = false;
+            wb.error = fmt::format("Failed to write metadata: {}", strerror(-ret));
+            return wb;
+        }
+    }
+
+    // Write data to .data
+    if(data_content_size > 0) {
+        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_data,
+            data_content, data_content_size, m_data_offset);
+        if(ret < 0) {
+            wb.success = false;
+            wb.error = fmt::format("Failed to write data: {}", strerror(-ret));
+            return wb;
+        }
+    }
+
+    // Write descriptors to .desc
+    if(!wb.desc_buf.empty()) {
+        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_desc,
+            wb.desc_buf.data(), wb.desc_buf.size(),
+            m_desc_offset - wb.desc_buf.size());
+        if(ret < 0) {
+            wb.success = false;
+            wb.error = fmt::format("Failed to write descriptors: {}", strerror(-ret));
+            return wb;
+        }
+    }
+
+    // Write index records to .idx
+    {
+        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_idx,
+            wb.records.data(),
+            num_events * sizeof(IndexRecord),
+            m_events_in_current_chunk * sizeof(IndexRecord));
+        if(ret < 0) {
+            wb.success = false;
+            wb.error = fmt::format("Failed to write index: {}", strerror(-ret));
+            return wb;
+        }
+    }
+
+    // Sync if configured
+    if(m_sync) {
+        abt_io_fdatasync(m_abt_io, m_fd_meta);
+        abt_io_fdatasync(m_abt_io, m_fd_data);
+        abt_io_fdatasync(m_abt_io, m_fd_desc);
+        abt_io_fdatasync(m_abt_io, m_fd_idx);
+    }
+
+    // Update in-memory state
+    m_meta_offset = meta_off;
+    m_data_offset = data_off;
+    m_events_in_current_chunk += num_events;
+
+    for(size_t i = 0; i < num_events; ++i) {
+        m_index.push_back(wb.records[i]);
+        m_event_chunk_ids.push_back(m_current_chunk_id);
+    }
+    m_total_events += num_events;
+
+    // Check if we need to rotate
+    if(shouldRotate()) {
+        rotateChunk();
+    }
+
+    return wb;
 }
 
 Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
@@ -169,120 +290,31 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
             first_id = m_total_events;
         }
 
-        // Compute per-event offsets relative to the current chunk position
-        std::vector<IndexRecord> batch_records(num_events);
-        uint64_t meta_off = m_meta_offset;
-        uint64_t data_off = m_data_offset;
+        auto wb = writeBatchToFiles(
+            num_events,
+            metadata_sizes_ptr, metadata_content_ptr, metadata_content_size,
+            data_sizes_ptr, data_content_ptr, data_content_size);
 
-        // Serialize DataDescriptors
-        std::vector<char> desc_buf;
-        std::vector<size_t> desc_sizes(num_events);
-        std::vector<size_t> desc_offsets(num_events);
-
-        {
-            size_t event_meta_cursor = 0;
-            size_t event_data_cursor = 0;
-            diaspora::BufferWrapperOutputArchive output_archive{desc_buf};
-            for(size_t i = 0; i < num_events; ++i) {
-                batch_records[i].metadata_offset = meta_off;
-                batch_records[i].metadata_size   = static_cast<uint32_t>(metadata_sizes_ptr[i]);
-                batch_records[i].data_offset     = data_off;
-                batch_records[i].data_size       = static_cast<uint32_t>(data_sizes_ptr[i]);
-                batch_records[i].data_desc_offset = m_desc_offset;
-
-                // Build FileDataDescriptor for this event
-                FileDataDescriptor fdd;
-                fdd.chunk_id = m_current_chunk_id;
-                fdd.offset   = data_off;
-                fdd.size     = static_cast<uint32_t>(data_sizes_ptr[i]);
-
-                auto data_descriptor = diaspora::DataDescriptor(fdd.toString(), fdd.size);
-                size_t desc_buf_before = desc_buf.size();
-                data_descriptor.save(output_archive);
-                size_t desc_size = desc_buf.size() - desc_buf_before;
-
-                desc_sizes[i] = desc_size;
-                desc_offsets[i] = m_desc_offset;
-                batch_records[i].data_desc_size = static_cast<uint32_t>(desc_size);
-
-                meta_off += metadata_sizes_ptr[i];
-                data_off += data_sizes_ptr[i];
-                m_desc_offset += desc_size;
-
-                event_meta_cursor += metadata_sizes_ptr[i];
-                event_data_cursor += data_sizes_ptr[i];
-            }
+        if(!wb.success) {
+            result.success() = false;
+            result.error() = std::move(wb.error);
+            return result;
         }
 
-        // Write metadata to .meta
-        if(metadata_content_size > 0) {
-            ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_meta,
-                metadata_content_ptr, metadata_content_size, m_meta_offset);
-            if(ret < 0) {
-                result.success() = false;
-                result.error() = fmt::format("Failed to write metadata: {}", strerror(-ret));
-                return result;
-            }
-        }
-
-        // Write data to .data
-        if(data_content_size > 0) {
-            ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_data,
-                data_content_ptr, data_content_size, m_data_offset);
-            if(ret < 0) {
-                result.success() = false;
-                result.error() = fmt::format("Failed to write data: {}", strerror(-ret));
-                return result;
-            }
-        }
-
-        // Write descriptors to .desc
-        if(!desc_buf.empty()) {
-            ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_desc,
-                desc_buf.data(), desc_buf.size(),
-                m_desc_offset - desc_buf.size());
-            if(ret < 0) {
-                result.success() = false;
-                result.error() = fmt::format("Failed to write descriptors: {}", strerror(-ret));
-                return result;
-            }
-        }
-
-        // Write index records to .idx
-        {
-            ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_idx,
-                batch_records.data(),
-                num_events * sizeof(IndexRecord),
-                m_events_in_current_chunk * sizeof(IndexRecord));
-            if(ret < 0) {
-                result.success() = false;
-                result.error() = fmt::format("Failed to write index: {}", strerror(-ret));
-                return result;
-            }
-        }
-
-        // Sync if configured
-        if(m_sync) {
-            abt_io_fdatasync(m_abt_io, m_fd_meta);
-            abt_io_fdatasync(m_abt_io, m_fd_data);
-            abt_io_fdatasync(m_abt_io, m_fd_desc);
-            abt_io_fdatasync(m_abt_io, m_fd_idx);
-        }
-
-        // Update in-memory state
-        m_meta_offset = meta_off;
-        m_data_offset = data_off;
-        m_events_in_current_chunk += num_events;
-
-        for(size_t i = 0; i < num_events; ++i) {
-            m_index.push_back(batch_records[i]);
-            m_event_chunk_ids.push_back(m_current_chunk_id);
-        }
-        m_total_events += num_events;
-
-        // Check if we need to rotate
-        if(shouldRotate()) {
-            rotateChunk();
+        if(m_write_cache_enabled) {
+            CachedBatch cb;
+            cb.first_id = first_id;
+            cb.num_events = num_events;
+            cb.chunk_id = wb.chunk_id;
+            cb.metadata_sizes.assign(metadata_sizes_ptr, metadata_sizes_ptr + num_events);
+            cb.metadata_content.assign(metadata_content_ptr, metadata_content_ptr + metadata_content_size);
+            cb.data_sizes.assign(data_sizes_ptr, data_sizes_ptr + num_events);
+            cb.data_content.assign(data_content_ptr, data_content_ptr + data_content_size);
+            cb.desc_sizes = std::move(wb.desc_sizes);
+            cb.desc_content = std::move(wb.desc_buf);
+            cb.index_records = std::move(wb.records);
+            auto g2 = std::unique_lock<thallium::mutex>{m_write_cache_mtx};
+            m_write_cache.insert(std::move(cb));
         }
     }
 
@@ -357,116 +389,30 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatchAckEarly(
 }
 
 void DefaultPartitionManager::processPendingWrite(PendingWrite& pw) {
-    size_t num_events = pw.num_events;
-    size_t metadata_content_size = pw.metadata_content.size();
-    size_t data_content_size = pw.data_content.size();
+    auto wb = writeBatchToFiles(
+        pw.num_events,
+        pw.metadata_sizes.data(), pw.metadata_content.data(), pw.metadata_content.size(),
+        pw.data_sizes.data(), pw.data_content.data(), pw.data_content.size());
 
-    size_t* metadata_sizes_ptr = pw.metadata_sizes.data();
-    char*   metadata_content_ptr = pw.metadata_content.data();
-    size_t* data_sizes_ptr = pw.data_sizes.data();
-    char*   data_content_ptr = pw.data_content.data();
-
-    // Compute per-event offsets relative to the current chunk position
-    std::vector<IndexRecord> batch_records(num_events);
-    uint64_t meta_off = m_meta_offset;
-    uint64_t data_off = m_data_offset;
-
-    // Serialize DataDescriptors
-    std::vector<char> desc_buf;
-    std::vector<size_t> desc_sizes(num_events);
-
-    {
-        diaspora::BufferWrapperOutputArchive output_archive{desc_buf};
-        for(size_t i = 0; i < num_events; ++i) {
-            batch_records[i].metadata_offset = meta_off;
-            batch_records[i].metadata_size   = static_cast<uint32_t>(metadata_sizes_ptr[i]);
-            batch_records[i].data_offset     = data_off;
-            batch_records[i].data_size       = static_cast<uint32_t>(data_sizes_ptr[i]);
-            batch_records[i].data_desc_offset = m_desc_offset;
-
-            FileDataDescriptor fdd;
-            fdd.chunk_id = m_current_chunk_id;
-            fdd.offset   = data_off;
-            fdd.size     = static_cast<uint32_t>(data_sizes_ptr[i]);
-
-            auto data_descriptor = diaspora::DataDescriptor(fdd.toString(), fdd.size);
-            size_t desc_buf_before = desc_buf.size();
-            data_descriptor.save(output_archive);
-            size_t desc_size = desc_buf.size() - desc_buf_before;
-
-            desc_sizes[i] = desc_size;
-            batch_records[i].data_desc_size = static_cast<uint32_t>(desc_size);
-
-            meta_off += metadata_sizes_ptr[i];
-            data_off += data_sizes_ptr[i];
-            m_desc_offset += desc_size;
-        }
+    if(!wb.success) {
+        spdlog::error("[mofka] Background write failed: {}", wb.error);
+        return;
     }
 
-    // Write metadata to .meta
-    if(metadata_content_size > 0) {
-        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_meta,
-            metadata_content_ptr, metadata_content_size, m_meta_offset);
-        if(ret < 0) {
-            spdlog::error("[mofka] Background write failed for metadata: {}", strerror(-ret));
-            return;
-        }
-    }
-
-    // Write data to .data
-    if(data_content_size > 0) {
-        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_data,
-            data_content_ptr, data_content_size, m_data_offset);
-        if(ret < 0) {
-            spdlog::error("[mofka] Background write failed for data: {}", strerror(-ret));
-            return;
-        }
-    }
-
-    // Write descriptors to .desc
-    if(!desc_buf.empty()) {
-        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_desc,
-            desc_buf.data(), desc_buf.size(),
-            m_desc_offset - desc_buf.size());
-        if(ret < 0) {
-            spdlog::error("[mofka] Background write failed for descriptors: {}", strerror(-ret));
-            return;
-        }
-    }
-
-    // Write index records to .idx
-    {
-        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_idx,
-            batch_records.data(),
-            num_events * sizeof(IndexRecord),
-            m_events_in_current_chunk * sizeof(IndexRecord));
-        if(ret < 0) {
-            spdlog::error("[mofka] Background write failed for index: {}", strerror(-ret));
-            return;
-        }
-    }
-
-    // Sync if configured
-    if(m_sync) {
-        abt_io_fdatasync(m_abt_io, m_fd_meta);
-        abt_io_fdatasync(m_abt_io, m_fd_data);
-        abt_io_fdatasync(m_abt_io, m_fd_desc);
-        abt_io_fdatasync(m_abt_io, m_fd_idx);
-    }
-
-    // Update in-memory state
-    m_meta_offset = meta_off;
-    m_data_offset = data_off;
-    m_events_in_current_chunk += num_events;
-
-    for(size_t i = 0; i < num_events; ++i) {
-        m_index.push_back(batch_records[i]);
-        m_event_chunk_ids.push_back(m_current_chunk_id);
-    }
-    m_total_events += num_events;
-
-    if(shouldRotate()) {
-        rotateChunk();
+    if(m_write_cache_enabled) {
+        CachedBatch cb;
+        cb.first_id = pw.first_id;
+        cb.num_events = pw.num_events;
+        cb.chunk_id = wb.chunk_id;
+        cb.metadata_sizes = std::move(pw.metadata_sizes);
+        cb.metadata_content = std::move(pw.metadata_content);
+        cb.data_sizes = std::move(pw.data_sizes);
+        cb.data_content = std::move(pw.data_content);
+        cb.desc_sizes = std::move(wb.desc_sizes);
+        cb.desc_content = std::move(wb.desc_buf);
+        cb.index_records = std::move(wb.records);
+        auto g2 = std::unique_lock<thallium::mutex>{m_write_cache_mtx};
+        m_write_cache.insert(std::move(cb));
     }
 }
 
@@ -496,6 +442,87 @@ void DefaultPartitionManager::backgroundWriterLoop() {
 
 void DefaultPartitionManager::wakeUp() {
     m_events_cv.notify_all();
+}
+
+void DefaultPartitionManager::readMetadataFromDisk(
+        diaspora::EventID first_id, size_t count,
+        size_t* sizes_out, char* content_out) {
+    size_t buf_offset = 0;
+    int current_fd = -1;
+    uint32_t current_chunk = UINT32_MAX;
+    for(size_t i = 0; i < count; ++i) {
+        auto& rec = m_index[first_id + i];
+        sizes_out[i] = rec.metadata_size;
+        auto chunk_id = m_event_chunk_ids[first_id + i];
+        if(chunk_id != current_chunk) {
+            if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+            auto path = chunkPath(chunk_id, "meta");
+            current_fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
+            current_chunk = chunk_id;
+        }
+        if(current_fd >= 0) {
+            abt_io_pread(m_abt_io, current_fd, content_out + buf_offset,
+                         rec.metadata_size, rec.metadata_offset);
+        }
+        buf_offset += rec.metadata_size;
+    }
+    if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+}
+
+void DefaultPartitionManager::readDescriptorsFromDisk(
+        diaspora::EventID first_id, size_t count,
+        size_t* sizes_out, char* content_out) {
+    size_t buf_offset = 0;
+    int current_fd = -1;
+    uint32_t current_chunk = UINT32_MAX;
+    for(size_t i = 0; i < count; ++i) {
+        auto& rec = m_index[first_id + i];
+        sizes_out[i] = rec.data_desc_size;
+        auto chunk_id = m_event_chunk_ids[first_id + i];
+        if(chunk_id != current_chunk) {
+            if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+            auto path = chunkPath(chunk_id, "desc");
+            current_fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
+            current_chunk = chunk_id;
+        }
+        if(current_fd >= 0) {
+            abt_io_pread(m_abt_io, current_fd, content_out + buf_offset,
+                         rec.data_desc_size, rec.data_desc_offset);
+        }
+        buf_offset += rec.data_desc_size;
+    }
+    if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+}
+
+void DefaultPartitionManager::readDataFromDisk(
+        const std::vector<diaspora::DataDescriptor>& descriptors,
+        char* buffer, size_t total_size,
+        std::vector<Result<void>>& results) {
+    (void)total_size;
+    size_t buffer_cursor = 0;
+    int current_fd = -1;
+    uint32_t current_chunk = UINT32_MAX;
+    for(size_t i = 0; i < descriptors.size(); ++i) {
+        auto& desc = descriptors[i];
+        if(desc.size() == 0) continue;
+        FileDataDescriptor fdd = FileDataDescriptor::fromDataDescriptor(desc);
+        if(fdd.chunk_id != current_chunk) {
+            if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+            auto path = chunkPath(fdd.chunk_id, "data");
+            current_fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
+            current_chunk = fdd.chunk_id;
+        }
+        if(current_fd < 0) {
+            results[i].success() = false;
+            results[i].error() = fmt::format("Failed to open chunk {}", fdd.chunk_id);
+            buffer_cursor += fdd.size;
+            continue;
+        }
+        abt_io_pread(m_abt_io, current_fd, buffer + buffer_cursor,
+                     fdd.size, fdd.offset);
+        buffer_cursor += fdd.size;
+    }
+    if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
 }
 
 Result<void> DefaultPartitionManager::feedConsumer(
@@ -572,40 +599,67 @@ Result<void> DefaultPartitionManager::feedConsumer(
                 desc_content_ptr = fb_desc_content.data();
             }
 
-            // Fill metadata sizes and read metadata content from chunk files
-            {
-                size_t buf_offset = 0;
-                for(size_t i = 0; i < num_events_to_send; ++i) {
-                    auto& rec = m_index[first_id + i];
-                    metadata_sizes_ptr[i] = rec.metadata_size;
-                    auto chunk_id = m_event_chunk_ids[first_id + i];
-                    auto path = chunkPath(chunk_id, "meta");
-                    int fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
-                    if(fd >= 0) {
-                        abt_io_pread(m_abt_io, fd, metadata_content_ptr + buf_offset,
-                                     rec.metadata_size, rec.metadata_offset);
-                        abt_io_close(m_abt_io, fd);
+            // Try write cache first, fall back to disk
+            bool cache_hit = false;
+            if(m_write_cache_enabled) {
+                std::vector<std::shared_ptr<const CachedBatch>> hits;
+                {
+                    auto g2 = std::unique_lock<thallium::mutex>{m_write_cache_mtx};
+                    if(m_write_cache.coversRange(first_id, num_events_to_send)) {
+                        hits = m_write_cache.findOverlapping(first_id, num_events_to_send);
+                        cache_hit = true;
                     }
-                    buf_offset += rec.metadata_size;
+                }
+                if(cache_hit) {
+                    // Copy from cached batches into feed buffers
+                    size_t meta_cursor = 0;
+                    size_t desc_cursor = 0;
+                    size_t event_idx = 0;
+                    for(auto& cb : hits) {
+                        // Determine overlap: [overlap_start, overlap_end) in global event IDs
+                        diaspora::EventID overlap_start = std::max(first_id, cb->first_id);
+                        diaspora::EventID overlap_end = std::min(
+                            first_id + num_events_to_send,
+                            cb->first_id + cb->num_events);
+                        size_t local_start = overlap_start - cb->first_id;
+                        size_t local_end = overlap_end - cb->first_id;
+
+                        // Copy metadata sizes and content
+                        size_t meta_src_offset = 0;
+                        for(size_t j = 0; j < local_start; ++j)
+                            meta_src_offset += cb->metadata_sizes[j];
+                        for(size_t j = local_start; j < local_end; ++j) {
+                            metadata_sizes_ptr[event_idx] = cb->metadata_sizes[j];
+                            std::memcpy(metadata_content_ptr + meta_cursor,
+                                        cb->metadata_content.data() + meta_src_offset,
+                                        cb->metadata_sizes[j]);
+                            meta_cursor += cb->metadata_sizes[j];
+                            meta_src_offset += cb->metadata_sizes[j];
+
+                            // Copy descriptor sizes and content
+                            size_t desc_src_offset = 0;
+                            for(size_t k = 0; k < j; ++k)
+                                desc_src_offset += cb->desc_sizes[k];
+                            desc_sizes_ptr[event_idx] = cb->desc_sizes[j];
+                            std::memcpy(desc_content_ptr + desc_cursor,
+                                        cb->desc_content.data() + desc_src_offset,
+                                        cb->desc_sizes[j]);
+                            desc_cursor += cb->desc_sizes[j];
+
+                            event_idx++;
+                        }
+                    }
                 }
             }
-
-            // Fill descriptor sizes and read descriptor content from chunk files
-            {
-                size_t buf_offset = 0;
-                for(size_t i = 0; i < num_events_to_send; ++i) {
-                    auto& rec = m_index[first_id + i];
-                    desc_sizes_ptr[i] = rec.data_desc_size;
-                    auto chunk_id = m_event_chunk_ids[first_id + i];
-                    auto path = chunkPath(chunk_id, "desc");
-                    int fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
-                    if(fd >= 0) {
-                        abt_io_pread(m_abt_io, fd, desc_content_ptr + buf_offset,
-                                     rec.data_desc_size, rec.data_desc_offset);
-                        abt_io_close(m_abt_io, fd);
-                    }
-                    buf_offset += rec.data_desc_size;
-                }
+            if(cache_hit) {
+                m_feed_cache_hits.fetch_add(1, std::memory_order_relaxed);
+            } else {
+                m_feed_cache_misses.fetch_add(1, std::memory_order_relaxed);
+                // SLOW PATH: read from disk
+                readMetadataFromDisk(first_id, num_events_to_send,
+                                     metadata_sizes_ptr, metadata_content_ptr);
+                readDescriptorsFromDisk(first_id, num_events_to_send,
+                                        desc_sizes_ptr, desc_content_ptr);
             }
 
             // Expose metadata as bulk (cached or per-call)
@@ -696,35 +750,83 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
         fb_data_buffer.resize(total_data_size);
         data_buffer_ptr = fb_data_buffer.data();
     }
+    // For each descriptor, try cache first, then fall back to disk
+    // We keep shared_ptrs alive so cached data pointers remain valid
+    std::vector<std::shared_ptr<const CachedBatch>> cache_owners;
     size_t buffer_cursor = 0;
+    // Track which descriptors need disk read
+    std::vector<bool> from_cache(descriptors.size(), false);
 
     for(size_t i = 0; i < descriptors.size(); ++i) {
         auto& desc = descriptors[i];
         if(desc.size() == 0) continue;
-
         FileDataDescriptor fdd = FileDataDescriptor::fromDataDescriptor(desc);
-        auto path = chunkPath(fdd.chunk_id, "data");
 
-        // Read the full event data into our buffer
-        int fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
-        if(fd < 0) {
-            result.value()[i].success() = false;
-            result.value()[i].error() = fmt::format("Failed to open {}", path);
-            buffer_cursor += fdd.size;
-            continue;
+        if(m_write_cache_enabled) {
+            const char* cached_ptr = nullptr;
+            std::shared_ptr<const CachedBatch> owner;
+            {
+                auto g2 = std::unique_lock<thallium::mutex>{m_write_cache_mtx};
+                auto pair = m_write_cache.findDataByLocation(fdd.chunk_id, fdd.offset, fdd.size);
+                cached_ptr = pair.first;
+                owner = pair.second;
+            }
+            if(cached_ptr) {
+                std::memcpy(data_buffer_ptr + buffer_cursor, cached_ptr, fdd.size);
+                cache_owners.push_back(std::move(owner));
+                from_cache[i] = true;
+                m_getdata_cache_hits.fetch_add(1, std::memory_order_relaxed);
+            } else {
+                m_getdata_cache_misses.fetch_add(1, std::memory_order_relaxed);
+            }
         }
+        buffer_cursor += fdd.size;
+    }
 
-        abt_io_pread(m_abt_io, fd, data_buffer_ptr + buffer_cursor,
-                     fdd.size, fdd.offset);
-        abt_io_close(m_abt_io, fd);
+    // Read remaining from disk (batched by chunk_id)
+    // Only read descriptors that weren't served from cache
+    {
+        size_t cursor = 0;
+        int current_fd = -1;
+        uint32_t current_chunk = UINT32_MAX;
+        for(size_t i = 0; i < descriptors.size(); ++i) {
+            auto& desc = descriptors[i];
+            if(desc.size() == 0) continue;
+            FileDataDescriptor fdd = FileDataDescriptor::fromDataDescriptor(desc);
+            if(!from_cache[i]) {
+                if(fdd.chunk_id != current_chunk) {
+                    if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+                    auto path = chunkPath(fdd.chunk_id, "data");
+                    current_fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
+                    current_chunk = fdd.chunk_id;
+                }
+                if(current_fd < 0) {
+                    result.value()[i].success() = false;
+                    result.value()[i].error() = fmt::format("Failed to open chunk {}", fdd.chunk_id);
+                } else {
+                    abt_io_pread(m_abt_io, current_fd, data_buffer_ptr + cursor,
+                                 fdd.size, fdd.offset);
+                }
+            }
+            cursor += fdd.size;
+        }
+        if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+    }
 
-        // Apply flatten() for sub-selections
-        auto flat = desc.flatten();
-        for(auto& seg : flat) {
-            local_segments.push_back({
-                data_buffer_ptr + buffer_cursor + seg.offset,
-                seg.size
-            });
+    // Build local segments for bulk transfer
+    buffer_cursor = 0;
+    for(size_t i = 0; i < descriptors.size(); ++i) {
+        auto& desc = descriptors[i];
+        if(desc.size() == 0) continue;
+        FileDataDescriptor fdd = FileDataDescriptor::fromDataDescriptor(desc);
+        if(result.value()[i].success()) {
+            auto flat = desc.flatten();
+            for(auto& seg : flat) {
+                local_segments.push_back({
+                    data_buffer_ptr + buffer_cursor + seg.offset,
+                    seg.size
+                });
+            }
         }
         buffer_cursor += fdd.size;
     }
@@ -772,6 +874,14 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
                     "enabled": {"type": "boolean"},
                     "max_pending_batches": {"type": "integer", "minimum": 1}
                 }
+            },
+            "write_cache": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "max_batches": {"type": "integer", "minimum": 1},
+                    "max_memory_bytes": {"type": "integer", "minimum": 0}
+                }
             }
         },
         "required": ["path"]
@@ -815,6 +925,17 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
         auto& ae = json["ack_early"];
         ack_early_enabled = ae.value("enabled", false);
         max_pending_batches = ae.value("max_pending_batches", (size_t)8);
+    }
+
+    /* Parse write_cache config */
+    bool write_cache_enabled = true;
+    size_t write_cache_max_batches = 16;
+    size_t write_cache_max_memory = 64 * 1024 * 1024;
+    if(json.contains("write_cache")) {
+        auto& wc = json["write_cache"];
+        write_cache_enabled = wc.value("enabled", true);
+        write_cache_max_batches = wc.value("max_batches", (size_t)16);
+        write_cache_max_memory = wc.value("max_memory_bytes", (size_t)(64 * 1024 * 1024));
     }
 
     /* Create directory: <path>/<topic_name>-<uuid>/ */
@@ -897,6 +1018,8 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     manager->m_events_in_current_chunk = events_in_current_chunk;
     manager->m_ack_early = ack_early_enabled;
     manager->m_max_pending_batches = max_pending_batches;
+    manager->m_write_cache_enabled = write_cache_enabled;
+    manager->m_write_cache = WriteCache(write_cache_max_batches, write_cache_max_memory);
 
     /* Open current chunk files */
     manager->openChunk(current_chunk_id);
