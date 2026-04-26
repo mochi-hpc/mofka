@@ -26,7 +26,7 @@ std::shared_ptr<diaspora::ProducerInterface> MofkaTopicHandle::makeProducer(
         std::shared_ptr<diaspora::ThreadPoolInterface> thread_pool,
         diaspora::Metadata options) {
     (void)options;
-    if(!thread_pool) thread_pool = m_driver->makeThreadPool(diaspora::ThreadCount{0});
+    if(!thread_pool) thread_pool = m_driver->defaultThreadPool();
     auto mofka_thread_pool = std::dynamic_pointer_cast<MofkaThreadPool>(thread_pool);
     if(!mofka_thread_pool)
         throw diaspora::Exception{"ThreadPool should be an instance of MofkaThreadPool"};
@@ -45,7 +45,7 @@ std::shared_ptr<diaspora::ConsumerInterface> MofkaTopicHandle::makeConsumer(
         const std::vector<size_t>& targets,
         diaspora::Metadata options) {
     (void)options;
-    if(!thread_pool) thread_pool = m_driver->makeThreadPool(diaspora::ThreadCount{0});
+    if(!thread_pool) thread_pool = m_driver->defaultThreadPool();
     auto mofka_thread_pool = std::dynamic_pointer_cast<MofkaThreadPool>(thread_pool);
     if(!mofka_thread_pool)
         throw diaspora::Exception{"ThreadPool should be an instance of MofkaThreadPool"};

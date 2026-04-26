@@ -79,7 +79,7 @@ class MofkaConsumer : public diaspora::ConsumerInterface {
         std::pair<
             Promise<std::optional<diaspora::Event>>,
             diaspora::Future<std::optional<diaspora::Event>>>> m_futures;
-    bool                                                       m_futures_credit;
+    bool                                                       m_futures_credit = false;
     thallium::mutex                                            m_futures_mtx;
 
     MofkaConsumer(thallium::engine engine,

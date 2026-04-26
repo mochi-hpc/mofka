@@ -38,8 +38,6 @@ class MofkaTopicHandle : public diaspora::TopicHandleInterface,
     std::vector<diaspora::PartitionInfo>             m_partitions_info;
     std::shared_ptr<MofkaDriver>                     m_driver;
 
-    tl::remote_procedure m_topic_mark_as_complete;
-
     MofkaTopicHandle() = default;
 
     MofkaTopicHandle(tl::engine engine,
@@ -55,8 +53,7 @@ class MofkaTopicHandle : public diaspora::TopicHandleInterface,
     , m_selector(std::move(selector))
     , m_serializer(std::move(serializer))
     , m_partitions(std::move(partitions))
-    , m_driver(std::move(driver))
-    , m_topic_mark_as_complete{m_engine.define("mofka_topic_mark_as_complete")} {
+    , m_driver(std::move(driver)) {
         m_partitions_info.reserve(m_partitions.size());
         for(auto& p : m_partitions) {
             m_partitions_info.push_back(p->toPartitionInfo());
