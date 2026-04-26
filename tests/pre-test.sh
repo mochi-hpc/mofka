@@ -11,7 +11,7 @@ rm -rf /tmp/mofka-logs
 mkdir /tmp/mofka-logs
 
 echo "==> Starting Mofka server"
-bedrock na+sm -c $HERE/config.json -v trace 1> mofka.out 2> mofka.err &
+bedrock ofi+tcp -c $HERE/config.json -v trace 1> mofka.out 2> mofka.err &
 BEDROCK_PID=$!
 
 echo "==> Bedrock has started with PID ${BEDROCK_PID}"
