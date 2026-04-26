@@ -38,7 +38,7 @@ spack:
       require: "@1.2:"
     diaspora-stream-api:
       require:
-      - "@0.5.1:"
+      - "@0.5.3:"
       - "+python"
       - "+tests"
       - "+benchmarks"
