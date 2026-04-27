@@ -135,7 +135,7 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             ENSURE_VALID_PARTITION_MANAGER(result);
             result = m_partition_manager->receiveBatch(
                 req.get_endpoint(), producer_name, count, metadata, data);
-        } catch(const diaspora::Exception& ex) {
+        } catch(const std::exception& ex) {
             result.error() = ex.what();
             result.success() = false;
         }
