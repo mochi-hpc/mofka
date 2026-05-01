@@ -11,11 +11,9 @@
 #include <abt-io.h>
 #include <cstdint>
 #include <string>
-#include <queue>
 #include <deque>
 #include <memory>
 #include <algorithm>
-#include <atomic>
 
 namespace mofka {
 
@@ -60,10 +58,6 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     size_t              m_max_events_per_chunk;
     bool                m_sync;
 
-    // ack_early config
-    bool                m_ack_early = false;
-    size_t              m_max_pending_batches = 8;
-
     // ABT-IO
     abt_io_instance_id  m_abt_io;
 
@@ -97,25 +91,98 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     // Write lock
     thallium::mutex              m_write_mtx;
 
-    // ID assignment (atomic, advances before writes when ack_early is enabled)
-    std::atomic<size_t>          m_assigned_events{0};
+    // Encapsulates the arguments of a receiveBatch call.
+    struct PushOperation {
 
-    // Pending write queue for ack_early
-    struct PendingWrite {
-        std::vector<size_t> metadata_sizes;
-        std::vector<char>   metadata_content;
-        std::vector<size_t> data_sizes;
-        std::vector<char>   data_content;
-        size_t              num_events;
-        diaspora::EventID   first_id;
+        enum class State {
+            submitted,
+            metadata_transferred,
+            data_transferred,
+            assigned,
+            stored
+        };
+
+        DefaultPartitionManager&     m_manager;
+        thallium::endpoint           sender;
+        std::string                  producer_name;
+        size_t                       num_events;
+        BulkRef                      metadata_bulk;
+        BulkRef                      data_bulk;
+        // Buffers populated by transferMetadata / transferData
+        std::vector<size_t>          metadata_sizes;
+        std::vector<char>            metadata_content;
+        std::vector<size_t>          data_sizes;
+        std::vector<char>            data_content;
+        diaspora::EventID            first_id = 0;
+        State                        state = State::submitted;
+        thallium::mutex              mtx;
+        thallium::condition_variable cv;
+
+        PushOperation(DefaultPartitionManager& manager,
+                      const thallium::endpoint& sender,
+                      const std::string& producer_name,
+                      size_t num_events,
+                      const BulkRef& metadata_bulk,
+                      const BulkRef& data_bulk)
+        : m_manager(manager)
+        , sender(sender)
+        , producer_name(producer_name)
+        , num_events(num_events)
+        , metadata_bulk(metadata_bulk)
+        , data_bulk(data_bulk)
+        {}
+
+        size_t metadataContentSize() const { return metadata_bulk.size - num_events * sizeof(size_t); }
+        size_t dataContentSize()     const { return data_bulk.size     - num_events * sizeof(size_t); }
+
+        void changeState(State new_state) {
+            auto g = std::unique_lock<thallium::mutex>{mtx};
+            state = new_state;
+            cv.notify_all();
+        }
+
+        void waitState(State expected) {
+            auto g = std::unique_lock<thallium::mutex>{mtx};
+            cv.wait(g, [this, expected]() { return state == expected; });
+        }
+
+        void assignFirstID(diaspora::EventID id) {
+            auto g = std::unique_lock<thallium::mutex>{mtx};
+            first_id = id;
+            state = State::assigned;
+            cv.notify_all();
+        }
+
+        void transferMetadata(thallium::engine& engine) {
+            auto content_size = metadataContentSize();
+            metadata_sizes.resize(num_events);
+            metadata_content.resize(std::max(content_size, (size_t)1));
+            auto local_bulk = engine.expose(
+                {{(char*)metadata_sizes.data(), num_events * sizeof(size_t)},
+                 {metadata_content.data(), metadata_content.size()}},
+                thallium::bulk_mode::write_only);
+            local_bulk << metadata_bulk.handle.on(sender).select(
+                metadata_bulk.offset, metadata_bulk.size);
+            metadata_content.resize(content_size);
+            changeState(State::metadata_transferred);
+        }
+
+        void transferData(thallium::engine& engine) {
+            auto content_size = dataContentSize();
+            data_sizes.resize(num_events);
+            data_content.resize(std::max(content_size, (size_t)1));
+            auto local_bulk = engine.expose(
+                {{(char*)data_sizes.data(), num_events * sizeof(size_t)},
+                 {data_content.data(), data_content.size()}},
+                thallium::bulk_mode::write_only);
+            local_bulk << data_bulk.handle.on(sender).select(
+                data_bulk.offset, data_bulk.size);
+            data_content.resize(content_size);
+            changeState(State::data_transferred);
+        }
+
+        void writeToFiles();
     };
-
-    std::queue<PendingWrite>         m_pending_writes;
-    thallium::mutex                  m_pending_writes_mtx;
-    thallium::condition_variable     m_pending_writes_cv;
-    thallium::condition_variable     m_pending_writes_ready_cv;
-    bool                             m_writer_stop = false;
-    thallium::eventual<void>         m_writer_done;
 
     // Helpers
     std::string chunkPath(uint32_t chunk_id, const std::string& ext) const;
@@ -123,20 +190,6 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     void closeCurrentChunk();
     void rotateChunk();
     bool shouldRotate() const;
-
-    struct WriteBatchResult {
-        std::vector<IndexRecord> records;
-        std::vector<char>        desc_buf;
-        std::vector<size_t>      desc_sizes;
-        uint32_t                 chunk_id;
-        bool                     success = true;
-        std::string              error;
-    };
-
-    WriteBatchResult writeBatchToFiles(
-        size_t num_events,
-        const size_t* metadata_sizes, const char* metadata_content, size_t metadata_content_size,
-        const size_t* data_sizes, const char* data_content, size_t data_content_size);
 
     void readMetadataFromDisk(diaspora::EventID first_id, size_t count,
                               size_t* sizes_out, char* content_out);
@@ -176,18 +229,6 @@ class DefaultPartitionManager : public mofka::PartitionManager {
             size_t num_events,
             const BulkRef& metadata_bulk,
             const BulkRef& data_bulk) override;
-
-    bool supportsAckEarly() const override { return m_ack_early; }
-
-    Result<diaspora::EventID> receiveBatchAckEarly(
-            const thallium::endpoint& sender,
-            const std::string& producer_name,
-            size_t num_events,
-            const BulkRef& metadata_bulk,
-            const BulkRef& data_bulk) override;
-
-    void backgroundWriterLoop();
-    void processPendingWrite(PendingWrite& pw);
 
     void wakeUp() override;
 

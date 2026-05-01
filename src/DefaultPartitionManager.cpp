@@ -82,130 +82,104 @@ bool DefaultPartitionManager::shouldRotate() const {
 }
 
 DefaultPartitionManager::~DefaultPartitionManager() {
-    if(m_ack_early) {
-        {
-            auto g = std::unique_lock<thallium::mutex>{m_pending_writes_mtx};
-            m_writer_stop = true;
-        }
-        m_pending_writes_ready_cv.notify_all();
-        m_writer_done.wait();
-    }
     closeCurrentChunk();
 }
 
-DefaultPartitionManager::WriteBatchResult DefaultPartitionManager::writeBatchToFiles(
-        size_t num_events,
-        const size_t* metadata_sizes, const char* metadata_content, size_t metadata_content_size,
-        const size_t* data_sizes, const char* data_content, size_t data_content_size)
+void DefaultPartitionManager::PushOperation::writeToFiles()
 {
-    WriteBatchResult wb;
-    wb.chunk_id = m_current_chunk_id;
-    wb.records.resize(num_events);
-    wb.desc_sizes.resize(num_events);
+    auto& mgr = m_manager;
 
-    uint64_t meta_off = m_meta_offset;
-    uint64_t data_off = m_data_offset;
+    std::vector<IndexRecord> records(num_events);
+    std::vector<char>        desc_buf;
+
+    uint64_t meta_off = mgr.m_meta_offset;
+    uint64_t data_off = mgr.m_data_offset;
 
     {
-        diaspora::BufferWrapperOutputArchive output_archive{wb.desc_buf};
+        diaspora::BufferWrapperOutputArchive output_archive{desc_buf};
         for(size_t i = 0; i < num_events; ++i) {
-            wb.records[i].metadata_offset = meta_off;
-            wb.records[i].metadata_size   = static_cast<uint32_t>(metadata_sizes[i]);
-            wb.records[i].data_offset     = data_off;
-            wb.records[i].data_size       = static_cast<uint32_t>(data_sizes[i]);
-            wb.records[i].data_desc_offset = m_desc_offset;
+            records[i].metadata_offset  = meta_off;
+            records[i].metadata_size    = static_cast<uint32_t>(metadata_sizes[i]);
+            records[i].data_offset      = data_off;
+            records[i].data_size        = static_cast<uint32_t>(data_sizes[i]);
+            records[i].data_desc_offset = mgr.m_desc_offset;
 
             FileDataDescriptor fdd;
-            fdd.chunk_id = m_current_chunk_id;
+            fdd.chunk_id = mgr.m_current_chunk_id;
             fdd.offset   = data_off;
             fdd.size     = static_cast<uint32_t>(data_sizes[i]);
 
             auto data_descriptor = diaspora::DataDescriptor(fdd.toString(), fdd.size);
-            size_t desc_buf_before = wb.desc_buf.size();
+            size_t desc_before = desc_buf.size();
             data_descriptor.save(output_archive);
-            size_t desc_size = wb.desc_buf.size() - desc_buf_before;
+            size_t desc_size = desc_buf.size() - desc_before;
 
-            wb.desc_sizes[i] = desc_size;
-            wb.records[i].data_desc_size = static_cast<uint32_t>(desc_size);
+            records[i].data_desc_size = static_cast<uint32_t>(desc_size);
 
             meta_off += metadata_sizes[i];
             data_off += data_sizes[i];
-            m_desc_offset += desc_size;
+            mgr.m_desc_offset += desc_size;
         }
     }
 
     // Write metadata to .meta
-    if(metadata_content_size > 0) {
-        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_meta,
-            metadata_content, metadata_content_size, m_meta_offset);
-        if(ret < 0) {
-            wb.success = false;
-            wb.error = fmt::format("Failed to write metadata: {}", strerror(-ret));
-            return wb;
-        }
+    if(!metadata_content.empty()) {
+        ssize_t ret = abt_io_pwrite(mgr.m_abt_io, mgr.m_fd_meta,
+            metadata_content.data(), metadata_content.size(), mgr.m_meta_offset);
+        if(ret < 0)
+            throw diaspora::Exception{fmt::format("Failed to write metadata: {}", strerror(-ret))};
     }
 
     // Write data to .data
-    if(data_content_size > 0) {
-        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_data,
-            data_content, data_content_size, m_data_offset);
-        if(ret < 0) {
-            wb.success = false;
-            wb.error = fmt::format("Failed to write data: {}", strerror(-ret));
-            return wb;
-        }
+    if(!data_content.empty()) {
+        ssize_t ret = abt_io_pwrite(mgr.m_abt_io, mgr.m_fd_data,
+            data_content.data(), data_content.size(), mgr.m_data_offset);
+        if(ret < 0)
+            throw diaspora::Exception{fmt::format("Failed to write data: {}", strerror(-ret))};
     }
 
     // Write descriptors to .desc
-    if(!wb.desc_buf.empty()) {
-        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_desc,
-            wb.desc_buf.data(), wb.desc_buf.size(),
-            m_desc_offset - wb.desc_buf.size());
-        if(ret < 0) {
-            wb.success = false;
-            wb.error = fmt::format("Failed to write descriptors: {}", strerror(-ret));
-            return wb;
-        }
+    if(!desc_buf.empty()) {
+        ssize_t ret = abt_io_pwrite(mgr.m_abt_io, mgr.m_fd_desc,
+            desc_buf.data(), desc_buf.size(),
+            mgr.m_desc_offset - desc_buf.size());
+        if(ret < 0)
+            throw diaspora::Exception{fmt::format("Failed to write descriptors: {}", strerror(-ret))};
     }
 
     // Write index records to .idx
     {
-        ssize_t ret = abt_io_pwrite(m_abt_io, m_fd_idx,
-            wb.records.data(),
+        ssize_t ret = abt_io_pwrite(mgr.m_abt_io, mgr.m_fd_idx,
+            records.data(),
             num_events * sizeof(IndexRecord),
-            m_events_in_current_chunk * sizeof(IndexRecord));
-        if(ret < 0) {
-            wb.success = false;
-            wb.error = fmt::format("Failed to write index: {}", strerror(-ret));
-            return wb;
-        }
+            mgr.m_events_in_current_chunk * sizeof(IndexRecord));
+        if(ret < 0)
+            throw diaspora::Exception{fmt::format("Failed to write index: {}", strerror(-ret))};
     }
 
     // Sync if configured
-    if(m_sync) {
-        abt_io_fdatasync(m_abt_io, m_fd_meta);
-        abt_io_fdatasync(m_abt_io, m_fd_data);
-        abt_io_fdatasync(m_abt_io, m_fd_desc);
-        abt_io_fdatasync(m_abt_io, m_fd_idx);
+    if(mgr.m_sync) {
+        abt_io_fdatasync(mgr.m_abt_io, mgr.m_fd_meta);
+        abt_io_fdatasync(mgr.m_abt_io, mgr.m_fd_data);
+        abt_io_fdatasync(mgr.m_abt_io, mgr.m_fd_desc);
+        abt_io_fdatasync(mgr.m_abt_io, mgr.m_fd_idx);
     }
 
     // Update in-memory state
-    m_meta_offset = meta_off;
-    m_data_offset = data_off;
-    m_events_in_current_chunk += num_events;
+    mgr.m_meta_offset = meta_off;
+    mgr.m_data_offset = data_off;
+    mgr.m_events_in_current_chunk += num_events;
 
     for(size_t i = 0; i < num_events; ++i) {
-        m_index.push_back(wb.records[i]);
-        m_event_chunk_ids.push_back(m_current_chunk_id);
+        mgr.m_index.push_back(records[i]);
+        mgr.m_event_chunk_ids.push_back(mgr.m_current_chunk_id);
     }
-    m_total_events += num_events;
+    mgr.m_total_events += num_events;
 
-    // Check if we need to rotate
-    if(shouldRotate()) {
-        rotateChunk();
-    }
+    if(mgr.shouldRotate())
+        mgr.rotateChunk();
 
-    return wb;
+    changeState(State::stored);
 }
 
 void DefaultPartitionManager::readMetadataFromDisk(
@@ -296,151 +270,23 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
           const BulkRef& metadata_bulk,
           const BulkRef& data_bulk)
 {
-    (void)producer_name;
+    auto op = std::make_shared<PushOperation>(
+        *this, sender, producer_name, num_events, metadata_bulk, data_bulk);
+
     Result<diaspora::EventID> result;
 
-    auto metadata_content_size = metadata_bulk.size - num_events*sizeof(size_t);
-    auto data_content_size = data_bulk.size - num_events*sizeof(size_t);
-
-    diaspora::EventID first_id;
     {
+        op->transferMetadata(m_engine);
+        op->transferData(m_engine);
+
         auto g = std::unique_lock<thallium::mutex>{m_write_mtx};
-
-        std::vector<size_t> metadata_sizes(num_events);
-        std::vector<char>   metadata_content(std::max(metadata_content_size, (size_t)1));
-        std::vector<size_t> data_sizes(num_events);
-        std::vector<char>   data_content(std::max(data_content_size, (size_t)1));
-
-        auto local_metadata_bulk = m_engine.expose(
-            {{(char*)metadata_sizes.data(), num_events*sizeof(size_t)},
-             {metadata_content.data(), metadata_content.size()}},
-            thallium::bulk_mode::write_only);
-        local_metadata_bulk << metadata_bulk.handle.on(sender).select(
-            metadata_bulk.offset, metadata_bulk.size);
-
-        auto local_data_bulk = m_engine.expose(
-            {{(char*)data_sizes.data(), num_events*sizeof(size_t)},
-             {data_content.data(), data_content.size()}},
-            thallium::bulk_mode::write_only);
-        local_data_bulk << data_bulk.handle.on(sender).select(
-            data_bulk.offset, data_bulk.size);
-
-        metadata_content.resize(metadata_content_size);
-        data_content.resize(data_content_size);
-
-        first_id = m_total_events;
-
-        auto wb = writeBatchToFiles(
-            num_events,
-            metadata_sizes.data(), metadata_content.data(), metadata_content_size,
-            data_sizes.data(), data_content.data(), data_content_size);
-
-        if(!wb.success) {
-            result.success() = false;
-            result.error() = std::move(wb.error);
-            return result;
-        }
+        op->assignFirstID(m_total_events);
+        op->writeToFiles();
     }
 
     m_events_cv.notify_all();
-    result.value() = first_id;
+    result.value() = op->first_id;
     return result;
-}
-
-Result<diaspora::EventID> DefaultPartitionManager::receiveBatchAckEarly(
-          const thallium::endpoint& sender,
-          const std::string& producer_name,
-          size_t num_events,
-          const BulkRef& metadata_bulk,
-          const BulkRef& data_bulk)
-{
-    (void)producer_name;
-    Result<diaspora::EventID> result;
-
-    auto metadata_content_size = metadata_bulk.size - num_events*sizeof(size_t);
-    auto data_content_size = data_bulk.size - num_events*sizeof(size_t);
-
-    // Backpressure: wait until the queue has room
-    {
-        auto g = std::unique_lock<thallium::mutex>{m_pending_writes_mtx};
-        m_pending_writes_cv.wait(g, [this]() {
-            return m_pending_writes.size() < m_max_pending_batches;
-        });
-    }
-
-    // RDMA pull into owned vectors before the RPC returns
-    PendingWrite pw;
-    pw.num_events = num_events;
-    pw.metadata_sizes.resize(num_events);
-    pw.metadata_content.resize(std::max(metadata_content_size, (size_t)1));
-    pw.data_sizes.resize(num_events);
-    pw.data_content.resize(std::max(data_content_size, (size_t)1));
-
-    {
-        auto local_metadata_bulk = m_engine.expose(
-            {{(char*)pw.metadata_sizes.data(), num_events*sizeof(size_t)},
-             {pw.metadata_content.data(), pw.metadata_content.size()}},
-            thallium::bulk_mode::write_only);
-        local_metadata_bulk << metadata_bulk.handle.on(sender).select(
-            metadata_bulk.offset, metadata_bulk.size);
-
-        auto local_data_bulk = m_engine.expose(
-            {{(char*)pw.data_sizes.data(), num_events*sizeof(size_t)},
-             {pw.data_content.data(), pw.data_content.size()}},
-            thallium::bulk_mode::write_only);
-        local_data_bulk << data_bulk.handle.on(sender).select(
-            data_bulk.offset, data_bulk.size);
-    }
-
-    pw.metadata_content.resize(metadata_content_size);
-    pw.data_content.resize(data_content_size);
-
-    pw.first_id = m_assigned_events.fetch_add(num_events);
-    diaspora::EventID first_id = pw.first_id;
-
-    {
-        auto g = std::unique_lock<thallium::mutex>{m_pending_writes_mtx};
-        m_pending_writes.push(std::move(pw));
-    }
-    m_pending_writes_ready_cv.notify_one();
-
-    result.value() = first_id;
-    return result;
-}
-
-void DefaultPartitionManager::processPendingWrite(PendingWrite& pw) {
-    auto wb = writeBatchToFiles(
-        pw.num_events,
-        pw.metadata_sizes.data(), pw.metadata_content.data(), pw.metadata_content.size(),
-        pw.data_sizes.data(), pw.data_content.data(), pw.data_content.size());
-
-    if(!wb.success) {
-        spdlog::error("[mofka] Background write failed: {}", wb.error);
-    }
-}
-
-void DefaultPartitionManager::backgroundWriterLoop() {
-    while(true) {
-        PendingWrite pw;
-        {
-            auto g = std::unique_lock<thallium::mutex>{m_pending_writes_mtx};
-            m_pending_writes_ready_cv.wait(g, [this]() {
-                return !m_pending_writes.empty() || m_writer_stop;
-            });
-            if(m_writer_stop && m_pending_writes.empty()) break;
-            pw = std::move(m_pending_writes.front());
-            m_pending_writes.pop();
-        }
-        m_pending_writes_cv.notify_all();
-
-        {
-            auto g = std::unique_lock<thallium::mutex>{m_write_mtx};
-            processPendingWrite(pw);
-        }
-
-        m_events_cv.notify_all();
-    }
-    m_writer_done.set_value();
 }
 
 void DefaultPartitionManager::wakeUp() {
@@ -612,14 +458,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             "path": {"type": "string"},
             "max_chunk_size": {"type": "integer"},
             "max_events_per_chunk": {"type": "integer"},
-            "sync": {"type": "boolean"},
-            "ack_early": {
-                "type": "object",
-                "properties": {
-                    "enabled": {"type": "boolean"},
-                    "max_pending_batches": {"type": "integer", "minimum": 1}
-                }
-            }
+            "sync": {"type": "boolean"}
         },
         "required": ["path"]
     }
@@ -645,15 +484,6 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     size_t max_chunk_size = json.value("max_chunk_size", (size_t)(64 * 1024 * 1024));
     size_t max_events_per_chunk = json.value("max_events_per_chunk", (size_t)1000000);
     bool sync = json.value("sync", true);
-
-    /* Parse ack_early config */
-    bool ack_early_enabled = false;
-    size_t max_pending_batches = 8;
-    if(json.contains("ack_early")) {
-        auto& ae = json["ack_early"];
-        ack_early_enabled = ae.value("enabled", false);
-        max_pending_batches = ae.value("max_pending_batches", (size_t)8);
-    }
 
     /* Create directory: <path>/<topic_name>-<uuid>/ */
     std::string partition_path = base_path + "/" + topic_name + "-" + partition_uuid.to_string();
@@ -722,26 +552,15 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
 
     manager->m_current_chunk_id = current_chunk_id;
     manager->m_total_events = total_events;
-    manager->m_assigned_events.store(total_events);
     manager->m_index = std::move(index);
     manager->m_event_chunk_ids = std::move(event_chunk_ids);
     manager->m_meta_offset = meta_offset;
     manager->m_data_offset = data_offset;
     manager->m_desc_offset = desc_offset;
     manager->m_events_in_current_chunk = events_in_current_chunk;
-    manager->m_ack_early = ack_early_enabled;
-    manager->m_max_pending_batches = max_pending_batches;
 
     /* Open current chunk files */
     manager->openChunk(current_chunk_id);
-
-    /* Start background writer ULT if ack_early is enabled */
-    if(ack_early_enabled) {
-        auto mgr = manager.get();
-        thallium::pool(engine.get_handler_pool()).make_thread(
-            [mgr]() { mgr->backgroundWriterLoop(); },
-            thallium::anonymous{});
-    }
 
     return manager;
 }
