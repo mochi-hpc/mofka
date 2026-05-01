@@ -57,6 +57,11 @@ Passed as JSON in the partition config:
     "bulk_cache": {
         "enabled": true,
         "initial_buffer_size": 1048576
+    },
+    "write_cache": {
+        "enabled": true,
+        "max_batches": 16,
+        "max_memory_bytes": 67108864
     }
 }
 ```
@@ -71,6 +76,9 @@ Passed as JSON in the partition config:
 | `bulk_cache.initial_buffer_size`| integer | no       | `0`        | Pre-allocate content buffers to this size at startup (bytes). 0 = no pre-allocation |
 | `ack_early.enabled`             | boolean | no       | `false`    | Enable deferred writes with early producer acknowledgment (see [Early Acknowledgment](#early-acknowledgment-ack_early)) |
 | `ack_early.max_pending_batches` | integer | no       | `8`        | Max queued unwritten batches before backpressure blocks the producer |
+| `write_cache.enabled`           | boolean | no       | `true`     | Keep recently written batches in memory to serve consumer reads without disk I/O (see [Write-Through Batch Cache](#write-through-batch-cache)) |
+| `write_cache.max_batches`       | integer | no       | `16`       | Max number of recent batches to retain in the cache      |
+| `write_cache.max_memory_bytes`  | integer | no       | 64 MiB     | Max total heap memory used by the write-through cache    |
 
 The configuration is validated against a JSON Schema at creation time.
 
@@ -631,6 +639,127 @@ ack_early pipeline:
 - Consumes all 100 events and verifies event IDs, metadata content, and data
   content match expected values
 
+## Write-Through Batch Cache
+
+### Motivation
+
+`feedConsumer` and `getData` read event data from chunk files via `abt_io_pread`,
+opening and closing file descriptors at each chunk boundary. For consumers that
+closely follow the write frontier (the common case in streaming workloads), most
+reads hit events that were written moments ago — data that is still hot in the
+page cache. The write-through batch cache exploits this by keeping a copy of
+recently written batch payloads in the server's heap, so reads never touch the
+filesystem at all for recent events.
+
+### Enabling
+
+The cache is **on by default**. It is controlled by the `write_cache` config object:
+
+```json
+{
+    "path": "/data/mofka",
+    "write_cache": {
+        "enabled": true,
+        "max_batches": 16,
+        "max_memory_bytes": 67108864
+    }
+}
+```
+
+| Field                         | Type    | Required | Default  | Description                                          |
+|-------------------------------|---------|----------|----------|------------------------------------------------------|
+| `write_cache.enabled`         | boolean | no       | `true`   | Enable the write-through batch cache                 |
+| `write_cache.max_batches`     | integer | no       | `16`     | Max number of recent batches to keep in memory       |
+| `write_cache.max_memory_bytes`| integer | no       | 64 MiB   | Max total memory used by cached batches              |
+
+Eviction is FIFO: when either limit is exceeded, the oldest cached batch is
+dropped. The two limits are checked together — the batch that caused the overflow
+is inserted first, then old batches are evicted until both limits are satisfied.
+
+### Implementation
+
+**`CachedBatch` struct** (`src/DefaultPartitionManager.hpp:143`): holds all the
+data written in one `receiveBatch` or `processPendingWrite` call:
+- `first_id`, `num_events`, `chunk_id` — event range and chunk identity
+- `metadata_sizes`, `metadata_content` — flat metadata buffer with per-event sizes
+- `data_sizes`, `data_content` — flat data buffer with per-event sizes
+- `desc_sizes`, `desc_content` — flat descriptor buffer with per-event sizes
+- `index_records` — one `IndexRecord` per event, for offset lookups
+
+**`WriteCache` class** (`src/DefaultPartitionManager.hpp:166`): manages a
+`std::deque<shared_ptr<CachedBatch>>` with the two configurable limits.
+Key methods:
+- `insert()` — push batch, then evict from front until within limits
+- `coversRange(first_id, count)` — true if cached batches fully cover the event
+  range `[first_id, first_id + count)`
+- `findDataByLocation(chunk_id, offset, size)` — find a data pointer by its
+  `FileDataDescriptor` coordinates; returns a raw pointer plus the owning
+  `shared_ptr` (to keep the batch alive while the pointer is in use)
+- `findOverlapping(first_id, count)` — return all batches that overlap the range
+
+### Integration Points
+
+**Write path** — both write paths populate the cache immediately after data lands
+on disk (or in the pending queue for `ack_early`):
+
+- `receiveBatch()` (`src/DefaultPartitionManager.cpp`): after `writeBatchToFiles()`
+  succeeds, a `CachedBatch` is constructed from the local buffer pointers and
+  inserted into `m_write_cache`.
+- `processPendingWrite()`: same insertion after the background writer's
+  `writeBatchToFiles()` call, so ack_early batches are also cached.
+
+Both insertions are performed while `m_write_mtx` is held; consumers read the
+cache under `m_events_mtx` (feedConsumer) or `m_getdata_mtx` (getData), so there
+is no shared lock. The cache itself is not internally thread-safe; callers are
+responsible for holding the appropriate lock.
+
+**Read path**:
+
+- `feedConsumer()`: before reading metadata and descriptors from disk, calls
+  `m_write_cache.coversRange(first_id, num_events_to_send)`. On a hit, metadata
+  sizes and content are assembled directly from the overlapping `CachedBatch`
+  objects into the `DualBulkCache` buffers without any file I/O. On a miss, the
+  normal `readMetadataFromDisk` / `readDescriptorsFromDisk` path is used.
+- `getData()`: before calling `readDataFromDisk`, calls
+  `m_write_cache.findDataByLocation(chunk_id, offset, size)`. On a hit, the raw
+  data pointer from the cache is used directly (the `shared_ptr` keeps the batch
+  alive for the duration of the RDMA transfer). On a miss, falls back to disk.
+
+### Statistics
+
+Four atomic counters track cache effectiveness:
+
+| Counter                  | Meaning                                       |
+|--------------------------|-----------------------------------------------|
+| `m_feed_cache_hits`      | `feedConsumer` batches served from cache      |
+| `m_feed_cache_misses`    | `feedConsumer` batches that required disk I/O |
+| `m_getdata_cache_hits`   | `getData` requests served from cache          |
+| `m_getdata_cache_misses` | `getData` requests that required disk I/O     |
+
+At partition destruction, the stats are logged at `info` level:
+
+```
+[mofka] Write cache stats: feed hits=N, feed misses=N, getData hits=N, getData misses=N
+```
+
+### Interaction with `ack_early`
+
+The two features compose: when `ack_early` is enabled, the background writer
+inserts each completed `PendingWrite` into the cache after its file writes. This
+means consumers can read ack_early events from the cache even before the
+background writer has finished processing the full queue (though a consumer will
+only see events after `m_total_events` is updated, which happens in the
+background writer, ensuring reads always see fully written data).
+
+### Testing
+
+`MofkaWriteCacheTest` (`tests/MofkaWriteCacheTest.cpp`) exercises two scenarios:
+
+1. **Synchronous write + cache**: produces 100 events, consumes them immediately.
+   All 100 reads should be served from the cache (`feed hits = 1`).
+2. **`ack_early` + cache**: produces 100 events with `ack_early: true` and
+   `write_cache` enabled. Verifies that the combination works correctly end-to-end.
+
 ## Limitations and Future Work
 
 - **Single-node**: data is stored on the local filesystem of the server hosting
@@ -638,7 +767,10 @@ ack_early pipeline:
 - **No compaction or GC**: chunk files are never deleted or compacted. Old chunks
   accumulate until the partition is destroyed.
 - **File descriptor usage**: each `feedConsumer` and `getData` call opens and
-  closes chunk files per event. A file descriptor cache could reduce overhead.
+  closes chunk files per chunk boundary. The write-through batch cache eliminates
+  this overhead for recently written events, but events that have aged out of the
+  cache still require file opens on each read. A persistent file descriptor cache
+  would reduce overhead for older chunks.
 - **Recovery is read-only**: the scan rebuilds the in-memory index but does not
   repair partial writes (e.g. from a crash mid-batch).
 - **ack_early data loss**: when `ack_early` is enabled, events that have been

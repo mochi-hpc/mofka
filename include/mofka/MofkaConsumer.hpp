@@ -82,6 +82,10 @@ class MofkaConsumer : public diaspora::ConsumerInterface {
     bool                                                       m_futures_credit = false;
     thallium::mutex                                            m_futures_mtx;
 
+    std::atomic<size_t>      m_pending_ults{0};
+    thallium::mutex          m_pending_ults_mtx;
+    thallium::condition_variable m_pending_ults_cv;
+
     MofkaConsumer(thallium::engine engine,
                   std::string_view name,
                   diaspora::BatchSize batch_size,

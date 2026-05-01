@@ -696,14 +696,14 @@ Result<void> DefaultPartitionManager::feedConsumer(
                 data_descriptors_bulk, num_events_to_send*sizeof(size_t), total_desc_size, self_addr
             };
 
-            // Feed consumer
+            // Feed consumer and wait for RDMA to complete before reusing caches
             consumerHandle.feed(
                     num_events_to_send,
                     first_id,
                     metadata_size_bulk_ref,
                     metadata_bulk_ref,
                     data_desc_size_bulk_ref,
-                    data_desc_bulk_ref);
+                    data_desc_bulk_ref).wait(-1);
 
             first_id += num_events_to_send;
         }

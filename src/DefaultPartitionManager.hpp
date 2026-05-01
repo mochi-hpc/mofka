@@ -59,8 +59,8 @@ class DualBulkCache {
     std::vector<size_t>  m_sizes;
     std::vector<char>    m_content;
     thallium::bulk       m_bulk;
-    size_t               m_registered_sizes_cap = 0;
-    size_t               m_registered_content_cap = 0;
+    size_t               m_registered_sizes_bytes = 0;
+    size_t               m_registered_content_bytes = 0;
     thallium::engine     m_engine;
     thallium::bulk_mode  m_mode;
 
@@ -78,24 +78,24 @@ public:
      * Re-registers the combined bulk only if either vector grew beyond registered capacity.
      */
     void prepare(size_t num_events, size_t content_size) {
-        m_sizes.resize(num_events);
         // Ensure content has at least 1 byte so the two-segment bulk always
         // has valid memory for both segments.
-        m_content.resize(std::max(content_size, (size_t)1));
+        size_t effective_content = std::max(content_size, (size_t)1);
+        m_sizes.resize(num_events);
+        m_content.resize(effective_content);
 
+        size_t exact_sizes_bytes = num_events * sizeof(size_t);
         bool needs_reregister =
-            (m_sizes.capacity() * sizeof(size_t) > m_registered_sizes_cap) ||
-            (m_content.capacity() > m_registered_content_cap);
+            (exact_sizes_bytes != m_registered_sizes_bytes) ||
+            (effective_content != m_registered_content_bytes);
 
         if(needs_reregister && num_events > 0) {
-            auto sizes_bytes = m_sizes.capacity() * sizeof(size_t);
-            auto content_bytes = m_content.capacity();
             m_bulk = m_engine.expose(
-                {{(char*)m_sizes.data(), sizes_bytes},
-                 {m_content.data(), content_bytes}},
+                {{(char*)m_sizes.data(), exact_sizes_bytes},
+                 {m_content.data(), effective_content}},
                 m_mode);
-            m_registered_sizes_cap = sizes_bytes;
-            m_registered_content_cap = content_bytes;
+            m_registered_sizes_bytes = exact_sizes_bytes;
+            m_registered_content_bytes = effective_content;
         }
     }
 

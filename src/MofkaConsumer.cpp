@@ -84,6 +84,14 @@ void MofkaConsumer::subscribe() {
 }
 
 void MofkaConsumer::unsubscribe() {
+    // Wait for all in-flight recvBatch ULTs to complete before removing the consumer,
+    // so the server-side feedConsumer loop is still alive to receive the stop signal.
+    {
+        auto g = std::unique_lock<thallium::mutex>{m_pending_ults_mtx};
+        m_pending_ults_cv.wait(g, [this]() {
+            return m_pending_ults.load(std::memory_order_acquire) == 0;
+        });
+    }
     // send a message to all the partitions requesting to disconnect
     auto& rpc = m_consumer_remove_consumer;
     auto n = m_partitions.size();
@@ -168,7 +176,8 @@ void MofkaConsumer::recvBatch(const tl::request& req,
     Result<void> result;
     req.respond(result);
 
-    auto ult = [this, self = shared_from_this_mofka(),
+    m_pending_ults.fetch_add(1, std::memory_order_relaxed);
+    auto ult = [this,
                 count, startID, batch = std::move(batch),
                 serializer = m_topic->m_serializer,
                 partition = m_partitions[partition_index],
@@ -217,6 +226,10 @@ void MofkaConsumer::recvBatch(const tl::request& req,
             metadata_offset  += batch->m_meta_sizes[i];
             data_desc_offset += batch->m_data_desc_sizes[i];
         }
+
+        // Signal completion so unsubscribe() can proceed
+        m_pending_ults.fetch_sub(1, std::memory_order_acq_rel);
+        m_pending_ults_cv.notify_all();
     };
     m_thread_pool->pushWork(std::move(ult));
 }
