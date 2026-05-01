@@ -14,6 +14,7 @@ spack:
   - mochi-warabi
   - mochi-yokan
   - mochi-flock
+  - mochi-abt-io
   - py-coverage
   - py-pybind11
   - py-mochi-margo
