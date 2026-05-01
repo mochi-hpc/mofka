@@ -730,8 +730,6 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
 
     auto client_address = m_engine.lookup(bulk.address);
 
-    auto g = std::unique_lock<thallium::mutex>{m_getdata_mtx};
-
     std::vector<std::pair<void*, size_t>> local_segments;
     // Calculate total size needed based on actual file data sizes
     size_t total_data_size = 0;
@@ -741,11 +739,14 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
         total_data_size += fdd.size;
     }
 
-    // Use cached buffer to avoid per-call allocation
+    // Check out a pre-registered buffer from the pool (cache enabled)
+    // or fall back to a per-call vector (cache disabled).
+    std::optional<PooledEntry> pooled;
     char* data_buffer_ptr;
     std::vector<char> fb_data_buffer;
     if(m_bulk_cache_enabled) {
-        data_buffer_ptr = m_getdata_cache.resize(total_data_size);
+        pooled.emplace(m_getdata_pool);
+        data_buffer_ptr = pooled->get().resize(total_data_size);
     } else {
         fb_data_buffer.resize(total_data_size);
         data_buffer_ptr = fb_data_buffer.data();
@@ -832,8 +833,34 @@ Result<std::vector<Result<void>>> DefaultPartitionManager::getData(
     }
 
     if(!local_segments.empty()) {
-        auto local_data_bulk = m_engine.expose(local_segments, thallium::bulk_mode::read_only);
-        bulk.handle.on(client_address) << local_data_bulk;
+        if(m_bulk_cache_enabled) {
+            // Check if all segments are contiguous in the pre-registered buffer.
+            // If so, use the pre-registered bulk directly via select() to avoid
+            // a per-call expose() call.
+            bool contiguous = true;
+            for(size_t i = 1; i < local_segments.size(); ++i) {
+                const char* prev_end =
+                    (const char*)local_segments[i-1].first + local_segments[i-1].second;
+                if(prev_end != (const char*)local_segments[i].first) {
+                    contiguous = false;
+                    break;
+                }
+            }
+            if(contiguous) {
+                size_t offset = (const char*)local_segments[0].first - pooled->get().data();
+                size_t total  = 0;
+                for(auto& seg : local_segments) total += seg.second;
+                bulk.handle.on(client_address) << pooled->get().bulk().select(offset, total);
+            } else {
+                auto local_data_bulk = m_engine.expose(
+                    local_segments, thallium::bulk_mode::read_only);
+                bulk.handle.on(client_address) << local_data_bulk;
+            }
+        } else {
+            auto local_data_bulk = m_engine.expose(
+                local_segments, thallium::bulk_mode::read_only);
+            bulk.handle.on(client_address) << local_data_bulk;
+        }
     }
 
     return result;

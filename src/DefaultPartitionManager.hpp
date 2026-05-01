@@ -20,33 +20,98 @@
 namespace mofka {
 
 /**
- * Grow-only buffer cache that reuses an already-registered thallium::bulk handle.
- * Re-registers only when the underlying std::vector reallocates (capacity grows).
+ * Grow-only buffer with a pre-registered RDMA bulk handle (read-only).
+ * Re-registers the bulk only when the vector's capacity grows.
+ * Non-copyable; move-safe because std::vector move transfers the data pointer.
  */
-class BulkCache {
+class BulkCacheEntry {
 
-    std::vector<char>    m_buffer;
-    thallium::bulk       m_bulk;
-    size_t               m_registered_capacity = 0;
-    thallium::engine     m_engine;
+    std::vector<char>   m_buffer;
+    thallium::bulk      m_bulk;
+    size_t              m_registered_capacity = 0;
+    thallium::engine    m_engine;
 
 public:
 
-    BulkCache() = default;
+    BulkCacheEntry() = default;
+    explicit BulkCacheEntry(thallium::engine engine) : m_engine(std::move(engine)) {}
+    BulkCacheEntry(BulkCacheEntry&&) = default;
+    BulkCacheEntry& operator=(BulkCacheEntry&&) = default;
+    BulkCacheEntry(const BulkCacheEntry&) = delete;
+    BulkCacheEntry& operator=(const BulkCacheEntry&) = delete;
 
-    BulkCache(thallium::engine engine)
-    : m_engine(std::move(engine))
-    {}
-
-    // Ensure buffer is at least `size` bytes. Returns pointer to buffer.
-    // No bulk registration — used as a simple buffer cache for getData.
     char* resize(size_t size) {
         m_buffer.resize(size);
+        if(m_buffer.capacity() != m_registered_capacity) {
+            if(m_buffer.capacity() > 0) {
+                m_bulk = m_engine.expose(
+                    {{m_buffer.data(), m_buffer.capacity()}},
+                    thallium::bulk_mode::read_only);
+                m_registered_capacity = m_buffer.capacity();
+            }
+        }
         return m_buffer.data();
     }
 
     char* data() { return m_buffer.data(); }
-    size_t size() const { return m_buffer.size(); }
+    const thallium::bulk& bulk() const { return m_bulk; }
+};
+
+/**
+ * Pool of BulkCacheEntry objects for concurrent getData calls.
+ * Checkout takes from the free list or creates a new entry; never blocks.
+ * Entries are heap-allocated (unique_ptr) so their addresses — and the
+ * data pointers their registered bulks point to — remain stable.
+ */
+class BulkCachePool {
+
+    std::deque<std::unique_ptr<BulkCacheEntry>> m_free;
+    thallium::mutex                              m_mtx;
+    thallium::engine                             m_engine;
+
+public:
+
+    BulkCachePool() = default;
+    BulkCachePool(thallium::engine engine, size_t initial_size = 0)
+    : m_engine(std::move(engine)) {
+        if(initial_size > 0) {
+            auto entry = std::make_unique<BulkCacheEntry>(m_engine);
+            entry->resize(initial_size);
+            m_free.push_back(std::move(entry));
+        }
+    }
+
+    std::unique_ptr<BulkCacheEntry> checkout() {
+        std::unique_lock<thallium::mutex> g{m_mtx};
+        if(!m_free.empty()) {
+            auto e = std::move(m_free.front());
+            m_free.pop_front();
+            return e;
+        }
+        return std::make_unique<BulkCacheEntry>(m_engine);
+    }
+
+    void checkin(std::unique_ptr<BulkCacheEntry> entry) {
+        std::unique_lock<thallium::mutex> g{m_mtx};
+        m_free.push_back(std::move(entry));
+    }
+};
+
+/**
+ * RAII guard for a checked-out BulkCachePool entry.
+ * Returns the entry to the pool on destruction.
+ */
+class PooledEntry {
+
+    BulkCachePool&                  m_pool;
+    std::unique_ptr<BulkCacheEntry> m_entry;
+
+public:
+
+    explicit PooledEntry(BulkCachePool& pool)
+    : m_pool(pool), m_entry(pool.checkout()) {}
+    ~PooledEntry() { m_pool.checkin(std::move(m_entry)); }
+    BulkCacheEntry& get() { return *m_entry; }
 };
 
 /**
@@ -314,9 +379,8 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     DualBulkCache                m_feed_metadata_cache;
     DualBulkCache                m_feed_desc_cache;
 
-    // Buffer cache for getData (buffer only, no bulk caching)
-    BulkCache                    m_getdata_cache;
-    thallium::mutex              m_getdata_mtx;
+    // Buffer pool for getData (pre-registered, concurrent-safe)
+    BulkCachePool                m_getdata_pool;
 
     // Write-through cache
     bool                         m_write_cache_enabled = true;
@@ -379,14 +443,14 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     , m_recv_data_cache(m_engine, thallium::bulk_mode::write_only)
     , m_feed_metadata_cache(m_engine, thallium::bulk_mode::read_only)
     , m_feed_desc_cache(m_engine, thallium::bulk_mode::read_only)
-    , m_getdata_cache(m_engine)
+    , m_getdata_pool(m_engine, bulk_cache_enabled ? initial_buffer_size : 0)
     {
         if(m_bulk_cache_enabled && m_initial_buffer_size > 0) {
             m_recv_metadata_cache.prepare(0, m_initial_buffer_size);
             m_recv_data_cache.prepare(0, m_initial_buffer_size);
             m_feed_metadata_cache.prepare(0, m_initial_buffer_size);
             m_feed_desc_cache.prepare(0, m_initial_buffer_size);
-            m_getdata_cache.resize(m_initial_buffer_size);
+            // m_getdata_pool is pre-populated via its constructor
         }
     }
 
