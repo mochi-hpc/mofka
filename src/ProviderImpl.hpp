@@ -132,27 +132,18 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         spdlog::trace("[mofka:{}] Received receiveBatch request (topic: {}, count:{}, ack_early:{})",
                       id(), m_topic, count, ack_early_requested);
         Result<diaspora::EventID> result;
-        bool use_ack_early = ack_early_requested
-                          && m_partition_manager
-                          && m_partition_manager->supportsAckEarly();
-        tl::auto_respond<decltype(result)> ensureResponse(req, result);
-        if(use_ack_early) {
-            try {
-                result = m_partition_manager->receiveBatchAckEarly(
-                    req.get_endpoint(), producer_name, count, metadata, data);
-            } catch(const std::exception& ex) {
-                result.error() = ex.what();
-                result.success() = false;
-            }
-        } else {
-            try {
-                ENSURE_VALID_PARTITION_MANAGER(result);
-                result = m_partition_manager->receiveBatch(
-                    req.get_endpoint(), producer_name, count, metadata, data);
-            } catch(const std::exception& ex) {
-                result.error() = ex.what();
-                result.success() = false;
-            }
+        if(!m_partition_manager) {
+            result.error() = "No partition manager attached to this provider";
+            result.success() = false;
+            req.respond(result);
+            return;
+        }
+        try {
+            m_partition_manager->receiveBatch(req, producer_name, count, metadata, data);
+        } catch(const std::exception& ex) {
+            result.error() = ex.what();
+            result.success() = false;
+            req.respond(result);
         }
         spdlog::trace("[mofka:{}] Done executing receiveBatch", id());
     }

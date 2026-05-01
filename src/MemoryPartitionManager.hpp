@@ -90,8 +90,8 @@ class MemoryPartitionManager : public mofka::PartitionManager {
     /**
      * @brief Receives a batch.
      */
-    Result<diaspora::EventID> receiveBatch(
-            const thallium::endpoint& sender,
+    void receiveBatch(
+            const thallium::request& req,
             const std::string& producer_name,
             size_t num_events,
             const BulkRef& metadata_bulk,

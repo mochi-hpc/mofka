@@ -101,7 +101,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         };
 
         DefaultPartitionManager&     m_manager;
-        thallium::endpoint           sender;
+        thallium::request            req;
         std::string                  producer_name;
         size_t                       num_events;
         BulkRef                      metadata_bulk;
@@ -113,17 +113,18 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         std::vector<char>            data_content;
         diaspora::EventID            first_id = 0;
         State                        state = State::submitted;
+        bool                         m_responded = false;
         thallium::mutex              mtx;
         thallium::condition_variable cv;
 
         PushOperation(DefaultPartitionManager& manager,
-                      const thallium::endpoint& sender,
+                      const thallium::request& req,
                       const std::string& producer_name,
                       size_t num_events,
                       const BulkRef& metadata_bulk,
                       const BulkRef& data_bulk)
         : m_manager(manager)
-        , sender(sender)
+        , req(req)
         , producer_name(producer_name)
         , num_events(num_events)
         , metadata_bulk(metadata_bulk)
@@ -135,8 +136,15 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
         void changeState(State new_state) {
             auto g = std::unique_lock<thallium::mutex>{mtx};
+            if(new_state <= state) return;
             state = new_state;
             cv.notify_all();
+        }
+
+        void sendResponse(Result<diaspora::EventID> result) {
+            if(m_responded) return;
+            m_responded = true;
+            req.respond(result);
         }
 
         void waitState(State expected) {
@@ -145,11 +153,9 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         }
 
         void assignFirstID() {
-            auto g = std::unique_lock<thallium::mutex>{mtx};
             first_id = m_manager.m_assigned_events;
             m_manager.m_assigned_events += num_events;
-            state = State::assigned;
-            cv.notify_all();
+            changeState(State::assigned);
         }
 
         void transferMetadata(thallium::engine& engine) {
@@ -160,7 +166,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
                 {{(char*)metadata_sizes.data(), num_events * sizeof(size_t)},
                  {metadata_content.data(), metadata_content.size()}},
                 thallium::bulk_mode::write_only);
-            local_bulk << metadata_bulk.handle.on(sender).select(
+            local_bulk << metadata_bulk.handle.on(req.get_endpoint()).select(
                 metadata_bulk.offset, metadata_bulk.size);
             metadata_content.resize(content_size);
             changeState(State::metadata_transferred);
@@ -174,7 +180,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
                 {{(char*)data_sizes.data(), num_events * sizeof(size_t)},
                  {data_content.data(), data_content.size()}},
                 thallium::bulk_mode::write_only);
-            local_bulk << data_bulk.handle.on(sender).select(
+            local_bulk << data_bulk.handle.on(req.get_endpoint()).select(
                 data_bulk.offset, data_bulk.size);
             data_content.resize(content_size);
             changeState(State::data_transferred);
@@ -224,8 +230,8 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     virtual ~DefaultPartitionManager();
 
-    Result<diaspora::EventID> receiveBatch(
-            const thallium::endpoint& sender,
+    void receiveBatch(
+            const thallium::request& req,
             const std::string& producer_name,
             size_t num_events,
             const BulkRef& metadata_bulk,

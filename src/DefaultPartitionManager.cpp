@@ -121,7 +121,15 @@ void DefaultPartitionManager::writeLoop() {
             m_write_queue.pop_front();
         }
         op->waitState(PushOperation::State::data_transferred);
-        op->writeToFiles();
+        Result<diaspora::EventID> result;
+        try {
+            op->writeToFiles();
+            result.value() = op->first_id;
+        } catch(const std::exception& ex) {
+            result.success() = false;
+            result.error() = ex.what();
+        }
+        op->sendResponse(result);
         m_events_cv.notify_all();
     }
 }
@@ -304,17 +312,15 @@ void DefaultPartitionManager::readDataFromDisk(
     if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
 }
 
-Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
-          const thallium::endpoint& sender,
+void DefaultPartitionManager::receiveBatch(
+          const thallium::request& req,
           const std::string& producer_name,
           size_t num_events,
           const BulkRef& metadata_bulk,
           const BulkRef& data_bulk)
 {
     auto op = std::make_shared<PushOperation>(
-        *this, sender, producer_name, num_events, metadata_bulk, data_bulk);
-
-    Result<diaspora::EventID> result;
+        *this, req, producer_name, num_events, metadata_bulk, data_bulk);
 
     {
         auto g = std::unique_lock<thallium::mutex>{m_write_queue_mtx};
@@ -325,10 +331,6 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
 
     op->transferMetadata(m_engine);
     op->transferData(m_engine);
-    op->waitState(PushOperation::State::stored);
-
-    result.value() = op->first_id;
-    return result;
 }
 
 void DefaultPartitionManager::wakeUp() {

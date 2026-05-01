@@ -22,15 +22,14 @@ MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(
     {"data", "warabi", true, false, false},
     {"metadata", "yokan", true, false, false});
 
-Result<diaspora::EventID> LegacyPartitionManager::receiveBatch(
-          const thallium::endpoint& sender,
+void LegacyPartitionManager::receiveBatch(
+          const thallium::request& req,
           const std::string& producer_name,
           size_t num_events,
           const BulkRef& metadata_bulk,
           const BulkRef& data_bulk)
 {
     (void)producer_name;
-    (void)sender;
     Result<diaspora::EventID> first_id;
 
     // --------- asynchronously transfer the data to the DataStore
@@ -38,7 +37,7 @@ Result<diaspora::EventID> LegacyPartitionManager::receiveBatch(
 
     // --------- meanwhile transfer the metadata to the EventStore
     first_id = m_event_store->appendMetadata(num_events, metadata_bulk);
-    if(!first_id.success()) return first_id;
+    if(!first_id.success()) { req.respond(first_id); return; }
 
     // --------- wait for the data transfers
     std::vector<diaspora::DataDescriptor> descriptors;
@@ -47,7 +46,8 @@ Result<diaspora::EventID> LegacyPartitionManager::receiveBatch(
     } catch(const std::exception& ex) {
         first_id.success() = false;
         first_id.error() = ex.what();
-        return first_id;
+        req.respond(first_id);
+        return;
     }
 
     // --------- transfer the descriptors
@@ -55,12 +55,13 @@ Result<diaspora::EventID> LegacyPartitionManager::receiveBatch(
     if(!ok.success()) {
         first_id.success() = false;
         first_id.error() = ok.error();
-        return first_id;
+        req.respond(first_id);
+        return;
     }
 
     wakeUp();
 
-    return first_id;
+    req.respond(first_id);
 }
 
 void LegacyPartitionManager::wakeUp() {
