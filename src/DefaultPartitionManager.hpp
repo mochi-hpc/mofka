@@ -80,7 +80,8 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     std::vector<uint32_t>     m_event_chunk_ids;
 
     // Event tracking
-    size_t                       m_total_events = 0;
+    size_t                       m_assigned_events = 0; // IDs handed out (may not yet be written)
+    size_t                       m_total_events = 0;    // events written and available to consumers
     thallium::mutex              m_events_mtx;
     thallium::condition_variable m_events_cv;
 
@@ -88,17 +89,14 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     std::unordered_map<std::string, diaspora::EventID> m_consumer_cursor;
     thallium::mutex                                    m_consumer_cursor_mtx;
 
-    // Write lock
-    thallium::mutex              m_write_mtx;
-
     // Encapsulates the arguments of a receiveBatch call.
     struct PushOperation {
 
-        enum class State {
+        enum class State : uint8_t {
             submitted,
+            assigned,
             metadata_transferred,
             data_transferred,
-            assigned,
             stored
         };
 
@@ -143,12 +141,13 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
         void waitState(State expected) {
             auto g = std::unique_lock<thallium::mutex>{mtx};
-            cv.wait(g, [this, expected]() { return state == expected; });
+            cv.wait(g, [this, expected]() { return state >= expected; });
         }
 
-        void assignFirstID(diaspora::EventID id) {
+        void assignFirstID() {
             auto g = std::unique_lock<thallium::mutex>{mtx};
-            first_id = id;
+            first_id = m_manager.m_assigned_events;
+            m_manager.m_assigned_events += num_events;
             state = State::assigned;
             cv.notify_all();
         }
@@ -184,6 +183,15 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         void writeToFiles();
     };
 
+    // Write queue
+    std::deque<std::shared_ptr<PushOperation>> m_write_queue;
+    thallium::mutex                            m_write_queue_mtx;
+    thallium::condition_variable               m_write_queue_cv;
+    bool                                       m_stop = false;
+    thallium::managed<thallium::thread>        m_write_ult;
+
+    void writeLoop();
+
     // Helpers
     std::string chunkPath(uint32_t chunk_id, const std::string& ext) const;
     void openChunk(uint32_t chunk_id);
@@ -207,18 +215,11 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         size_t max_events_per_chunk,
         bool sync,
         abt_io_instance_id abt_io,
-        thallium::engine engine)
-    : m_path(std::move(path))
-    , m_max_chunk_size(max_chunk_size)
-    , m_max_events_per_chunk(max_events_per_chunk)
-    , m_sync(sync)
-    , m_abt_io(abt_io)
-    , m_engine(std::move(engine))
-    {}
+        thallium::engine engine);
 
-    DefaultPartitionManager(DefaultPartitionManager&&) = default;
+    DefaultPartitionManager(DefaultPartitionManager&&) = delete;
     DefaultPartitionManager(const DefaultPartitionManager&) = delete;
-    DefaultPartitionManager& operator=(DefaultPartitionManager&&) = default;
+    DefaultPartitionManager& operator=(DefaultPartitionManager&&) = delete;
     DefaultPartitionManager& operator=(const DefaultPartitionManager&) = delete;
 
     virtual ~DefaultPartitionManager();

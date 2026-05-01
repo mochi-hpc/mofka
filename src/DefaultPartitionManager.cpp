@@ -32,6 +32,23 @@ static void mkdirs(const std::string& path) {
     }
 }
 
+DefaultPartitionManager::DefaultPartitionManager(
+        std::string path,
+        size_t max_chunk_size,
+        size_t max_events_per_chunk,
+        bool sync,
+        abt_io_instance_id abt_io,
+        thallium::engine engine)
+: m_path(std::move(path))
+, m_max_chunk_size(max_chunk_size)
+, m_max_events_per_chunk(max_events_per_chunk)
+, m_sync(sync)
+, m_abt_io(abt_io)
+, m_engine(std::move(engine))
+{
+    m_write_ult = m_engine.get_handler_pool().make_thread([this]() { writeLoop(); });
+}
+
 std::string DefaultPartitionManager::chunkPath(uint32_t chunk_id, const std::string& ext) const {
     char buf[32];
     snprintf(buf, sizeof(buf), "chunk-%06u", chunk_id);
@@ -82,7 +99,31 @@ bool DefaultPartitionManager::shouldRotate() const {
 }
 
 DefaultPartitionManager::~DefaultPartitionManager() {
+    {
+        auto g = std::unique_lock<thallium::mutex>{m_write_queue_mtx};
+        m_stop = true;
+        m_write_queue_cv.notify_all();
+    }
+    m_write_ult->join();
     closeCurrentChunk();
+}
+
+void DefaultPartitionManager::writeLoop() {
+    while(true) {
+        std::shared_ptr<PushOperation> op;
+        {
+            auto g = std::unique_lock<thallium::mutex>{m_write_queue_mtx};
+            m_write_queue_cv.wait(g, [this]() {
+                return !m_write_queue.empty() || m_stop;
+            });
+            if(m_write_queue.empty()) break;
+            op = std::move(m_write_queue.front());
+            m_write_queue.pop_front();
+        }
+        op->waitState(PushOperation::State::data_transferred);
+        op->writeToFiles();
+        m_events_cv.notify_all();
+    }
 }
 
 void DefaultPartitionManager::PushOperation::writeToFiles()
@@ -276,15 +317,16 @@ Result<diaspora::EventID> DefaultPartitionManager::receiveBatch(
     Result<diaspora::EventID> result;
 
     {
-        op->transferMetadata(m_engine);
-        op->transferData(m_engine);
-
-        auto g = std::unique_lock<thallium::mutex>{m_write_mtx};
-        op->assignFirstID(m_total_events);
-        op->writeToFiles();
+        auto g = std::unique_lock<thallium::mutex>{m_write_queue_mtx};
+        op->assignFirstID();
+        m_write_queue.push_back(op);
+        m_write_queue_cv.notify_one();
     }
 
-    m_events_cv.notify_all();
+    op->transferMetadata(m_engine);
+    op->transferData(m_engine);
+    op->waitState(PushOperation::State::stored);
+
     result.value() = op->first_id;
     return result;
 }
@@ -551,6 +593,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             sync, abt_io, engine));
 
     manager->m_current_chunk_id = current_chunk_id;
+    manager->m_assigned_events = total_events;
     manager->m_total_events = total_events;
     manager->m_index = std::move(index);
     manager->m_event_chunk_ids = std::move(event_chunk_ids);
