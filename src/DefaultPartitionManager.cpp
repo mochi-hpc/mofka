@@ -124,7 +124,7 @@ void DefaultPartitionManager::writeLoop() {
         Result<diaspora::EventID> result;
         try {
             op->writeToFiles();
-            result.value() = op->first_id;
+            result.value() = op->m_first_id;
         } catch(const std::exception& ex) {
             result.success() = false;
             result.error() = ex.what();
@@ -138,7 +138,7 @@ void DefaultPartitionManager::PushOperation::writeToFiles()
 {
     auto& mgr = m_manager;
 
-    std::vector<IndexRecord> records(num_events);
+    std::vector<IndexRecord> records(m_num_events);
     std::vector<char>        desc_buf;
 
     uint64_t meta_off = mgr.m_meta_offset;
@@ -146,17 +146,17 @@ void DefaultPartitionManager::PushOperation::writeToFiles()
 
     {
         diaspora::BufferWrapperOutputArchive output_archive{desc_buf};
-        for(size_t i = 0; i < num_events; ++i) {
+        for(size_t i = 0; i < m_num_events; ++i) {
             records[i].metadata_offset  = meta_off;
-            records[i].metadata_size    = static_cast<uint32_t>(metadata_sizes[i]);
+            records[i].metadata_size    = static_cast<uint32_t>(m_metadata_sizes[i]);
             records[i].data_offset      = data_off;
-            records[i].data_size        = static_cast<uint32_t>(data_sizes[i]);
+            records[i].data_size        = static_cast<uint32_t>(m_data_sizes[i]);
             records[i].data_desc_offset = mgr.m_desc_offset;
 
             FileDataDescriptor fdd;
             fdd.chunk_id = mgr.m_current_chunk_id;
             fdd.offset   = data_off;
-            fdd.size     = static_cast<uint32_t>(data_sizes[i]);
+            fdd.size     = static_cast<uint32_t>(m_data_sizes[i]);
 
             auto data_descriptor = diaspora::DataDescriptor(fdd.toString(), fdd.size);
             size_t desc_before = desc_buf.size();
@@ -165,24 +165,24 @@ void DefaultPartitionManager::PushOperation::writeToFiles()
 
             records[i].data_desc_size = static_cast<uint32_t>(desc_size);
 
-            meta_off += metadata_sizes[i];
-            data_off += data_sizes[i];
+            meta_off += m_metadata_sizes[i];
+            data_off += m_data_sizes[i];
             mgr.m_desc_offset += desc_size;
         }
     }
 
     // Write metadata to .meta
-    if(!metadata_content.empty()) {
+    if(!m_metadata_content.empty()) {
         ssize_t ret = abt_io_pwrite(mgr.m_abt_io, mgr.m_fd_meta,
-            metadata_content.data(), metadata_content.size(), mgr.m_meta_offset);
+            m_metadata_content.data(), m_metadata_content.size(), mgr.m_meta_offset);
         if(ret < 0)
             throw diaspora::Exception{fmt::format("Failed to write metadata: {}", strerror(-ret))};
     }
 
     // Write data to .data
-    if(!data_content.empty()) {
+    if(!m_data_content.empty()) {
         ssize_t ret = abt_io_pwrite(mgr.m_abt_io, mgr.m_fd_data,
-            data_content.data(), data_content.size(), mgr.m_data_offset);
+            m_data_content.data(), m_data_content.size(), mgr.m_data_offset);
         if(ret < 0)
             throw diaspora::Exception{fmt::format("Failed to write data: {}", strerror(-ret))};
     }
@@ -200,7 +200,7 @@ void DefaultPartitionManager::PushOperation::writeToFiles()
     {
         ssize_t ret = abt_io_pwrite(mgr.m_abt_io, mgr.m_fd_idx,
             records.data(),
-            num_events * sizeof(IndexRecord),
+            m_num_events * sizeof(IndexRecord),
             mgr.m_events_in_current_chunk * sizeof(IndexRecord));
         if(ret < 0)
             throw diaspora::Exception{fmt::format("Failed to write index: {}", strerror(-ret))};
@@ -217,13 +217,13 @@ void DefaultPartitionManager::PushOperation::writeToFiles()
     // Update in-memory state
     mgr.m_meta_offset = meta_off;
     mgr.m_data_offset = data_off;
-    mgr.m_events_in_current_chunk += num_events;
+    mgr.m_events_in_current_chunk += m_num_events;
 
-    for(size_t i = 0; i < num_events; ++i) {
+    for(size_t i = 0; i < m_num_events; ++i) {
         mgr.m_index.push_back(records[i]);
         mgr.m_event_chunk_ids.push_back(mgr.m_current_chunk_id);
     }
-    mgr.m_total_events += num_events;
+    mgr.m_total_events += m_num_events;
 
     if(mgr.shouldRotate())
         mgr.rotateChunk();

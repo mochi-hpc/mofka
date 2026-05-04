@@ -101,21 +101,21 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         };
 
         DefaultPartitionManager&     m_manager;
-        thallium::request            req;
-        std::string                  producer_name;
-        size_t                       num_events;
-        BulkRef                      metadata_bulk;
-        BulkRef                      data_bulk;
+        thallium::request            m_req;
+        std::string                  m_producer_name;
+        size_t                       m_num_events;
+        BulkRef                      m_metadata_bulk;
+        BulkRef                      m_data_bulk;
         // Buffers populated by transferMetadata / transferData
-        std::vector<size_t>          metadata_sizes;
-        std::vector<char>            metadata_content;
-        std::vector<size_t>          data_sizes;
-        std::vector<char>            data_content;
-        diaspora::EventID            first_id = 0;
-        State                        state = State::submitted;
+        std::vector<size_t>          m_metadata_sizes;
+        std::vector<char>            m_metadata_content;
+        std::vector<size_t>          m_data_sizes;
+        std::vector<char>            m_data_content;
+        diaspora::EventID            m_first_id = 0;
+        State                        m_state = State::submitted;
         bool                         m_responded = false;
-        thallium::mutex              mtx;
-        thallium::condition_variable cv;
+        thallium::mutex              m_state_mtx;
+        thallium::condition_variable m_state_cv;
 
         PushOperation(DefaultPartitionManager& manager,
                       const thallium::request& req,
@@ -124,65 +124,65 @@ class DefaultPartitionManager : public mofka::PartitionManager {
                       const BulkRef& metadata_bulk,
                       const BulkRef& data_bulk)
         : m_manager(manager)
-        , req(req)
-        , producer_name(producer_name)
-        , num_events(num_events)
-        , metadata_bulk(metadata_bulk)
-        , data_bulk(data_bulk)
+        , m_req(req)
+        , m_producer_name(producer_name)
+        , m_num_events(num_events)
+        , m_metadata_bulk(metadata_bulk)
+        , m_data_bulk(data_bulk)
         {}
 
-        size_t metadataContentSize() const { return metadata_bulk.size - num_events * sizeof(size_t); }
-        size_t dataContentSize()     const { return data_bulk.size     - num_events * sizeof(size_t); }
+        size_t metadataContentSize() const { return m_metadata_bulk.size - m_num_events * sizeof(size_t); }
+        size_t dataContentSize()     const { return m_data_bulk.size     - m_num_events * sizeof(size_t); }
 
         void changeState(State new_state) {
-            auto g = std::unique_lock<thallium::mutex>{mtx};
-            if(new_state <= state) return;
-            state = new_state;
-            cv.notify_all();
+            auto g = std::unique_lock<thallium::mutex>{m_state_mtx};
+            if(new_state <= m_state) return;
+            m_state = new_state;
+            m_state_cv.notify_all();
         }
 
         void sendResponse(Result<diaspora::EventID> result) {
             if(m_responded) return;
             m_responded = true;
-            req.respond(result);
+            m_req.respond(result);
         }
 
         void waitState(State expected) {
-            auto g = std::unique_lock<thallium::mutex>{mtx};
-            cv.wait(g, [this, expected]() { return state >= expected; });
+            auto g = std::unique_lock<thallium::mutex>{m_state_mtx};
+            m_state_cv.wait(g, [this, expected]() { return m_state >= expected; });
         }
 
         void assignFirstID() {
-            first_id = m_manager.m_assigned_events;
-            m_manager.m_assigned_events += num_events;
+            m_first_id = m_manager.m_assigned_events;
+            m_manager.m_assigned_events += m_num_events;
             changeState(State::assigned);
         }
 
         void transferMetadata(thallium::engine& engine) {
             auto content_size = metadataContentSize();
-            metadata_sizes.resize(num_events);
-            metadata_content.resize(std::max(content_size, (size_t)1));
+            m_metadata_sizes.resize(m_num_events);
+            m_metadata_content.resize(std::max(content_size, (size_t)1));
             auto local_bulk = engine.expose(
-                {{(char*)metadata_sizes.data(), num_events * sizeof(size_t)},
-                 {metadata_content.data(), metadata_content.size()}},
+                {{(char*)m_metadata_sizes.data(), m_num_events * sizeof(size_t)},
+                 {m_metadata_content.data(), m_metadata_content.size()}},
                 thallium::bulk_mode::write_only);
-            local_bulk << metadata_bulk.handle.on(req.get_endpoint()).select(
-                metadata_bulk.offset, metadata_bulk.size);
-            metadata_content.resize(content_size);
+            local_bulk << m_metadata_bulk.handle.on(m_req.get_endpoint()).select(
+                m_metadata_bulk.offset, m_metadata_bulk.size);
+            m_metadata_content.resize(content_size);
             changeState(State::metadata_transferred);
         }
 
         void transferData(thallium::engine& engine) {
             auto content_size = dataContentSize();
-            data_sizes.resize(num_events);
-            data_content.resize(std::max(content_size, (size_t)1));
+            m_data_sizes.resize(m_num_events);
+            m_data_content.resize(std::max(content_size, (size_t)1));
             auto local_bulk = engine.expose(
-                {{(char*)data_sizes.data(), num_events * sizeof(size_t)},
-                 {data_content.data(), data_content.size()}},
+                {{(char*)m_data_sizes.data(), m_num_events * sizeof(size_t)},
+                 {m_data_content.data(), m_data_content.size()}},
                 thallium::bulk_mode::write_only);
-            local_bulk << data_bulk.handle.on(req.get_endpoint()).select(
-                data_bulk.offset, data_bulk.size);
-            data_content.resize(content_size);
+            local_bulk << m_data_bulk.handle.on(m_req.get_endpoint()).select(
+                m_data_bulk.offset, m_data_bulk.size);
+            m_data_content.resize(content_size);
             changeState(State::data_transferred);
         }
 
