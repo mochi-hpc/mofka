@@ -53,6 +53,18 @@ DefaultPartitionManager::DefaultPartitionManager(
                           opts.data_pool_first_size,
                           opts.data_pool_size_multiple,
                           thallium::bulk_mode::write_only)
+, m_consumer_metadata_buffer_pool(m_engine,
+                          opts.consumer_metadata_pool_num_tiers,
+                          opts.consumer_metadata_pool_num_buffers,
+                          opts.consumer_metadata_pool_first_size,
+                          opts.consumer_metadata_pool_size_multiple,
+                          thallium::bulk_mode::read_only)
+, m_consumer_desc_buffer_pool(m_engine,
+                          opts.consumer_desc_pool_num_tiers,
+                          opts.consumer_desc_pool_num_buffers,
+                          opts.consumer_desc_pool_first_size,
+                          opts.consumer_desc_pool_size_multiple,
+                          thallium::bulk_mode::read_only)
 {
     m_write_ult = m_engine.get_handler_pool().make_thread([this]() { writeLoop(); });
 }
@@ -388,35 +400,40 @@ Result<void> DefaultPartitionManager::feedConsumer(
                 total_desc_size     += m_index[first_id + i].data_desc_size;
             }
 
-            // Allocate per-call staging buffers
-            std::vector<size_t> metadata_sizes(num_events_to_send);
-            std::vector<char>   metadata_content(std::max(total_metadata_size, (size_t)1));
-            std::vector<size_t> desc_sizes(num_events_to_send);
-            std::vector<char>   desc_content(std::max(total_desc_size, (size_t)1));
+            // Lease pool buffers: layout is [sizes (N*8 bytes) | content]
+            auto sizes_bytes = num_events_to_send * sizeof(size_t);
+
+            auto meta_buf = m_consumer_metadata_buffer_pool.get(
+                sizes_bytes + std::max(total_metadata_size, (size_t)1), /*extend=*/true);
+            auto meta_sizes_span   = std::span<size_t>{
+                reinterpret_cast<size_t*>(meta_buf.data()), num_events_to_send};
+            auto meta_content_span = std::span<char>{
+                static_cast<char*>(meta_buf.data()) + sizes_bytes,
+                std::max(total_metadata_size, (size_t)1)};
+
+            auto desc_buf = m_consumer_desc_buffer_pool.get(
+                sizes_bytes + std::max(total_desc_size, (size_t)1), /*extend=*/true);
+            auto desc_sizes_span   = std::span<size_t>{
+                reinterpret_cast<size_t*>(desc_buf.data()), num_events_to_send};
+            auto desc_content_span = std::span<char>{
+                static_cast<char*>(desc_buf.data()) + sizes_bytes,
+                std::max(total_desc_size, (size_t)1)};
 
             readMetadataFromDisk(first_id, num_events_to_send,
-                                 metadata_sizes.data(), metadata_content.data());
+                                 meta_sizes_span.data(), meta_content_span.data());
             readDescriptorsFromDisk(first_id, num_events_to_send,
-                                    desc_sizes.data(), desc_content.data());
+                                    desc_sizes_span.data(), desc_content_span.data());
 
-            // Expose as read-only bulk
-            auto metadata_bulk = m_engine.expose(
-                {{(char*)metadata_sizes.data(), num_events_to_send*sizeof(size_t)},
-                 {metadata_content.data(), total_metadata_size}},
-                thallium::bulk_mode::read_only);
+            // Use the pool buffer's pre-registered bulk directly — no expose() needed
             auto metadata_size_bulk_ref = BulkRef{
-                metadata_bulk, 0, num_events_to_send*sizeof(size_t), self_addr};
+                meta_buf.bulk(), 0, sizes_bytes, self_addr};
             auto metadata_bulk_ref = BulkRef{
-                metadata_bulk, num_events_to_send*sizeof(size_t), total_metadata_size, self_addr};
+                meta_buf.bulk(), sizes_bytes, total_metadata_size, self_addr};
 
-            auto desc_bulk = m_engine.expose(
-                {{(char*)desc_sizes.data(), num_events_to_send*sizeof(size_t)},
-                 {desc_content.data(), total_desc_size}},
-                thallium::bulk_mode::read_only);
             auto data_desc_size_bulk_ref = BulkRef{
-                desc_bulk, 0, num_events_to_send*sizeof(size_t), self_addr};
+                desc_buf.bulk(), 0, sizes_bytes, self_addr};
             auto data_desc_bulk_ref = BulkRef{
-                desc_bulk, num_events_to_send*sizeof(size_t), total_desc_size, self_addr};
+                desc_buf.bulk(), sizes_bytes, total_desc_size, self_addr};
 
             consumerHandle.feed(
                 num_events_to_send,
@@ -511,22 +528,50 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             "max_chunk_size": {"type": "integer"},
             "max_events_per_chunk": {"type": "integer"},
             "sync": {"type": "boolean"},
-            "metadata_buffer_pool": {
+            "producers": {
                 "type": "object",
                 "properties": {
-                    "num_tiers":     {"type": "integer", "minimum": 1},
-                    "num_buffers":   {"type": "integer", "minimum": 0},
-                    "first_size":    {"type": "integer", "minimum": 1},
-                    "size_multiple": {"type": "number",  "exclusiveMinimum": 1.0}
+                    "metadata_buffer_pool": {
+                        "type": "object",
+                        "properties": {
+                            "num_tiers":     {"type": "integer", "minimum": 1},
+                            "num_buffers":   {"type": "integer", "minimum": 0},
+                            "first_size":    {"type": "integer", "minimum": 1},
+                            "size_multiple": {"type": "number",  "exclusiveMinimum": 1.0}
+                        }
+                    },
+                    "data_buffer_pool": {
+                        "type": "object",
+                        "properties": {
+                            "num_tiers":     {"type": "integer", "minimum": 1},
+                            "num_buffers":   {"type": "integer", "minimum": 0},
+                            "first_size":    {"type": "integer", "minimum": 1},
+                            "size_multiple": {"type": "number",  "exclusiveMinimum": 1.0}
+                        }
+                    }
                 }
             },
-            "data_buffer_pool": {
+            "consumers": {
                 "type": "object",
                 "properties": {
-                    "num_tiers":     {"type": "integer", "minimum": 1},
-                    "num_buffers":   {"type": "integer", "minimum": 0},
-                    "first_size":    {"type": "integer", "minimum": 1},
-                    "size_multiple": {"type": "number",  "exclusiveMinimum": 1.0}
+                    "metadata_buffer_pool": {
+                        "type": "object",
+                        "properties": {
+                            "num_tiers":     {"type": "integer", "minimum": 1},
+                            "num_buffers":   {"type": "integer", "minimum": 0},
+                            "first_size":    {"type": "integer", "minimum": 1},
+                            "size_multiple": {"type": "number",  "exclusiveMinimum": 1.0}
+                        }
+                    },
+                    "desc_buffer_pool": {
+                        "type": "object",
+                        "properties": {
+                            "num_tiers":     {"type": "integer", "minimum": 1},
+                            "num_buffers":   {"type": "integer", "minimum": 0},
+                            "first_size":    {"type": "integer", "minimum": 1},
+                            "size_multiple": {"type": "number",  "exclusiveMinimum": 1.0}
+                        }
+                    }
                 }
             }
         },
@@ -555,15 +600,25 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     size_t max_events_per_chunk  = json.value("max_events_per_chunk", (size_t)1000000);
     bool sync                    = json.value("sync", true);
 
-    size_t meta_num_tiers     = json.value("/metadata_buffer_pool/num_tiers"_json_pointer,     (size_t)1);
-    size_t meta_num_buffers   = json.value("/metadata_buffer_pool/num_buffers"_json_pointer,   (size_t)0);
-    size_t meta_first_size    = json.value("/metadata_buffer_pool/first_size"_json_pointer,    (size_t)(64*1024));
-    float  meta_size_multiple = json.value("/metadata_buffer_pool/size_multiple"_json_pointer, 4.0f);
+    size_t meta_num_tiers     = json.value("/producers/metadata_buffer_pool/num_tiers"_json_pointer,     (size_t)1);
+    size_t meta_num_buffers   = json.value("/producers/metadata_buffer_pool/num_buffers"_json_pointer,   (size_t)0);
+    size_t meta_first_size    = json.value("/producers/metadata_buffer_pool/first_size"_json_pointer,    (size_t)(64*1024));
+    float  meta_size_multiple = json.value("/producers/metadata_buffer_pool/size_multiple"_json_pointer, 4.0f);
 
-    size_t data_num_tiers     = json.value("/data_buffer_pool/num_tiers"_json_pointer,         (size_t)1);
-    size_t data_num_buffers   = json.value("/data_buffer_pool/num_buffers"_json_pointer,       (size_t)0);
-    size_t data_first_size    = json.value("/data_buffer_pool/first_size"_json_pointer,        (size_t)(64*1024*1024));
-    float  data_size_multiple = json.value("/data_buffer_pool/size_multiple"_json_pointer,     4.0f);
+    size_t data_num_tiers     = json.value("/producers/data_buffer_pool/num_tiers"_json_pointer,         (size_t)1);
+    size_t data_num_buffers   = json.value("/producers/data_buffer_pool/num_buffers"_json_pointer,       (size_t)0);
+    size_t data_first_size    = json.value("/producers/data_buffer_pool/first_size"_json_pointer,        (size_t)(64*1024*1024));
+    float  data_size_multiple = json.value("/producers/data_buffer_pool/size_multiple"_json_pointer,     4.0f);
+
+    size_t cmeta_num_tiers     = json.value("/consumers/metadata_buffer_pool/num_tiers"_json_pointer,     (size_t)1);
+    size_t cmeta_num_buffers   = json.value("/consumers/metadata_buffer_pool/num_buffers"_json_pointer,   (size_t)0);
+    size_t cmeta_first_size    = json.value("/consumers/metadata_buffer_pool/first_size"_json_pointer,    (size_t)(64*1024));
+    float  cmeta_size_multiple = json.value("/consumers/metadata_buffer_pool/size_multiple"_json_pointer, 4.0f);
+
+    size_t cdesc_num_tiers     = json.value("/consumers/desc_buffer_pool/num_tiers"_json_pointer,         (size_t)1);
+    size_t cdesc_num_buffers   = json.value("/consumers/desc_buffer_pool/num_buffers"_json_pointer,       (size_t)0);
+    size_t cdesc_first_size    = json.value("/consumers/desc_buffer_pool/first_size"_json_pointer,        (size_t)(4*1024));
+    float  cdesc_size_multiple = json.value("/consumers/desc_buffer_pool/size_multiple"_json_pointer,     4.0f);
 
     /* Create directory: <path>/<topic_name>-<uuid>/ */
     std::string partition_path = base_path + "/" + topic_name + "-" + partition_uuid.to_string();
@@ -640,6 +695,14 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             .data_pool_num_buffers      = data_num_buffers,
             .data_pool_first_size       = data_first_size,
             .data_pool_size_multiple    = data_size_multiple,
+            .consumer_metadata_pool_num_tiers     = cmeta_num_tiers,
+            .consumer_metadata_pool_num_buffers   = cmeta_num_buffers,
+            .consumer_metadata_pool_first_size    = cmeta_first_size,
+            .consumer_metadata_pool_size_multiple = cmeta_size_multiple,
+            .consumer_desc_pool_num_tiers         = cdesc_num_tiers,
+            .consumer_desc_pool_num_buffers       = cdesc_num_buffers,
+            .consumer_desc_pool_first_size        = cdesc_first_size,
+            .consumer_desc_pool_size_multiple     = cdesc_size_multiple,
         }));
 
     manager->m_current_chunk_id = current_chunk_id;

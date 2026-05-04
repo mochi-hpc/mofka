@@ -36,6 +36,16 @@ struct DefaultPartitionManagerOptions {
     size_t             data_pool_num_buffers      = 0;
     size_t             data_pool_first_size       = 64 * 1024 * 1024;
     float              data_pool_size_multiple    = 4.0f;
+
+    size_t             consumer_metadata_pool_num_tiers    = 1;
+    size_t             consumer_metadata_pool_num_buffers  = 0;
+    size_t             consumer_metadata_pool_first_size   = 64 * 1024;
+    float              consumer_metadata_pool_size_multiple = 4.0f;
+
+    size_t             consumer_desc_pool_num_tiers        = 1;
+    size_t             consumer_desc_pool_num_buffers      = 0;
+    size_t             consumer_desc_pool_first_size       = 4 * 1024;
+    float              consumer_desc_pool_size_multiple    = 4.0f;
 };
 
 /**
@@ -85,9 +95,13 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     // Engine
     thallium::engine    m_engine;
 
-    // Buffer pools for incoming RDMA transfers (write_only, pre-registered)
+    // Buffer pools for incoming producer RDMA transfers (write_only)
     thallium::bulk_buffer_pool<> m_metadata_buffer_pool;
     thallium::bulk_buffer_pool<> m_data_buffer_pool;
+
+    // Buffer pools for outgoing consumer RDMA transfers (read_only)
+    thallium::bulk_buffer_pool<> m_consumer_metadata_buffer_pool;
+    thallium::bulk_buffer_pool<> m_consumer_desc_buffer_pool;
 
     // Current chunk write state
     uint32_t            m_current_chunk_id = 0;
