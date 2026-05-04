@@ -8,8 +8,10 @@
 
 #include "PartitionManager.hpp"
 #include <diaspora/DataDescriptor.hpp>
+#include <thallium/bulk_buffer.hpp>
 #include <abt-io.h>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <deque>
 #include <memory>
@@ -104,13 +106,15 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         thallium::request            m_req;
         std::string                  m_producer_name;
         size_t                       m_num_events;
-        BulkRef                      m_metadata_bulk;
-        BulkRef                      m_data_bulk;
+        BulkRef                      m_remote_metadata_bulk;
+        BulkRef                      m_remote_data_bulk;
         // Buffers populated by transferMetadata / transferData
-        std::vector<size_t>          m_metadata_sizes;
-        std::vector<char>            m_metadata_content;
-        std::vector<size_t>          m_data_sizes;
-        std::vector<char>            m_data_content;
+        thallium::bulk_buffer<>      m_metadata_buffer;
+        std::span<size_t>            m_metadata_sizes;
+        std::span<char>              m_metadata_content;
+        thallium::bulk_buffer<>      m_data_buffer;
+        std::span<size_t>            m_data_sizes;
+        std::span<char>              m_data_content;
         diaspora::EventID            m_first_id = 0;
         State                        m_state = State::submitted;
         bool                         m_responded = false;
@@ -127,12 +131,12 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         , m_req(req)
         , m_producer_name(producer_name)
         , m_num_events(num_events)
-        , m_metadata_bulk(metadata_bulk)
-        , m_data_bulk(data_bulk)
+        , m_remote_metadata_bulk(metadata_bulk)
+        , m_remote_data_bulk(data_bulk)
         {}
 
-        size_t metadataContentSize() const { return m_metadata_bulk.size - m_num_events * sizeof(size_t); }
-        size_t dataContentSize()     const { return m_data_bulk.size     - m_num_events * sizeof(size_t); }
+        size_t metadataContentSize() const { return m_remote_metadata_bulk.size - m_num_events * sizeof(size_t); }
+        size_t dataContentSize()     const { return m_remote_data_bulk.size     - m_num_events * sizeof(size_t); }
 
         void changeState(State new_state) {
             auto g = std::unique_lock<thallium::mutex>{m_state_mtx};
@@ -159,30 +163,34 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         }
 
         void transferMetadata(thallium::engine& engine) {
-            auto content_size = metadataContentSize();
-            m_metadata_sizes.resize(m_num_events);
-            m_metadata_content.resize(std::max(content_size, (size_t)1));
-            auto local_bulk = engine.expose(
-                {{(char*)m_metadata_sizes.data(), m_num_events * sizeof(size_t)},
-                 {m_metadata_content.data(), m_metadata_content.size()}},
-                thallium::bulk_mode::write_only);
-            local_bulk << m_metadata_bulk.handle.on(m_req.get_endpoint()).select(
-                m_metadata_bulk.offset, m_metadata_bulk.size);
-            m_metadata_content.resize(content_size);
+            auto sizes_bytes   = m_num_events * sizeof(size_t);
+            auto content_size  = metadataContentSize();
+            auto total_size    = sizes_bytes + std::max(content_size, (size_t)1);
+            m_metadata_buffer  = thallium::bulk_buffer<>{engine, total_size, thallium::bulk_mode::write_only};
+            m_metadata_sizes   = std::span<size_t>{
+                reinterpret_cast<size_t*>(m_metadata_buffer.data()), m_num_events};
+            m_metadata_content = std::span<char>{
+                static_cast<char*>(m_metadata_buffer.data()) + sizes_bytes,
+                std::max(content_size, (size_t)1)};
+            m_metadata_buffer << m_remote_metadata_bulk.handle.on(m_req.get_endpoint()).select(
+                m_remote_metadata_bulk.offset, m_remote_metadata_bulk.size);
+            m_metadata_content = m_metadata_content.first(content_size);
             changeState(State::metadata_transferred);
         }
 
         void transferData(thallium::engine& engine) {
+            auto sizes_bytes  = m_num_events * sizeof(size_t);
             auto content_size = dataContentSize();
-            m_data_sizes.resize(m_num_events);
-            m_data_content.resize(std::max(content_size, (size_t)1));
-            auto local_bulk = engine.expose(
-                {{(char*)m_data_sizes.data(), m_num_events * sizeof(size_t)},
-                 {m_data_content.data(), m_data_content.size()}},
-                thallium::bulk_mode::write_only);
-            local_bulk << m_data_bulk.handle.on(m_req.get_endpoint()).select(
-                m_data_bulk.offset, m_data_bulk.size);
-            m_data_content.resize(content_size);
+            auto total_size   = sizes_bytes + std::max(content_size, (size_t)1);
+            m_data_buffer     = thallium::bulk_buffer<>{engine, total_size, thallium::bulk_mode::write_only};
+            m_data_sizes      = std::span<size_t>{
+                reinterpret_cast<size_t*>(m_data_buffer.data()), m_num_events};
+            m_data_content    = std::span<char>{
+                static_cast<char*>(m_data_buffer.data()) + sizes_bytes,
+                std::max(content_size, (size_t)1)};
+            m_data_buffer << m_remote_data_bulk.handle.on(m_req.get_endpoint()).select(
+                m_remote_data_bulk.offset, m_remote_data_bulk.size);
+            m_data_content = m_data_content.first(content_size);
             changeState(State::data_transferred);
         }
 
