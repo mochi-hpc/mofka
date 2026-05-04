@@ -40,6 +40,7 @@ DefaultPartitionManager::DefaultPartitionManager(
 , m_max_events_per_chunk(opts.max_events_per_chunk)
 , m_sync(opts.sync)
 , m_abt_io(opts.abt_io)
+, m_fd_cache(opts.abt_io, opts.fd_cache_capacity)
 , m_engine(std::move(engine))
 , m_metadata_buffer_pool(m_engine,
                           opts.metadata_pool_num_tiers,
@@ -265,9 +266,7 @@ DefaultPartitionManager::PendingReads DefaultPartitionManager::readMetadataFromD
         sizes_out[i] = rec.metadata_size;
         auto chunk_id = m_event_chunk_ids[first_id + i];
         if(chunk_id != current_chunk) {
-            auto path = chunkPath(chunk_id, "meta");
-            current_fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
-            if(current_fd >= 0) pending.m_open_fds.push_back(current_fd);
+            current_fd = m_fd_cache.get(chunkPath(chunk_id, "meta"));
             current_chunk = chunk_id;
         }
         if(current_fd >= 0) {
@@ -296,9 +295,7 @@ DefaultPartitionManager::PendingReads DefaultPartitionManager::readDescriptorsFr
         sizes_out[i] = rec.data_desc_size;
         auto chunk_id = m_event_chunk_ids[first_id + i];
         if(chunk_id != current_chunk) {
-            auto path = chunkPath(chunk_id, "desc");
-            current_fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
-            if(current_fd >= 0) pending.m_open_fds.push_back(current_fd);
+            current_fd = m_fd_cache.get(chunkPath(chunk_id, "desc"));
             current_chunk = chunk_id;
         }
         if(current_fd >= 0) {
@@ -543,6 +540,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             "max_chunk_size": {"type": "integer"},
             "max_events_per_chunk": {"type": "integer"},
             "sync": {"type": "boolean"},
+            "fd_cache_capacity": {"type": "integer", "minimum": 1},
             "producers": {
                 "type": "object",
                 "properties": {
@@ -614,6 +612,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     size_t max_chunk_size        = json.value("max_chunk_size", (size_t)(64 * 1024 * 1024));
     size_t max_events_per_chunk  = json.value("max_events_per_chunk", (size_t)1000000);
     bool sync                    = json.value("sync", true);
+    size_t fd_cache_capacity     = json.value("fd_cache_capacity", (size_t)64);
 
     size_t meta_num_tiers     = json.value("/producers/metadata_buffer_pool/num_tiers"_json_pointer,     (size_t)1);
     size_t meta_num_buffers   = json.value("/producers/metadata_buffer_pool/num_buffers"_json_pointer,   (size_t)0);
@@ -718,6 +717,7 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             .consumer_desc_pool_num_buffers       = cdesc_num_buffers,
             .consumer_desc_pool_first_size        = cdesc_first_size,
             .consumer_desc_pool_size_multiple     = cdesc_size_multiple,
+            .fd_cache_capacity                    = fd_cache_capacity,
         }));
 
     manager->m_current_chunk_id = current_chunk_id;

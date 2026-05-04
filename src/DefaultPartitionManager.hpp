@@ -11,12 +11,15 @@
 #include <thallium/bulk_buffer.hpp>
 #include <thallium/bulk_buffer_pool.hpp>
 #include <abt-io.h>
+#include <fcntl.h>
 #include <cstdint>
 #include <span>
 #include <string>
 #include <deque>
+#include <list>
 #include <memory>
 #include <algorithm>
+#include <unordered_map>
 
 namespace mofka {
 
@@ -46,6 +49,8 @@ struct DefaultPartitionManagerOptions {
     size_t             consumer_desc_pool_num_buffers      = 0;
     size_t             consumer_desc_pool_first_size       = 4 * 1024;
     float              consumer_desc_pool_size_multiple    = 4.0f;
+
+    size_t             fd_cache_capacity                   = 64;
 };
 
 /**
@@ -83,6 +88,55 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     private:
 
+    // LRU cache of open read-only file descriptors, keyed by path.
+    struct FDCache {
+        struct Entry { std::string path; int fd; };
+
+        size_t                                                      m_capacity = 0;
+        abt_io_instance_id                                          m_abt_io = ABT_IO_INSTANCE_NULL;
+        std::list<Entry>                                            m_lru;
+        std::unordered_map<std::string, std::list<Entry>::iterator> m_map;
+        thallium::mutex                                             m_mtx;
+
+        FDCache() = default;
+        FDCache(abt_io_instance_id ai, size_t capacity)
+        : m_capacity(capacity), m_abt_io(ai) {}
+
+        FDCache(const FDCache&) = delete;
+        FDCache& operator=(const FDCache&) = delete;
+        FDCache(FDCache&&) = delete;
+        FDCache& operator=(FDCache&&) = delete;
+
+        ~FDCache() noexcept { close_all(); }
+
+        int get(const std::string& path) {
+            auto g = std::unique_lock<thallium::mutex>{m_mtx};
+            auto it = m_map.find(path);
+            if(it != m_map.end()) {
+                m_lru.splice(m_lru.begin(), m_lru, it->second);
+                return it->second->fd;
+            }
+            int fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
+            if(fd < 0) return fd;
+            if(m_lru.size() >= m_capacity) {
+                auto& lru_entry = m_lru.back();
+                m_map.erase(lru_entry.path);
+                abt_io_close(m_abt_io, lru_entry.fd);
+                m_lru.pop_back();
+            }
+            m_lru.push_front({path, fd});
+            m_map[path] = m_lru.begin();
+            return fd;
+        }
+
+        void close_all() noexcept {
+            auto g = std::unique_lock<thallium::mutex>{m_mtx};
+            for(auto& e : m_lru) ::close(e.fd);
+            m_lru.clear();
+            m_map.clear();
+        }
+    };
+
     // Config
     std::string         m_path;
     size_t              m_max_chunk_size;
@@ -91,6 +145,9 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     // ABT-IO
     abt_io_instance_id  m_abt_io;
+
+    // File descriptor cache
+    FDCache             m_fd_cache;
 
     // Engine
     thallium::engine    m_engine;
@@ -246,12 +303,10 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     void writeLoop();
 
     // RAII handle for a batch of in-flight abt_io_pread_nb operations.
-    // Owns the open file descriptors that must stay alive until all ops complete.
     struct PendingReads {
         abt_io_instance_id        m_abt_io = ABT_IO_INSTANCE_NULL;
         std::vector<abt_io_op_t*> m_ops;
         std::vector<ssize_t>      m_rets;     // stable pointers after reserve()
-        std::vector<int>          m_open_fds;
 
         PendingReads() = default;
         explicit PendingReads(abt_io_instance_id ai) : m_abt_io(ai) {}
@@ -265,8 +320,6 @@ class DefaultPartitionManager : public mofka::PartitionManager {
             for(auto* op : m_ops) { abt_io_op_wait(op); abt_io_op_free(op); }
             m_ops.clear();
             m_rets.clear();
-            for(int fd : m_open_fds) abt_io_close(m_abt_io, fd);
-            m_open_fds.clear();
         }
     };
 
