@@ -9,6 +9,7 @@
 #include "PartitionManager.hpp"
 #include <diaspora/DataDescriptor.hpp>
 #include <thallium/bulk_buffer.hpp>
+#include <thallium/bulk_buffer_pool.hpp>
 #include <abt-io.h>
 #include <cstdint>
 #include <span>
@@ -18,6 +19,24 @@
 #include <algorithm>
 
 namespace mofka {
+
+struct DefaultPartitionManagerOptions {
+    std::string        path;
+    size_t             max_chunk_size             = 64 * 1024 * 1024;
+    size_t             max_events_per_chunk       = 1000000;
+    bool               sync                       = true;
+    abt_io_instance_id abt_io                     = ABT_IO_INSTANCE_NULL;
+
+    size_t             metadata_pool_num_tiers    = 1;
+    size_t             metadata_pool_num_buffers  = 0;
+    size_t             metadata_pool_first_size   = 64 * 1024;
+    float              metadata_pool_size_multiple = 4.0f;
+
+    size_t             data_pool_num_tiers        = 1;
+    size_t             data_pool_num_buffers      = 0;
+    size_t             data_pool_first_size       = 64 * 1024 * 1024;
+    float              data_pool_size_multiple    = 4.0f;
+};
 
 /**
  * Default file-based implementation of a mofka PartitionManager.
@@ -65,6 +84,10 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     // Engine
     thallium::engine    m_engine;
+
+    // Buffer pools for incoming RDMA transfers (write_only, pre-registered)
+    thallium::bulk_buffer_pool<> m_metadata_buffer_pool;
+    thallium::bulk_buffer_pool<> m_data_buffer_pool;
 
     // Current chunk write state
     uint32_t            m_current_chunk_id = 0;
@@ -163,10 +186,11 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         }
 
         void transferMetadata(thallium::engine& engine) {
+            (void)engine;
             auto sizes_bytes   = m_num_events * sizeof(size_t);
             auto content_size  = metadataContentSize();
             auto total_size    = sizes_bytes + std::max(content_size, (size_t)1);
-            m_metadata_buffer  = thallium::bulk_buffer<>{engine, total_size, thallium::bulk_mode::write_only};
+            m_metadata_buffer  = m_manager.m_metadata_buffer_pool.get(total_size, /*extend_if_needed=*/true);
             m_metadata_sizes   = std::span<size_t>{
                 reinterpret_cast<size_t*>(m_metadata_buffer.data()), m_num_events};
             m_metadata_content = std::span<char>{
@@ -179,10 +203,11 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         }
 
         void transferData(thallium::engine& engine) {
+            (void)engine;
             auto sizes_bytes  = m_num_events * sizeof(size_t);
             auto content_size = dataContentSize();
             auto total_size   = sizes_bytes + std::max(content_size, (size_t)1);
-            m_data_buffer     = thallium::bulk_buffer<>{engine, total_size, thallium::bulk_mode::write_only};
+            m_data_buffer     = m_manager.m_data_buffer_pool.get(total_size, /*extend_if_needed=*/true);
             m_data_sizes      = std::span<size_t>{
                 reinterpret_cast<size_t*>(m_data_buffer.data()), m_num_events};
             m_data_content    = std::span<char>{
@@ -223,13 +248,8 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     public:
 
-    DefaultPartitionManager(
-        std::string path,
-        size_t max_chunk_size,
-        size_t max_events_per_chunk,
-        bool sync,
-        abt_io_instance_id abt_io,
-        thallium::engine engine);
+    DefaultPartitionManager(thallium::engine engine,
+                             DefaultPartitionManagerOptions opts);
 
     DefaultPartitionManager(DefaultPartitionManager&&) = delete;
     DefaultPartitionManager(const DefaultPartitionManager&) = delete;

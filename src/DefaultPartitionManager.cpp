@@ -33,18 +33,26 @@ static void mkdirs(const std::string& path) {
 }
 
 DefaultPartitionManager::DefaultPartitionManager(
-        std::string path,
-        size_t max_chunk_size,
-        size_t max_events_per_chunk,
-        bool sync,
-        abt_io_instance_id abt_io,
-        thallium::engine engine)
-: m_path(std::move(path))
-, m_max_chunk_size(max_chunk_size)
-, m_max_events_per_chunk(max_events_per_chunk)
-, m_sync(sync)
-, m_abt_io(abt_io)
+        thallium::engine engine,
+        DefaultPartitionManagerOptions opts)
+: m_path(std::move(opts.path))
+, m_max_chunk_size(opts.max_chunk_size)
+, m_max_events_per_chunk(opts.max_events_per_chunk)
+, m_sync(opts.sync)
+, m_abt_io(opts.abt_io)
 , m_engine(std::move(engine))
+, m_metadata_buffer_pool(m_engine,
+                          opts.metadata_pool_num_tiers,
+                          opts.metadata_pool_num_buffers,
+                          opts.metadata_pool_first_size,
+                          opts.metadata_pool_size_multiple,
+                          thallium::bulk_mode::write_only)
+, m_data_buffer_pool    (m_engine,
+                          opts.data_pool_num_tiers,
+                          opts.data_pool_num_buffers,
+                          opts.data_pool_first_size,
+                          opts.data_pool_size_multiple,
+                          thallium::bulk_mode::write_only)
 {
     m_write_ult = m_engine.get_handler_pool().make_thread([this]() { writeLoop(); });
 }
@@ -502,7 +510,25 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             "path": {"type": "string"},
             "max_chunk_size": {"type": "integer"},
             "max_events_per_chunk": {"type": "integer"},
-            "sync": {"type": "boolean"}
+            "sync": {"type": "boolean"},
+            "metadata_buffer_pool": {
+                "type": "object",
+                "properties": {
+                    "num_tiers":     {"type": "integer", "minimum": 1},
+                    "num_buffers":   {"type": "integer", "minimum": 0},
+                    "first_size":    {"type": "integer", "minimum": 1},
+                    "size_multiple": {"type": "number",  "exclusiveMinimum": 1.0}
+                }
+            },
+            "data_buffer_pool": {
+                "type": "object",
+                "properties": {
+                    "num_tiers":     {"type": "integer", "minimum": 1},
+                    "num_buffers":   {"type": "integer", "minimum": 0},
+                    "first_size":    {"type": "integer", "minimum": 1},
+                    "size_multiple": {"type": "number",  "exclusiveMinimum": 1.0}
+                }
+            }
         },
         "required": ["path"]
     }
@@ -524,10 +550,20 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
 
     /* Parse config */
     auto& json = config.json();
-    std::string base_path = json["path"].get<std::string>();
-    size_t max_chunk_size = json.value("max_chunk_size", (size_t)(64 * 1024 * 1024));
-    size_t max_events_per_chunk = json.value("max_events_per_chunk", (size_t)1000000);
-    bool sync = json.value("sync", true);
+    std::string base_path        = json["path"].get<std::string>();
+    size_t max_chunk_size        = json.value("max_chunk_size", (size_t)(64 * 1024 * 1024));
+    size_t max_events_per_chunk  = json.value("max_events_per_chunk", (size_t)1000000);
+    bool sync                    = json.value("sync", true);
+
+    size_t meta_num_tiers     = json.value("/metadata_buffer_pool/num_tiers"_json_pointer,     (size_t)1);
+    size_t meta_num_buffers   = json.value("/metadata_buffer_pool/num_buffers"_json_pointer,   (size_t)0);
+    size_t meta_first_size    = json.value("/metadata_buffer_pool/first_size"_json_pointer,    (size_t)(64*1024));
+    float  meta_size_multiple = json.value("/metadata_buffer_pool/size_multiple"_json_pointer, 4.0f);
+
+    size_t data_num_tiers     = json.value("/data_buffer_pool/num_tiers"_json_pointer,         (size_t)1);
+    size_t data_num_buffers   = json.value("/data_buffer_pool/num_buffers"_json_pointer,       (size_t)0);
+    size_t data_first_size    = json.value("/data_buffer_pool/first_size"_json_pointer,        (size_t)(64*1024*1024));
+    float  data_size_multiple = json.value("/data_buffer_pool/size_multiple"_json_pointer,     4.0f);
 
     /* Create directory: <path>/<topic_name>-<uuid>/ */
     std::string partition_path = base_path + "/" + topic_name + "-" + partition_uuid.to_string();
@@ -590,9 +626,21 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
 
     /* Create the manager */
     auto manager = std::unique_ptr<DefaultPartitionManager>(
-        new DefaultPartitionManager(
-            partition_path, max_chunk_size, max_events_per_chunk,
-            sync, abt_io, engine));
+        new DefaultPartitionManager(engine, DefaultPartitionManagerOptions{
+            .path                       = partition_path,
+            .max_chunk_size             = max_chunk_size,
+            .max_events_per_chunk       = max_events_per_chunk,
+            .sync                       = sync,
+            .abt_io                     = abt_io,
+            .metadata_pool_num_tiers    = meta_num_tiers,
+            .metadata_pool_num_buffers  = meta_num_buffers,
+            .metadata_pool_first_size   = meta_first_size,
+            .metadata_pool_size_multiple = meta_size_multiple,
+            .data_pool_num_tiers        = data_num_tiers,
+            .data_pool_num_buffers      = data_num_buffers,
+            .data_pool_first_size       = data_first_size,
+            .data_pool_size_multiple    = data_size_multiple,
+        }));
 
     manager->m_current_chunk_id = current_chunk_id;
     manager->m_assigned_events = total_events;
