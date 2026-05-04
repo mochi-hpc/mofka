@@ -245,6 +245,31 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     void writeLoop();
 
+    // RAII handle for a batch of in-flight abt_io_pread_nb operations.
+    // Owns the open file descriptors that must stay alive until all ops complete.
+    struct PendingReads {
+        abt_io_instance_id        m_abt_io = ABT_IO_INSTANCE_NULL;
+        std::vector<abt_io_op_t*> m_ops;
+        std::vector<ssize_t>      m_rets;     // stable pointers after reserve()
+        std::vector<int>          m_open_fds;
+
+        PendingReads() = default;
+        explicit PendingReads(abt_io_instance_id ai) : m_abt_io(ai) {}
+        PendingReads(PendingReads&&) = default;
+        PendingReads& operator=(PendingReads&&) = default;
+        PendingReads(const PendingReads&) = delete;
+        PendingReads& operator=(const PendingReads&) = delete;
+        ~PendingReads() noexcept { wait(); }
+
+        void wait() {
+            for(auto* op : m_ops) { abt_io_op_wait(op); abt_io_op_free(op); }
+            m_ops.clear();
+            m_rets.clear();
+            for(int fd : m_open_fds) abt_io_close(m_abt_io, fd);
+            m_open_fds.clear();
+        }
+    };
+
     // Helpers
     std::string chunkPath(uint32_t chunk_id, const std::string& ext) const;
     void openChunk(uint32_t chunk_id);
@@ -252,10 +277,10 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     void rotateChunk();
     bool shouldRotate() const;
 
-    void readMetadataFromDisk(diaspora::EventID first_id, size_t count,
-                              size_t* sizes_out, char* content_out);
-    void readDescriptorsFromDisk(diaspora::EventID first_id, size_t count,
-                                 size_t* sizes_out, char* content_out);
+    PendingReads readMetadataFromDisk(diaspora::EventID first_id, size_t count,
+                                       size_t* sizes_out, char* content_out);
+    PendingReads readDescriptorsFromDisk(diaspora::EventID first_id, size_t count,
+                                          size_t* sizes_out, char* content_out);
     void readDataFromDisk(const std::vector<diaspora::DataDescriptor>& descriptors,
                           char* buffer, size_t total_size,
                           std::vector<Result<void>>& results);

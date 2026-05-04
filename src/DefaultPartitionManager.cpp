@@ -251,9 +251,12 @@ void DefaultPartitionManager::PushOperation::writeToFiles()
     changeState(State::stored);
 }
 
-void DefaultPartitionManager::readMetadataFromDisk(
+DefaultPartitionManager::PendingReads DefaultPartitionManager::readMetadataFromDisk(
         diaspora::EventID first_id, size_t count,
         size_t* sizes_out, char* content_out) {
+    PendingReads pending{m_abt_io};
+    pending.m_ops.reserve(count);
+    pending.m_rets.reserve(count);
     size_t buf_offset = 0;
     int current_fd = -1;
     uint32_t current_chunk = UINT32_MAX;
@@ -262,23 +265,29 @@ void DefaultPartitionManager::readMetadataFromDisk(
         sizes_out[i] = rec.metadata_size;
         auto chunk_id = m_event_chunk_ids[first_id + i];
         if(chunk_id != current_chunk) {
-            if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
             auto path = chunkPath(chunk_id, "meta");
             current_fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
+            if(current_fd >= 0) pending.m_open_fds.push_back(current_fd);
             current_chunk = chunk_id;
         }
         if(current_fd >= 0) {
-            abt_io_pread(m_abt_io, current_fd, content_out + buf_offset,
-                         rec.metadata_size, rec.metadata_offset);
+            pending.m_rets.push_back(0);
+            pending.m_ops.push_back(
+                abt_io_pread_nb(m_abt_io, current_fd, content_out + buf_offset,
+                                rec.metadata_size, rec.metadata_offset,
+                                &pending.m_rets.back()));
         }
         buf_offset += rec.metadata_size;
     }
-    if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+    return pending;
 }
 
-void DefaultPartitionManager::readDescriptorsFromDisk(
+DefaultPartitionManager::PendingReads DefaultPartitionManager::readDescriptorsFromDisk(
         diaspora::EventID first_id, size_t count,
         size_t* sizes_out, char* content_out) {
+    PendingReads pending{m_abt_io};
+    pending.m_ops.reserve(count);
+    pending.m_rets.reserve(count);
     size_t buf_offset = 0;
     int current_fd = -1;
     uint32_t current_chunk = UINT32_MAX;
@@ -287,18 +296,21 @@ void DefaultPartitionManager::readDescriptorsFromDisk(
         sizes_out[i] = rec.data_desc_size;
         auto chunk_id = m_event_chunk_ids[first_id + i];
         if(chunk_id != current_chunk) {
-            if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
             auto path = chunkPath(chunk_id, "desc");
             current_fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
+            if(current_fd >= 0) pending.m_open_fds.push_back(current_fd);
             current_chunk = chunk_id;
         }
         if(current_fd >= 0) {
-            abt_io_pread(m_abt_io, current_fd, content_out + buf_offset,
-                         rec.data_desc_size, rec.data_desc_offset);
+            pending.m_rets.push_back(0);
+            pending.m_ops.push_back(
+                abt_io_pread_nb(m_abt_io, current_fd, content_out + buf_offset,
+                                rec.data_desc_size, rec.data_desc_offset,
+                                &pending.m_rets.back()));
         }
         buf_offset += rec.data_desc_size;
     }
-    if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
+    return pending;
 }
 
 void DefaultPartitionManager::readDataFromDisk(
@@ -419,10 +431,13 @@ Result<void> DefaultPartitionManager::feedConsumer(
                 static_cast<char*>(desc_buf.data()) + sizes_bytes,
                 std::max(total_desc_size, (size_t)1)};
 
-            readMetadataFromDisk(first_id, num_events_to_send,
-                                 meta_sizes_span.data(), meta_content_span.data());
-            readDescriptorsFromDisk(first_id, num_events_to_send,
-                                    desc_sizes_span.data(), desc_content_span.data());
+            // Issue both batches of reads concurrently, then wait for both
+            auto meta_pending = readMetadataFromDisk(first_id, num_events_to_send,
+                                                      meta_sizes_span.data(), meta_content_span.data());
+            auto desc_pending = readDescriptorsFromDisk(first_id, num_events_to_send,
+                                                         desc_sizes_span.data(), desc_content_span.data());
+            meta_pending.wait();
+            desc_pending.wait();
 
             // Use the pool buffer's pre-registered bulk directly — no expose() needed
             auto metadata_size_bulk_ref = BulkRef{
