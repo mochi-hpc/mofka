@@ -13,6 +13,7 @@
 #include <abt-io.h>
 #include <fcntl.h>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <deque>
@@ -216,8 +217,8 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         enum class State : uint8_t {
             submitted,
             assigned,
-            metadata_transferred,
-            data_transferred,
+            transfers_started,
+            transfers_completed,
             stored
         };
 
@@ -227,13 +228,15 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         size_t                       m_num_events;
         BulkRef                      m_remote_metadata_bulk;
         BulkRef                      m_remote_data_bulk;
-        // Buffers populated by transferMetadata / transferData
-        thallium::bulk_buffer<>      m_metadata_buffer;
-        std::span<size_t>            m_metadata_sizes;
-        std::span<char>              m_metadata_content;
-        thallium::bulk_buffer<>      m_data_buffer;
-        std::span<size_t>            m_data_sizes;
-        std::span<char>              m_data_content;
+        // Buffers populated by startTransfers
+        thallium::bulk_buffer<>                      m_metadata_buffer;
+        std::span<size_t>                            m_metadata_sizes;
+        std::span<char>                              m_metadata_content;
+        thallium::bulk_buffer<>                      m_data_buffer;
+        std::span<size_t>                            m_data_sizes;
+        std::span<char>                              m_data_content;
+        std::optional<thallium::async_bulk_op>       m_metadata_async_op;
+        std::optional<thallium::async_bulk_op>       m_data_async_op;
         diaspora::EventID            m_first_id = 0;
         State                        m_state = State::submitted;
         bool                         m_responded = false;
@@ -281,40 +284,8 @@ class DefaultPartitionManager : public mofka::PartitionManager {
             changeState(State::assigned);
         }
 
-        void transferMetadata(thallium::engine& engine) {
-            (void)engine;
-            auto sizes_bytes   = m_num_events * sizeof(size_t);
-            auto content_size  = metadataContentSize();
-            auto total_size    = sizes_bytes + std::max(content_size, (size_t)1);
-            m_metadata_buffer  = m_manager.m_metadata_buffer_pool.get(total_size, /*extend_if_needed=*/true);
-            m_metadata_sizes   = std::span<size_t>{
-                reinterpret_cast<size_t*>(m_metadata_buffer.data()), m_num_events};
-            m_metadata_content = std::span<char>{
-                static_cast<char*>(m_metadata_buffer.data()) + sizes_bytes,
-                std::max(content_size, (size_t)1)};
-            m_metadata_buffer << m_remote_metadata_bulk.handle.on(m_req.get_endpoint()).select(
-                m_remote_metadata_bulk.offset, m_remote_metadata_bulk.size);
-            m_metadata_content = m_metadata_content.first(content_size);
-            changeState(State::metadata_transferred);
-        }
-
-        void transferData(thallium::engine& engine) {
-            (void)engine;
-            auto sizes_bytes  = m_num_events * sizeof(size_t);
-            auto content_size = dataContentSize();
-            auto total_size   = sizes_bytes + std::max(content_size, (size_t)1);
-            m_data_buffer     = m_manager.m_data_buffer_pool.get(total_size, /*extend_if_needed=*/true);
-            m_data_sizes      = std::span<size_t>{
-                reinterpret_cast<size_t*>(m_data_buffer.data()), m_num_events};
-            m_data_content    = std::span<char>{
-                static_cast<char*>(m_data_buffer.data()) + sizes_bytes,
-                std::max(content_size, (size_t)1)};
-            m_data_buffer << m_remote_data_bulk.handle.on(m_req.get_endpoint()).select(
-                m_remote_data_bulk.offset, m_remote_data_bulk.size);
-            m_data_content = m_data_content.first(content_size);
-            changeState(State::data_transferred);
-        }
-
+        void startTransfers();
+        void waitTransfers();
         void writeToFiles();
     };
 

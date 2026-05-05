@@ -141,7 +141,7 @@ void DefaultPartitionManager::writeLoop() {
             op = std::move(m_write_queue.front());
             m_write_queue.pop_front();
         }
-        op->waitState(PushOperation::State::data_transferred);
+        op->waitTransfers();
         Result<diaspora::EventID> result;
         try {
             op->writeToFiles();
@@ -349,6 +349,45 @@ void DefaultPartitionManager::readDataFromDisk(
     if(current_fd >= 0) abt_io_close(m_abt_io, current_fd);
 }
 
+void DefaultPartitionManager::PushOperation::startTransfers() {
+    auto meta_sizes_bytes  = m_num_events * sizeof(size_t);
+    auto meta_content_size = metadataContentSize();
+    auto meta_total        = meta_sizes_bytes + std::max(meta_content_size, (size_t)1);
+    m_metadata_buffer      = m_manager.m_metadata_buffer_pool.get(meta_total, /*extend_if_needed=*/true);
+    m_metadata_sizes       = std::span<size_t>{
+        reinterpret_cast<size_t*>(m_metadata_buffer.data()), m_num_events};
+    m_metadata_content     = std::span<char>{
+        static_cast<char*>(m_metadata_buffer.data()) + meta_sizes_bytes,
+        meta_content_size};
+    m_metadata_async_op.emplace(
+        m_metadata_buffer.pull_from(
+            m_remote_metadata_bulk.handle.on(m_req.get_endpoint()).select(
+                m_remote_metadata_bulk.offset, m_remote_metadata_bulk.size)));
+
+    auto data_sizes_bytes  = m_num_events * sizeof(size_t);
+    auto data_content_size = dataContentSize();
+    auto data_total        = data_sizes_bytes + std::max(data_content_size, (size_t)1);
+    m_data_buffer          = m_manager.m_data_buffer_pool.get(data_total, /*extend_if_needed=*/true);
+    m_data_sizes           = std::span<size_t>{
+        reinterpret_cast<size_t*>(m_data_buffer.data()), m_num_events};
+    m_data_content         = std::span<char>{
+        static_cast<char*>(m_data_buffer.data()) + data_sizes_bytes,
+        data_content_size};
+    m_data_async_op.emplace(
+        m_data_buffer.pull_from(
+            m_remote_data_bulk.handle.on(m_req.get_endpoint()).select(
+                m_remote_data_bulk.offset, m_remote_data_bulk.size)));
+
+    changeState(State::transfers_started);
+}
+
+void DefaultPartitionManager::PushOperation::waitTransfers() {
+    waitState(State::transfers_started);
+    if(m_metadata_async_op) m_metadata_async_op->wait();
+    if(m_data_async_op)     m_data_async_op->wait();
+    changeState(State::transfers_completed);
+}
+
 void DefaultPartitionManager::receiveBatch(
           const thallium::request& req,
           const std::string& producer_name,
@@ -366,8 +405,7 @@ void DefaultPartitionManager::receiveBatch(
         m_write_queue_cv.notify_one();
     }
 
-    op->transferMetadata(m_engine);
-    op->transferData(m_engine);
+    op->startTransfers();
 }
 
 void DefaultPartitionManager::wakeUp() {
