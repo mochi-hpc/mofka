@@ -259,20 +259,21 @@ DefaultPartitionManager::PendingReads DefaultPartitionManager::readMetadataFromD
     pending.m_ops.reserve(count);
     pending.m_rets.reserve(count);
     size_t buf_offset = 0;
-    int current_fd = -1;
+    FDCache::EntryPtr current_entry;
     uint32_t current_chunk = UINT32_MAX;
     for(size_t i = 0; i < count; ++i) {
         auto& rec = m_index[first_id + i];
         sizes_out[i] = rec.metadata_size;
         auto chunk_id = m_event_chunk_ids[first_id + i];
         if(chunk_id != current_chunk) {
-            current_fd = m_fd_cache.get(chunkPath(chunk_id, "meta"));
+            current_entry = m_fd_cache.get(chunkPath(chunk_id, "meta"));
+            pending.m_entries.push_back(current_entry);
             current_chunk = chunk_id;
         }
-        if(current_fd >= 0) {
+        if(current_entry && current_entry->fd >= 0) {
             pending.m_rets.push_back(0);
             pending.m_ops.push_back(
-                abt_io_pread_nb(m_abt_io, current_fd, content_out + buf_offset,
+                abt_io_pread_nb(m_abt_io, current_entry->fd, content_out + buf_offset,
                                 rec.metadata_size, rec.metadata_offset,
                                 &pending.m_rets.back()));
         }
@@ -288,20 +289,21 @@ DefaultPartitionManager::PendingReads DefaultPartitionManager::readDescriptorsFr
     pending.m_ops.reserve(count);
     pending.m_rets.reserve(count);
     size_t buf_offset = 0;
-    int current_fd = -1;
+    FDCache::EntryPtr current_entry;
     uint32_t current_chunk = UINT32_MAX;
     for(size_t i = 0; i < count; ++i) {
         auto& rec = m_index[first_id + i];
         sizes_out[i] = rec.data_desc_size;
         auto chunk_id = m_event_chunk_ids[first_id + i];
         if(chunk_id != current_chunk) {
-            current_fd = m_fd_cache.get(chunkPath(chunk_id, "desc"));
+            current_entry = m_fd_cache.get(chunkPath(chunk_id, "desc"));
+            pending.m_entries.push_back(current_entry);
             current_chunk = chunk_id;
         }
-        if(current_fd >= 0) {
+        if(current_entry && current_entry->fd >= 0) {
             pending.m_rets.push_back(0);
             pending.m_ops.push_back(
-                abt_io_pread_nb(m_abt_io, current_fd, content_out + buf_offset,
+                abt_io_pread_nb(m_abt_io, current_entry->fd, content_out + buf_offset,
                                 rec.data_desc_size, rec.data_desc_offset,
                                 &pending.m_rets.back()));
         }

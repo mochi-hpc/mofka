@@ -90,13 +90,25 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     // LRU cache of open read-only file descriptors, keyed by path.
     struct FDCache {
-        struct Entry { std::string path; int fd; };
+        // Each open file is reference-counted via shared_ptr. The fd is closed
+        // only when both the cache and all outstanding FDGuards release it.
+        struct Entry {
+            std::string path;
+            int         fd = -1;
+            Entry(std::string p, int f) noexcept : path(std::move(p)), fd(f) {}
+            Entry(const Entry&) = delete;
+            Entry& operator=(const Entry&) = delete;
+            Entry(Entry&&) = delete;
+            Entry& operator=(Entry&&) = delete;
+            ~Entry() noexcept { if(fd >= 0) ::close(fd); }
+        };
+        using EntryPtr = std::shared_ptr<Entry>;
 
-        size_t                                                      m_capacity = 0;
-        abt_io_instance_id                                          m_abt_io = ABT_IO_INSTANCE_NULL;
-        std::list<Entry>                                            m_lru;
-        std::unordered_map<std::string, std::list<Entry>::iterator> m_map;
-        thallium::mutex                                             m_mtx;
+        size_t                                                          m_capacity = 0;
+        abt_io_instance_id                                              m_abt_io = ABT_IO_INSTANCE_NULL;
+        std::list<EntryPtr>                                             m_lru;
+        std::unordered_map<std::string, std::list<EntryPtr>::iterator>  m_map;
+        thallium::mutex                                                 m_mtx;
 
         FDCache() = default;
         FDCache(abt_io_instance_id ai, size_t capacity)
@@ -109,29 +121,41 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
         ~FDCache() noexcept { close_all(); }
 
-        int get(const std::string& path) {
+        // Returns a shared_ptr to the entry. The caller must keep it alive
+        // for the duration of any in-flight abt_io_pread_nb ops on entry->fd.
+        // Eviction only occurs when use_count == 1 (cache is sole owner).
+        EntryPtr get(const std::string& path) {
             auto g = std::unique_lock<thallium::mutex>{m_mtx};
             auto it = m_map.find(path);
             if(it != m_map.end()) {
                 m_lru.splice(m_lru.begin(), m_lru, it->second);
-                return it->second->fd;
+                return *it->second;
             }
             int fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
-            if(fd < 0) return fd;
-            if(m_lru.size() >= m_capacity) {
-                auto& lru_entry = m_lru.back();
-                m_map.erase(lru_entry.path);
-                abt_io_close(m_abt_io, lru_entry.fd);
-                m_lru.pop_back();
+            if(fd < 0) return {};
+            while(m_lru.size() >= m_capacity) {
+                bool evicted = false;
+                for(auto eit = m_lru.rbegin(); eit != m_lru.rend(); ++eit) {
+                    if((*eit).use_count() == 1) {
+                        m_map.erase((*eit)->path);
+                        m_lru.erase(std::next(eit).base());
+                        evicted = true;
+                        break;
+                    }
+                }
+                if(!evicted) break;  // all slots in-use; allow temporary growth
             }
-            m_lru.push_front({path, fd});
+            auto entry = std::make_shared<Entry>(path, fd);
+            m_lru.push_front(entry);
             m_map[path] = m_lru.begin();
-            return fd;
+            return entry;
         }
 
         void close_all() noexcept {
             auto g = std::unique_lock<thallium::mutex>{m_mtx};
-            for(auto& e : m_lru) ::close(e.fd);
+            // Drop the cache's strong refs. Entries held by FDGuards remain
+            // alive until those guards are destroyed; their fd is then closed
+            // by Entry::~Entry().
             m_lru.clear();
             m_map.clear();
         }
@@ -304,9 +328,10 @@ class DefaultPartitionManager : public mofka::PartitionManager {
 
     // RAII handle for a batch of in-flight abt_io_pread_nb operations.
     struct PendingReads {
-        abt_io_instance_id        m_abt_io = ABT_IO_INSTANCE_NULL;
-        std::vector<abt_io_op_t*> m_ops;
-        std::vector<ssize_t>      m_rets;     // stable pointers after reserve()
+        abt_io_instance_id              m_abt_io = ABT_IO_INSTANCE_NULL;
+        std::vector<abt_io_op_t*>       m_ops;
+        std::vector<ssize_t>            m_rets;     // stable pointers after reserve()
+        std::vector<FDCache::EntryPtr>  m_entries;  // keeps fds alive until wait()
 
         PendingReads() = default;
         explicit PendingReads(abt_io_instance_id ai) : m_abt_io(ai) {}
@@ -320,6 +345,7 @@ class DefaultPartitionManager : public mofka::PartitionManager {
             for(auto* op : m_ops) { abt_io_op_wait(op); abt_io_op_free(op); }
             m_ops.clear();
             m_rets.clear();
+            m_entries.clear();
         }
     };
 
