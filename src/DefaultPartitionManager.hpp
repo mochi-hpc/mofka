@@ -195,13 +195,14 @@ class DefaultPartitionManager : public mofka::PartitionManager {
     uint64_t            m_desc_offset = 0;
     size_t              m_events_in_current_chunk = 0;
 
-    // In-memory index cache
+    // In-memory index cache — protected by m_index_mtx
     std::vector<IndexRecord>  m_index;
     std::vector<uint32_t>     m_event_chunk_ids;
+    thallium::mutex           m_index_mtx;
 
     // Event tracking
     size_t                       m_assigned_events = 0; // IDs handed out (may not yet be written)
-    size_t                       m_total_events = 0;    // events written and available to consumers
+    size_t                       m_total_events = 0;    // events written and available to consumers — protected by m_events_mtx
     thallium::mutex              m_events_mtx;
     thallium::condition_variable m_events_cv;
 

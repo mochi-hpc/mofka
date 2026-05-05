@@ -240,11 +240,17 @@ void DefaultPartitionManager::PushOperation::writeToFiles()
     mgr.m_data_offset = data_off;
     mgr.m_events_in_current_chunk += m_num_events;
 
-    for(size_t i = 0; i < m_num_events; ++i) {
-        mgr.m_index.push_back(records[i]);
-        mgr.m_event_chunk_ids.push_back(mgr.m_current_chunk_id);
+    {
+        auto g = std::unique_lock<thallium::mutex>{mgr.m_index_mtx};
+        for(size_t i = 0; i < m_num_events; ++i) {
+            mgr.m_index.push_back(records[i]);
+            mgr.m_event_chunk_ids.push_back(mgr.m_current_chunk_id);
+        }
     }
-    mgr.m_total_events += m_num_events;
+    {
+        auto g = std::unique_lock<thallium::mutex>{mgr.m_events_mtx};
+        mgr.m_total_events += m_num_events;
+    }
 
     if(mgr.shouldRotate())
         mgr.rotateChunk();
@@ -383,84 +389,77 @@ Result<void> DefaultPartitionManager::feedConsumer(
     }
 
     auto self_addr = static_cast<std::string>(m_engine.self());
-    {
-        auto g = std::unique_lock<thallium::mutex>{m_events_mtx};
-        while(!consumerHandle.shouldStop()) {
-            size_t num_events_to_send;
-            bool should_stop = false;
+
+    diaspora::Future<void>   prev_future;
+    thallium::bulk_buffer<>  prev_meta_buf, prev_desc_buf;
+
+    while(!consumerHandle.shouldStop()) {
+        size_t num_events = 0, total_meta = 0, total_desc = 0;
+        thallium::bulk_buffer<> meta_buf, desc_buf;
+        PendingReads meta_pending, desc_pending;
+
+        // CS 1: wait for events — only m_total_events access needs m_events_mtx
+        bool stop_with_no_events = false;
+        {
+            auto g = std::unique_lock<thallium::mutex>{m_events_mtx};
             while(true) {
-                size_t max_available = m_total_events - first_id;
-                num_events_to_send = std::min(batchSize.value, max_available);
-                should_stop = consumerHandle.shouldStop();
-                if(num_events_to_send != 0 || should_stop) break;
+                size_t avail = m_total_events - first_id;
+                num_events   = std::min(batchSize.value, avail);
+                if(num_events || consumerHandle.shouldStop()) break;
                 m_events_cv.wait(g);
             }
-            if(should_stop) break;
-
-            if(num_events_to_send == 0) {
-                consumerHandle.feed(
-                    0, diaspora::NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
-                break;
-            }
-
-            // Compute total sizes from in-memory index
-            size_t total_metadata_size = 0;
-            size_t total_desc_size = 0;
-            for(size_t i = 0; i < num_events_to_send; ++i) {
-                total_metadata_size += m_index[first_id + i].metadata_size;
-                total_desc_size     += m_index[first_id + i].data_desc_size;
-            }
-
-            // Lease pool buffers: layout is [sizes (N*8 bytes) | content]
-            auto sizes_bytes = num_events_to_send * sizeof(size_t);
-
-            auto meta_buf = m_consumer_metadata_buffer_pool.get(
-                sizes_bytes + std::max(total_metadata_size, (size_t)1), /*extend=*/true);
-            auto meta_sizes_span   = std::span<size_t>{
-                reinterpret_cast<size_t*>(meta_buf.data()), num_events_to_send};
-            auto meta_content_span = std::span<char>{
-                static_cast<char*>(meta_buf.data()) + sizes_bytes,
-                std::max(total_metadata_size, (size_t)1)};
-
-            auto desc_buf = m_consumer_desc_buffer_pool.get(
-                sizes_bytes + std::max(total_desc_size, (size_t)1), /*extend=*/true);
-            auto desc_sizes_span   = std::span<size_t>{
-                reinterpret_cast<size_t*>(desc_buf.data()), num_events_to_send};
-            auto desc_content_span = std::span<char>{
-                static_cast<char*>(desc_buf.data()) + sizes_bytes,
-                std::max(total_desc_size, (size_t)1)};
-
-            // Issue both batches of reads concurrently, then wait for both
-            auto meta_pending = readMetadataFromDisk(first_id, num_events_to_send,
-                                                      meta_sizes_span.data(), meta_content_span.data());
-            auto desc_pending = readDescriptorsFromDisk(first_id, num_events_to_send,
-                                                         desc_sizes_span.data(), desc_content_span.data());
-            meta_pending.wait();
-            desc_pending.wait();
-
-            // Use the pool buffer's pre-registered bulk directly — no expose() needed
-            auto metadata_size_bulk_ref = BulkRef{
-                meta_buf.bulk(), 0, sizes_bytes, self_addr};
-            auto metadata_bulk_ref = BulkRef{
-                meta_buf.bulk(), sizes_bytes, total_metadata_size, self_addr};
-
-            auto data_desc_size_bulk_ref = BulkRef{
-                desc_buf.bulk(), 0, sizes_bytes, self_addr};
-            auto data_desc_bulk_ref = BulkRef{
-                desc_buf.bulk(), sizes_bytes, total_desc_size, self_addr};
-
-            consumerHandle.feed(
-                num_events_to_send,
-                first_id,
-                metadata_size_bulk_ref,
-                metadata_bulk_ref,
-                data_desc_size_bulk_ref,
-                data_desc_bulk_ref).wait(-1);
-
-            first_id += num_events_to_send;
+            stop_with_no_events = consumerHandle.shouldStop() && num_events == 0;
         }
+        if(stop_with_no_events) {
+            if(prev_future) prev_future.wait(-1);
+            consumerHandle.feed(
+                0, diaspora::NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
+            return result;
+        }
+
+        // CS 2: only m_index accesses need m_index_mtx; buffer alloc sits outside
+        {
+            auto g = std::unique_lock<thallium::mutex>{m_index_mtx};
+            for(size_t i = 0; i < num_events; ++i) {
+                total_meta += m_index[first_id + i].metadata_size;
+                total_desc += m_index[first_id + i].data_desc_size;
+            }
+        }
+        auto sz = num_events * sizeof(size_t);
+        meta_buf = m_consumer_metadata_buffer_pool.get(
+            sz + std::max(total_meta, (size_t)1), /*extend=*/true);
+        desc_buf = m_consumer_desc_buffer_pool.get(
+            sz + std::max(total_desc, (size_t)1), /*extend=*/true);
+        {
+            auto g = std::unique_lock<thallium::mutex>{m_index_mtx};
+            meta_pending = readMetadataFromDisk(first_id, num_events,
+                reinterpret_cast<size_t*>(meta_buf.data()),
+                static_cast<char*>(meta_buf.data()) + sz);
+            desc_pending = readDescriptorsFromDisk(first_id, num_events,
+                reinterpret_cast<size_t*>(desc_buf.data()),
+                static_cast<char*>(desc_buf.data()) + sz);
+        }
+
+        // No mutex: wait disk reads, drain previous RDMA, start new RDMA
+        meta_pending.wait();
+        desc_pending.wait();
+
+        if(prev_future) { prev_future.wait(-1); prev_future = {}; }
+        prev_meta_buf = {};
+        prev_desc_buf = {};
+
+        prev_future = consumerHandle.feed(
+            num_events, first_id,
+            BulkRef{meta_buf.bulk(), 0,  sz,          self_addr},
+            BulkRef{meta_buf.bulk(), sz, total_meta,   self_addr},
+            BulkRef{desc_buf.bulk(), 0,  sz,          self_addr},
+            BulkRef{desc_buf.bulk(), sz, total_desc,   self_addr});
+        prev_meta_buf = std::move(meta_buf);
+        prev_desc_buf = std::move(desc_buf);
+        first_id     += num_events;
     }
 
+    if(prev_future) prev_future.wait(-1);
     return result;
 }
 
