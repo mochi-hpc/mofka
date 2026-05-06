@@ -3,6 +3,7 @@
         "libflock-bedrock-module.so",
         "libyokan-bedrock-module.so",
         "libwarabi-bedrock-module.so",
+        "libabt-io-bedrock-module.so",
         "libmofka-bedrock-module.so"
     ],
     "providers": [
@@ -27,6 +28,15 @@
                 "database" : {
                     "type": "map"
                 }
+            }
+        },
+        {
+            "name" : "my_abt_io",
+            "type" : "abt_io",
+            "provider_id" : 3,
+            "config" : {},
+            "dependencies": {
+                "pool": "__primary__"
             }
         }
     ]

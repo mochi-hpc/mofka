@@ -2,6 +2,7 @@
     "libraries": [
         "libflock-bedrock-module.so",
         "libyokan-bedrock-module.so",
+        "libabt-io-bedrock-module.so",
         "libmofka-bedrock-module.so"
     ],
     "providers": [
@@ -24,6 +25,15 @@
             "tags" : [ "mofka:master" ],
             "config" : {
                 "database" : { "type": "map" }
+            }
+        },
+        {
+            "name": "my_abt_io",
+            "provider_id": 3,
+            "type": "abt_io",
+            "config" : {},
+            "dependencies": {
+                "pool": "__primary__"
             }
         }
     ]

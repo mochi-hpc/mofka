@@ -153,12 +153,12 @@ void MofkaDriver::createTopic(
     std::string partition_config = "{}";
     Dependencies partition_dependencies;
     if(options.json().is_object()) {
-        if(options.json().contains("partitions")) {
-            if(!options.json()["partitions"].is_number())
-                throw diaspora::Exception{"\"partitions\" parameter in options should be an integer"};
-            num_partitions = options.json()["partitions"].get<int>();
+        if(options.json().contains("num_partitions")) {
+            if(!options.json()["num_partitions"].is_number())
+                throw diaspora::Exception{"\"num_partitions\" parameter in options should be an integer"};
+            num_partitions = options.json()["num_partitions"].get<int>();
             if(num_partitions <= 0)
-                throw diaspora::Exception{"\"partitions\" value in options is invalid"};
+                throw diaspora::Exception{"\"num_partitions\" value in options is invalid"};
         }
         if(options.json().contains("partitions_type")) {
             if(!options.json()["partitions_type"].is_string())
