@@ -1,8 +1,8 @@
 {
-    "partitions":1,
-    "partitions_type":"legacy",
-    "partitions_config": {},
-    "partitions_dependencies": {
+    "num_partitions":1,
+    "partition_type":"legacy",
+    "config": {},
+    "dependencies": {
         "metadata": "metadata@local",
         "data": "data@local"
     }

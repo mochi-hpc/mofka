@@ -31,7 +31,7 @@ TEST_CASE("Write-cache producer/consumer test", "[write-cache]") {
         REQUIRE_NOTHROW(driver.createTopic("mytopic"));
 
         mofka::MofkaDriver::Dependencies partition_dependencies = {
-            {"abt_io", {"my_abt_io"}}
+            {"io_controller", {"my_abt_io"}}
         };
         // Use a large max_batches to ensure all producer batches fit in cache
         diaspora::Metadata partition_config{
@@ -112,7 +112,7 @@ TEST_CASE("Write-cache producer/consumer test", "[write-cache]") {
         REQUIRE_NOTHROW(driver.createTopic("mytopic2"));
 
         mofka::MofkaDriver::Dependencies partition_dependencies = {
-            {"abt_io", {"my_abt_io"}}
+            {"io_controller", {"my_abt_io"}}
         };
         diaspora::Metadata partition_config{
             R"({"path":"/tmp/mofka-write-cache-ack-test","ack_early":{"enabled":true,"max_pending_batches":4},"write_cache":{"enabled":true,"max_batches":1024}})"};

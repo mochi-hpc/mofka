@@ -94,7 +94,7 @@ static inline void getPartitionArguments(
         };
         partition_config = diaspora::Metadata{"{}"};
     } else if(partition_type == "default") {
-        dependencies = {{"abt_io", {"my_abt_io"}}};
+        dependencies = {{"io_controller", {"my_abt_io"}}};
         partition_config = diaspora::Metadata{R"({"path":"/tmp/mofka-default-test"})"};
     }
 }

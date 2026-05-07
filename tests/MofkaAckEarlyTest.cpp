@@ -32,7 +32,7 @@ TEST_CASE("Ack-early producer/consumer test", "[ack-early]") {
 
         // Use default partition with ack_early enabled
         mofka::MofkaDriver::Dependencies partition_dependencies = {
-            {"abt_io", {"my_abt_io"}}
+            {"io_controller", {"my_abt_io"}}
         };
         diaspora::Metadata partition_config{
             R"({"path":"/tmp/mofka-ack-early-test","ack_early":{"enabled":true,"max_pending_batches":4}})"};

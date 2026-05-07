@@ -253,9 +253,28 @@ void MofkaDriver::createTopic(
 
     // initialize partitions if options required it
     auto num_servers = m_bsgh.size();
+
+    auto get_dep = [&](const std::string& name) -> std::string_view {
+        if(partition_dependencies.find(name) != partition_dependencies.end())
+            return partition_dependencies[name][0];
+        else
+            return {};
+    };
+
     for(int i=0; i < num_partitions; ++i) {
-        addCustomPartition(name, i % num_servers, partition_type,
-                           partition_config.dump(), partition_dependencies);
+        if(partition_type == "memory") {
+            addMemoryPartition(name, i % num_servers, get_dep("pool"));
+        } else if(partition_type == "default") {
+            addDefaultPartition(name, i % num_servers, get_dep("io_controller"),
+                                partition_config, get_dep("pool"));
+        } else if(partition_type == "legacy") {
+            addLegacyPartition(name, i % num_servers,
+                               get_dep("metadata"), get_dep("data"),
+                               partition_config, get_dep("pool"));
+        } else {
+            addCustomPartition(name, i % num_servers, partition_type,
+                               partition_config, partition_dependencies);
+        }
     }
 }
 
