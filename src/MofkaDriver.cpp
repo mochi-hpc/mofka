@@ -147,11 +147,10 @@ void MofkaDriver::createTopic(
         std::shared_ptr<diaspora::SerializerInterface> serializer) {
     if(name.size() > 256) throw diaspora::Exception{"Topic names cannot exceed 256 characters"};
     // check options
-    int num_partitions = 0;
-    std::string partition_type = "memory";
-    std::string partition_pool = "";
-    std::string partition_config = "{}";
-    Dependencies partition_dependencies;
+    int            num_partitions         = 0;
+    std::string    partition_type         = "memory";
+    nlohmann::json partition_config       = nlohmann::json::object();
+    Dependencies   partition_dependencies;
     if(options.json().is_object()) {
         if(options.json().contains("num_partitions")) {
             if(!options.json()["num_partitions"].is_number())
@@ -160,38 +159,34 @@ void MofkaDriver::createTopic(
             if(num_partitions <= 0)
                 throw diaspora::Exception{"\"num_partitions\" value in options is invalid"};
         }
-        if(options.json().contains("partitions_type")) {
-            if(!options.json()["partitions_type"].is_string())
-                throw diaspora::Exception{"\"partitions_type\" parameter in options should be a string"};
-            options.json()["partitions_type"].get_to(partition_type);
+        if(options.json().contains("partition_type")) {
+            if(!options.json()["partition_type"].is_string())
+                throw diaspora::Exception{"\"partition_type\" parameter in options should be a string"};
+            options.json()["partition_type"].get_to(partition_type);
         }
-        if(options.json().contains("partitions_pool")) {
-            if(!options.json()["partitions_pool"].is_string())
-                throw diaspora::Exception{"\"partitions_pool\" parameter in options should be a string"};
-            options.json()["partitions_pool"].get_to(partition_pool);
+        if(options.json().contains("config")) {
+            partition_config = options.json()["config"];
         }
-        if(options.json().contains("partitions_config"))
-            partition_config = options.json()["partitions_config"].dump();
-        if(options.json().contains("partitions_dependencies")) {
-            auto& deps = options.json()["partitions_dependencies"];
-            if(!deps.is_object())
-                throw diaspora::Exception{
-                    "\"partitions_dependencies\" parameter in options should be an object"};
-            for(auto& p : deps.items()) {
-                if(p.value().is_string()) {
-                    partition_dependencies[p.key()] = {p.value().get<std::string>()};
-                } else if(p.value().is_array()) {
-                    for(auto& s : p.value()) {
+        if(options.json().contains("dependencies")) {
+            auto& dependencies = options.json()["dependencies"];
+            if(!dependencies.is_object()) {
+                throw diaspora::Exception{"\"dependencies\" parameter in options should be an object"};
+            }
+            for(auto& [k, v] : dependencies.items()) {
+                if(v.is_string())
+                    partition_dependencies[k] = {v};
+                else if(v.is_array()) {
+                    for(auto& s : v) {
                         if(!s.is_string()) {
                             throw diaspora::Exception{
-                                "\"partitions_dependencies\" in options should only contain"
+                                "\"dependencies\" in options should only contain"
                                 " strings or arrays of strings"};
                         }
-                        partition_dependencies[p.key()].push_back(s.get<std::string>());
+                        partition_dependencies[k].push_back(s.get<std::string>());
                     }
                 } else {
                     throw diaspora::Exception{
-                        "\"partitions_dependencies\" in options should only contain"
+                        "\"dependencies\" in options should only contain"
                         " strings or arrays of strings"};
                 }
             }
@@ -260,8 +255,7 @@ void MofkaDriver::createTopic(
     auto num_servers = m_bsgh.size();
     for(int i=0; i < num_partitions; ++i) {
         addCustomPartition(name, i % num_servers, partition_type,
-                           partition_config, partition_dependencies,
-                           partition_pool);
+                           partition_config.dump(), partition_dependencies);
     }
 }
 
@@ -543,7 +537,7 @@ void MofkaDriver::addDefaultPartition(std::string_view topic_name,
                                         const diaspora::Metadata& config,
                                         std::string_view pool_name) {
     Dependencies dependencies = {
-        {"abt_io", {std::string{abt_io_instance.data(), abt_io_instance.size()}}}
+        {"io_controller", {std::string{abt_io_instance.data(), abt_io_instance.size()}}}
     };
     if(abt_io_instance.empty()) {
         try {
@@ -553,7 +547,7 @@ void MofkaDriver::addDefaultPartition(std::string_view topic_name,
             $result["address"] = $__config__.margo.mercury.address;
             foreach($__config__.providers as $p) {
                 if($p.type != "abt_io") continue;
-                $result["abt_io"] = $p.name;
+                $result["io_controller"] = $p.name;
                 break;
             }
             return $result;
@@ -563,9 +557,9 @@ void MofkaDriver::addDefaultPartition(std::string_view topic_name,
 
             auto candidates = nlohmann::json::parse(script_result);
 
-            if(candidates.contains("abt_io")) {
-                dependencies["abt_io"] = {
-                    candidates["abt_io"].get<std::string>()};
+            if(candidates.contains("io_controller")) {
+                dependencies["io_controller"] = {
+                    candidates["io_controller"].get<std::string>()};
             } else {
                 throw diaspora::Exception(
                     "No ABT-IO provider provided or found in server. "
@@ -590,7 +584,19 @@ void MofkaDriver::addCustomPartition(
     const Dependencies& dependencies,
     std::string_view pool_name) {
 
-    auto partition_uuid = UUID::generate();
+    UUID partition_uuid;
+    if(partition_config.json().contains("uuid")) {
+        try {
+            partition_uuid = UUID::from_string(
+                partition_config.json()["uuid"].get_ref<const std::string&>().c_str());
+        } catch(const std::invalid_argument&) {
+            throw diaspora::Exception{
+                fmt::format("Invalid UUID \"{}\" in partition config",
+                    partition_config.json()["uuid"].get<std::string>())};
+        }
+    } else {
+        partition_uuid = UUID::generate();
+    }
     auto provider_name  = fmt::format("{}_partition_{}", topic_name, partition_uuid.to_string().substr(0, 8));
     uint16_t provider_id;
 

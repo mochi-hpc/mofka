@@ -109,9 +109,10 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         /* Validate configuration against schema */
         auto errors = jsonValidator.validate(config.json());
         if(!errors.empty()) {
-            spdlog::error("[mofka] Error(s) while validating JSON config for provider:");
-            for(auto& error : errors) spdlog::error("[mofka] \t{}", error);
-            throw diaspora::Exception{"Error(s) while validating JSON config for provider"};
+            std::string msg = "Error(s) while validating JSON config for provider:";
+            for(auto& error : errors) msg += "\n\t" + error;
+            spdlog::error("[mofka] {}", msg);
+            throw diaspora::Exception{msg};
         }
     }
 

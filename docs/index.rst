@@ -28,6 +28,7 @@ and the use of the Mofka driver for the Diaspora Stream API.
 
    usage/installation.rst
    usage/quickstart.rst
+   usage/advanced.rst
 
 
 Indices and tables

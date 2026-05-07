@@ -2,7 +2,6 @@
     "libraries": [
         "libflock-bedrock-module.so",
         "libyokan-bedrock-module.so",
-        "libwarabi-bedrock-module.so",
         "libabt-io-bedrock-module.so",
         "libmofka-bedrock-module.so"
     ],
@@ -12,7 +11,7 @@
             "type" : "flock",
             "provider_id" : 1,
             "config": {
-                "bootstrap": "self",
+                "bootstrap": "mpi",
                 "file": "mofka.json",
                 "group": {
                     "type": "static"
@@ -20,13 +19,18 @@
             }
         },
         {
-            "name": "master_database",
+            "__if__": "$MPI_COMM_WORLD.rank == 0",
+            "name": "master",
             "provider_id": 2,
             "type": "yokan",
             "tags" : [ "mofka:master" ],
             "config" : {
                 "database" : {
-                    "type": "map"
+                    "type": "rocksdb",
+                    "config": {
+                        "create_if_missing": true,
+                        "path": "/tmp/mofka/master"
+                    }
                 }
             }
         },

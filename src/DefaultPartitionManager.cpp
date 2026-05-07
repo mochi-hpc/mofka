@@ -20,7 +20,7 @@ namespace mofka {
 
 MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(
     default, DefaultPartitionManager,
-    {"abt_io", "abt_io", true, false, false});
+    {"io_controller", "abt_io", true, false, false});
 
 static void mkdirs(const std::string& path) {
     std::string current;
@@ -635,14 +635,14 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
     static JsonSchemaValidator schemaValidator{configSchema};
     auto validationErrors = schemaValidator.validate(config.json());
     if(!validationErrors.empty()) {
-        spdlog::error("[mofka] Error(s) while validating JSON config for DefaultPartitionManager:");
-        for(auto& error : validationErrors) spdlog::error("[mofka] \t{}", error);
-        throw diaspora::Exception{
-            "Error(s) while validating JSON config for DefaultPartitionManager"};
+        std::string msg = "Error(s) while validating JSON config for DefaultPartitionManager:";
+        for(auto& error : validationErrors) msg += "\n\t" + error;
+        spdlog::error("[mofka] {}", msg);
+        throw diaspora::Exception{msg};
     }
 
     /* Extract ABT-IO dependency */
-    auto abt_io_component = dependencies.at("abt_io")[0]->getHandle<bedrock::ComponentPtr>();
+    auto abt_io_component = dependencies.at("io_controller")[0]->getHandle<bedrock::ComponentPtr>();
     auto abt_io = static_cast<abt_io_instance_id>(abt_io_component->getHandle());
 
     /* Parse config */

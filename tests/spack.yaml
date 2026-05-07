@@ -55,7 +55,7 @@ spack:
       - "@0.15.1:"
     mochi-yokan:
       require:
-      - "@0.8.0:"
+      - "@0.9.2:"
       - "+bedrock"
       - "+space"
     mochi-warabi:
@@ -65,7 +65,7 @@ spack:
       - "+space"
     mochi-bedrock:
       require:
-      - "@0.15.0:"
+      - "@0.16.1:"
       - "+python"
       - "+mpi"
       - "+flock"

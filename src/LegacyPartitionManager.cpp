@@ -128,10 +128,10 @@ std::unique_ptr<mofka::PartitionManager> LegacyPartitionManager::create(
     static JsonSchemaValidator schemaValidator{configSchema};
     auto validationErrors = schemaValidator.validate(config.json());
     if(!validationErrors.empty()) {
-        spdlog::error("[mofka] Error(s) while validating JSON config for LegacyPartitionManager:");
-        for(auto& error : validationErrors) spdlog::error("[mofka] \t{}", error);
-        throw diaspora::Exception{
-            "Error(s) while validating JSON config for LegacyPartitionManager"};
+        std::string msg = "Error(s) while validating JSON config for LegacyPartitionManager:";
+        for(auto& error : validationErrors) msg += "\n\t" + error;
+        spdlog::error("[mofka] {}", msg);
+        throw diaspora::Exception{msg};
     }
 
     /* the data and metadata dependencies are required so we know they are in the map */
