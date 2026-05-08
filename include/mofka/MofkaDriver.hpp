@@ -13,6 +13,7 @@
 #include <diaspora/PartitionSelector.hpp>
 #include <diaspora/Metadata.hpp>
 #include <diaspora/Driver.hpp>
+#include <mofka/UUID.hpp>
 
 #include <yokan/cxx/database.hpp>
 #include <yokan/cxx/collection.hpp>
@@ -221,7 +222,8 @@ class MofkaDriver : public diaspora::DriverInterface,
                             std::string_view partition_type = "memory",
                             const diaspora::Metadata& partition_config = diaspora::Metadata{"{}"},
                             const Dependencies& dependencies = {},
-                            std::string_view pool_name = "");
+                            std::string_view pool_name = "",
+                            const UUID& partition_uuid = {});
 
     /**
      * @brief Add an in-memory partition. Full in-memory partitions are useful
@@ -235,7 +237,8 @@ class MofkaDriver : public diaspora::DriverInterface,
      */
     void addMemoryPartition(std::string_view topic_name,
                             size_t server_rank,
-                            std::string_view pool_name = "");
+                            std::string_view pool_name = "",
+                            const UUID& partition_uuid = {});
 
     /**
      * @brief Add a partition backed by Mofka' legacy partition manager implementation.
@@ -254,7 +257,8 @@ class MofkaDriver : public diaspora::DriverInterface,
                              std::string_view metadata_provider = {},
                              std::string_view data_provider = {},
                              const diaspora::Metadata& config = {},
-                             std::string_view pool_name = "");
+                             std::string_view pool_name = "",
+                             const UUID& partition_uuid = {});
 
     /**
      * @brief Add a partition backed by Mofka's default partition manager.
@@ -272,7 +276,8 @@ class MofkaDriver : public diaspora::DriverInterface,
                              size_t server_rank,
                              std::string_view abt_io_instance = {},
                              const diaspora::Metadata& config = {},
-                             std::string_view pool_name = "");
+                             std::string_view pool_name = "",
+                             const UUID& partition_uuid = {});
 
 };
 

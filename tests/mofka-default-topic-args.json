@@ -1,8 +1,10 @@
 {
     "num_partitions": 1,
-    "partition_type": "default",
     "config": {
-        "path": "/tmp/mofka-default-test"
+        "type": "default",
+        "partition": {
+            "path": "/tmp/mofka-default-test"
+        }
     },
     "dependencies": {
         "io_controller": "my_abt_io"

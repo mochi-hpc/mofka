@@ -159,13 +159,20 @@ void MofkaDriver::createTopic(
             if(num_partitions <= 0)
                 throw diaspora::Exception{"\"num_partitions\" value in options is invalid"};
         }
-        if(options.json().contains("partition_type")) {
-            if(!options.json()["partition_type"].is_string())
-                throw diaspora::Exception{"\"partition_type\" parameter in options should be a string"};
-            options.json()["partition_type"].get_to(partition_type);
-        }
         if(options.json().contains("config")) {
-            partition_config = options.json()["config"];
+            auto& cfg = options.json()["config"];
+            if(!cfg.is_object())
+                throw diaspora::Exception{"\"config\" parameter in options should be an object"};
+            if(cfg.contains("type")) {
+                if(!cfg["type"].is_string())
+                    throw diaspora::Exception{"\"config.type\" in options should be a string"};
+                cfg["type"].get_to(partition_type);
+            }
+            if(cfg.contains("partition")) {
+                if(!cfg["partition"].is_object())
+                    throw diaspora::Exception{"\"config.partition\" in options should be an object"};
+                partition_config = cfg["partition"];
+            }
         }
         if(options.json().contains("dependencies")) {
             auto& dependencies = options.json()["dependencies"];
@@ -261,19 +268,39 @@ void MofkaDriver::createTopic(
             return {};
     };
 
+    // Optional caller-supplied UUID (only valid when creating a single partition).
+    UUID requested_uuid;
+    if(options.json().contains("config")
+    && options.json()["config"].is_object()
+    && options.json()["config"].contains("uuid")) {
+        auto& u = options.json()["config"]["uuid"];
+        if(!u.is_string())
+            throw diaspora::Exception{"\"config.uuid\" in options should be a string"};
+        if(num_partitions != 1)
+            throw diaspora::Exception{
+                "\"config.uuid\" can only be used when creating a single partition"};
+        try {
+            requested_uuid = UUID::from_string(u.get_ref<const std::string&>().c_str());
+        } catch(const std::invalid_argument&) {
+            throw diaspora::Exception{fmt::format(
+                "Invalid UUID \"{}\" in config.uuid", u.get<std::string>())};
+        }
+    }
+
     for(int i=0; i < num_partitions; ++i) {
         if(partition_type == "memory") {
-            addMemoryPartition(name, i % num_servers, get_dep("pool"));
+            addMemoryPartition(name, i % num_servers, get_dep("pool"), requested_uuid);
         } else if(partition_type == "default") {
             addDefaultPartition(name, i % num_servers, get_dep("io_controller"),
-                                partition_config, get_dep("pool"));
+                                partition_config, get_dep("pool"), requested_uuid);
         } else if(partition_type == "legacy") {
             addLegacyPartition(name, i % num_servers,
                                get_dep("metadata"), get_dep("data"),
-                               partition_config, get_dep("pool"));
+                               partition_config, get_dep("pool"), requested_uuid);
         } else {
             addCustomPartition(name, i % num_servers, partition_type,
-                               partition_config, partition_dependencies);
+                               partition_config, partition_dependencies,
+                               /*pool_name=*/{}, requested_uuid);
         }
     }
 }
@@ -472,8 +499,9 @@ bool MofkaDriver::topicExists(std::string_view name) const {
 
 void MofkaDriver::addMemoryPartition(std::string_view topic_name,
                                        size_t server_rank,
-                                       std::string_view pool_name) {
-    addCustomPartition(topic_name, server_rank, "memory", {}, {}, pool_name);
+                                       std::string_view pool_name,
+                                       const UUID& partition_uuid) {
+    addCustomPartition(topic_name, server_rank, "memory", {}, {}, pool_name, partition_uuid);
 }
 
 void MofkaDriver::addLegacyPartition(std::string_view topic_name,
@@ -481,7 +509,8 @@ void MofkaDriver::addLegacyPartition(std::string_view topic_name,
                                         std::string_view metadata_provider,
                                         std::string_view data_provider,
                                         const diaspora::Metadata& config,
-                                        std::string_view pool_name) {
+                                        std::string_view pool_name,
+                                        const UUID& partition_uuid) {
     Dependencies dependencies = {
         {"metadata", {std::string{metadata_provider.data(), metadata_provider.size()}}},
         {"data", {std::string{data_provider.data(), data_provider.size()}}}
@@ -547,14 +576,15 @@ void MofkaDriver::addLegacyPartition(std::string_view topic_name,
         }
     }
 
-    addCustomPartition(topic_name, server_rank, "legacy", config, dependencies, pool_name);
+    addCustomPartition(topic_name, server_rank, "legacy", config, dependencies, pool_name, partition_uuid);
 }
 
 void MofkaDriver::addDefaultPartition(std::string_view topic_name,
                                         size_t server_rank,
                                         std::string_view abt_io_instance,
                                         const diaspora::Metadata& config,
-                                        std::string_view pool_name) {
+                                        std::string_view pool_name,
+                                        const UUID& partition_uuid) {
     Dependencies dependencies = {
         {"io_controller", {std::string{abt_io_instance.data(), abt_io_instance.size()}}}
     };
@@ -592,7 +622,7 @@ void MofkaDriver::addDefaultPartition(std::string_view topic_name,
         }
     }
 
-    addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name);
+    addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name, partition_uuid);
 }
 
 void MofkaDriver::addCustomPartition(
@@ -601,21 +631,12 @@ void MofkaDriver::addCustomPartition(
     std::string_view partition_type,
     const diaspora::Metadata& partition_config,
     const Dependencies& dependencies,
-    std::string_view pool_name) {
+    std::string_view pool_name,
+    const UUID& partition_uuid_arg) {
 
-    UUID partition_uuid;
-    if(partition_config.json().contains("uuid")) {
-        try {
-            partition_uuid = UUID::from_string(
-                partition_config.json()["uuid"].get_ref<const std::string&>().c_str());
-        } catch(const std::invalid_argument&) {
-            throw diaspora::Exception{
-                fmt::format("Invalid UUID \"{}\" in partition config",
-                    partition_config.json()["uuid"].get<std::string>())};
-        }
-    } else {
-        partition_uuid = UUID::generate();
-    }
+    // An all-zero UUID means "no caller-supplied UUID, generate one".
+    UUID partition_uuid =
+        (partition_uuid_arg == UUID{}) ? UUID::generate() : partition_uuid_arg;
     auto provider_name  = fmt::format("{}_partition_{}", topic_name, partition_uuid.to_string().substr(0, 8));
     uint16_t provider_id;
 

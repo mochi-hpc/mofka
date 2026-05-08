@@ -162,7 +162,7 @@ The more complete version of this command is the following.
 
    diaspora-ctl topic create --name my_topic \
         --topic.num_partitions 1 \
-        --topic.partition_type memory \
+        --topic.config.type memory \
         --topic.dependencies.pool __primary__
 
 We will discuss the :code:`--topic.dependencies.pool` later, for now note that by default,
@@ -172,9 +172,9 @@ a partition that is stored on disk. The following command will do that for us.
 .. code-block:: bash
 
    diaspora-ctl topic create --name my_topic \
-        --topic.partition_type default \
+        --topic.config.type default \
         --topic.num_partitions 1 \
-        --topic.config.path /tmp/mofka
+        --topic.config.partition.path /tmp/mofka
 
 
 This command should execute and we should find that a new folder *my_topic-<uuid>* has been
@@ -185,9 +185,9 @@ Note that a more complete version of the above command would be the following.
 .. code-block:: bash
 
    diaspora-ctl topic create --name my_topic \
-        --topic.partition_type default \
         --topic.num_partitions 1 \
-        --topic.config.path /tmp/mofka \
+        --topic.config.type default \
+        --topic.config.partition.path /tmp/mofka \
         --topic.dependencies.io_controller io_controller \
         --topic.dependencies.pool __primary__
 
@@ -196,14 +196,15 @@ component from the server will be used. If the pool is not specified, the :code:
 pool is used.
 
 The above code however lets us better understand how configuration is passed to the
-partitions. Parameters starting with :code:`--topic.config` and :code:`--topic.dependencies`
-will be converted into JSON information for the partition. The above command will convert
-its arguments into the following.
+partitions. The :code:`--topic.<X>` arguments are translated verbatim into a JSON
+options object that mirrors the resulting Bedrock provider configuration.
+The above command will convert its arguments into the following.
 
 .. code-block:: json
 
    {
        "config": {
+           "type": "default",
            "partition": {
                "path": "/tmp/mofka"
            }
@@ -214,9 +215,12 @@ its arguments into the following.
        }
    }
 
-Any argument passed with the :code:`--topic.config.` prefix will land in the "config/partition"
-object and any argument passed with the :code:`--topic.dependencies.` prefix will land in
-the "dependencies" object.
+That is: :code:`--topic.config.type` selects the partition manager,
+:code:`--topic.config.partition.<field>` sets a partition-manager-specific field
+(here, :code:`path`), and :code:`--topic.dependencies.<name>` resolves a Bedrock
+dependency. You can confirm the full effective configuration with
+:code:`bedrock-query`, where :code:`config/type`, :code:`config/partition/*`, and
+:code:`dependencies/*` will appear in the same shape as the arguments above.
 
 .. important::
 
@@ -347,9 +351,9 @@ We can then pass this configuration file to :code:`diaspora-ctl topic create` as
 .. code-block:: bash
 
    diaspora-ctl topic create --name my_topic \
-        --topic.partition_type default \
+        --topic.config.type default \
         --topic.num_partitions 1 \
-        --topic.config.path /tmp/mofka \
+        --topic.config.partition.path /tmp/mofka \
         --topic-config topic-config.json
 
 .. note::
@@ -357,7 +361,8 @@ We can then pass this configuration file to :code:`diaspora-ctl topic create` as
    Any argument passed using the :code:`--topic.config.` prefix will overwrite arguments
    from the configuration file passed to :code:`--topic-config`. In the above scenario,
    if the *topic-config.json* file had a "path" entry, it would be overwritten with
-   "/tmp/mofka" as a consequence of passing :code:`--topic.config.path /tmp/mofka`.
+   "/tmp/mofka" as a consequence of passing
+   :code:`--topic.config.partition.path /tmp/mofka`.
 
 
 Setting up multithreading
