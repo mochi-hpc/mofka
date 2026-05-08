@@ -9,16 +9,10 @@ echo "{\"group_file\":\"mofka.json\", \"margo\":{\"use_progress_thread\":true}}"
 echo "PYTHONPATH=$PYTHONPATH"
 echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
-echo "==> Creating topic"
-python -m mochi.mofka.mofkactl topic create my_topic -g mofka.json
-r="$?"
-if [ "$r" -ne "0" ]; then
-    $HERE/post-test.sh $r
-    exit 1
-fi
+export DIASPORA_CTL_DRIVER_OPTIONS="--driver mofka --driver.group_file mofka.json"
 
-echo "==> Adding memory partition"
-python -m mochi.mofka.mofkactl partition add my_topic -r 0 -t memory -g mofka.json
+echo "==> Creating topic and partition"
+diaspora-ctl topic create --name my_topic --topic.num_partitions 1
 r="$?"
 if [ "$r" -ne "0" ]; then
     $HERE/post-test.sh $r

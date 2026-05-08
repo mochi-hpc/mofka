@@ -86,6 +86,16 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             partition_type, get_engine(), m_topic, m_uuid,
             partition_config, dependencies);
 
+        /* Update m_config["partition"] with the manager's effective config
+         * (with defaults filled in), so bedrock-query reflects what's
+         * actually in use. Skip if the manager returned an empty object. */
+        auto resolved = m_partition_manager->getConfig().json();
+        if(resolved.is_object() && !resolved.empty()) {
+            auto cfg_json = m_config.json();
+            cfg_json["partition"] = std::move(resolved);
+            m_config = diaspora::Metadata{std::move(cfg_json)};
+        }
+
         spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), m_uuid.to_string());
     }
 

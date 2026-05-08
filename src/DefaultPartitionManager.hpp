@@ -162,6 +162,9 @@ class DefaultPartitionManager : public mofka::PartitionManager {
         }
     };
 
+    // Resolved configuration (with defaults filled in), published via getConfig()
+    diaspora::Metadata  m_config;
+
     // Config
     std::string         m_path;
     size_t              m_max_chunk_size;
@@ -370,6 +373,8 @@ class DefaultPartitionManager : public mofka::PartitionManager {
           const BulkRef& bulk) override;
 
     Result<bool> destroy() override;
+
+    diaspora::Metadata getConfig() const override { return m_config; }
 
     static std::unique_ptr<mofka::PartitionManager> create(
         const thallium::engine& engine,

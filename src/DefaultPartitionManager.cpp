@@ -759,6 +759,38 @@ std::unique_ptr<mofka::PartitionManager> DefaultPartitionManager::create(
             .fd_cache_capacity                    = fd_cache_capacity,
         }));
 
+    /* Build the effective configuration (with defaults filled in) */
+    nlohmann::json effective_config = {
+        {"path", base_path},
+        {"max_chunk_size", max_chunk_size},
+        {"max_events_per_chunk", max_events_per_chunk},
+        {"sync", sync},
+        {"fd_cache_capacity", fd_cache_capacity},
+        {"producers", {
+            {"metadata_buffer_pool", {
+                {"num_tiers", meta_num_tiers},
+                {"num_buffers", meta_num_buffers},
+                {"first_size", meta_first_size},
+                {"size_multiple", meta_size_multiple}}},
+            {"data_buffer_pool", {
+                {"num_tiers", data_num_tiers},
+                {"num_buffers", data_num_buffers},
+                {"first_size", data_first_size},
+                {"size_multiple", data_size_multiple}}}}},
+        {"consumers", {
+            {"metadata_buffer_pool", {
+                {"num_tiers", cmeta_num_tiers},
+                {"num_buffers", cmeta_num_buffers},
+                {"first_size", cmeta_first_size},
+                {"size_multiple", cmeta_size_multiple}}},
+            {"desc_buffer_pool", {
+                {"num_tiers", cdesc_num_tiers},
+                {"num_buffers", cdesc_num_buffers},
+                {"first_size", cdesc_first_size},
+                {"size_multiple", cdesc_size_multiple}}}}}
+    };
+    manager->m_config = diaspora::Metadata{std::move(effective_config)};
+
     manager->m_current_chunk_id = current_chunk_id;
     manager->m_assigned_events = total_events;
     manager->m_total_events = total_events;
