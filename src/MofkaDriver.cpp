@@ -300,7 +300,7 @@ void MofkaDriver::createTopic(
         } else {
             addCustomPartition(name, i % num_servers, partition_type,
                                partition_config, partition_dependencies,
-                               /*pool_name=*/{}, requested_uuid);
+                               requested_uuid);
         }
     }
 }
@@ -501,7 +501,10 @@ void MofkaDriver::addMemoryPartition(std::string_view topic_name,
                                        size_t server_rank,
                                        std::string_view pool_name,
                                        const UUID& partition_uuid) {
-    addCustomPartition(topic_name, server_rank, "memory", {}, {}, pool_name, partition_uuid);
+    Dependencies dependencies;
+    if(pool_name.size())
+        dependencies["pool"] = {std::string{pool_name.data(), pool_name.size()}};
+    addCustomPartition(topic_name, server_rank, "memory", {}, dependencies, partition_uuid);
 }
 
 void MofkaDriver::addLegacyPartition(std::string_view topic_name,
@@ -576,7 +579,9 @@ void MofkaDriver::addLegacyPartition(std::string_view topic_name,
         }
     }
 
-    addCustomPartition(topic_name, server_rank, "legacy", config, dependencies, pool_name, partition_uuid);
+    if(pool_name.size())
+        dependencies["pool"] = {std::string{pool_name.data(), pool_name.size()}};
+    addCustomPartition(topic_name, server_rank, "legacy", config, dependencies, partition_uuid);
 }
 
 void MofkaDriver::addDefaultPartition(std::string_view topic_name,
@@ -622,7 +627,9 @@ void MofkaDriver::addDefaultPartition(std::string_view topic_name,
         }
     }
 
-    addCustomPartition(topic_name, server_rank, "default", config, dependencies, pool_name, partition_uuid);
+    if(pool_name.size())
+        dependencies["pool"] = {std::string{pool_name.data(), pool_name.size()}};
+    addCustomPartition(topic_name, server_rank, "default", config, dependencies, partition_uuid);
 }
 
 void MofkaDriver::addCustomPartition(
@@ -631,7 +638,6 @@ void MofkaDriver::addCustomPartition(
     std::string_view partition_type,
     const diaspora::Metadata& partition_config,
     const Dependencies& dependencies,
-    std::string_view pool_name,
     const UUID& partition_uuid_arg) {
 
     // An all-zero UUID means "no caller-supplied UUID, generate one".
@@ -656,9 +662,10 @@ void MofkaDriver::addCustomPartition(
         provider_desciption["tags"] = nlohmann::json::array();
         provider_desciption["tags"].push_back("mofka:partition");
         provider_desciption["dependencies"] = dependencies;
-        if(!provider_desciption["dependencies"].contains("pool")) {
-            provider_desciption["dependencies"]["pool"] = pool_name.size() ? pool_name : "__primary__";
-        }
+        // If the caller didn't supply a "pool" dependency, leave it unset:
+        // Provider::create falls back to engine.get_handler_pool() (the
+        // engine's RPC handler pool — e.g. __rpc__ when rpc_thread_count
+        // is configured), which is what we want by default.
         provider_desciption["dependencies"]["master_database"] = m_yk_master_info;
         server.addProvider(provider_desciption.dump(), &provider_id);
     } catch(const bedrock::Exception& ex) {

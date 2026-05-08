@@ -367,3 +367,156 @@ We can then pass this configuration file to :code:`diaspora-ctl topic create` as
 
 Setting up multithreading
 -------------------------
+
+In all the configurations we have used so far, every Mofka provider, the
+network progress loop, and every RPC handler share the same default
+Argobots execution stream (:code:`__primary__`). That means RPCs serialize
+behind progress and behind one another — a bottleneck that becomes visible
+as soon as multiple producers or consumers hit a single server, or when
+chunk writes are slow enough to stall the handler that's currently running.
+
+The simplest way to relieve this pressure is to ask Margo to spawn extra
+Argobots resources for you. Two shortcut fields in the :code:`margo`
+section of the Bedrock configuration do exactly that:
+
+.. code-block:: json
+
+   "margo": {
+       "use_progress_thread": true,
+       "rpc_thread_count": 4
+   }
+
+* :code:`use_progress_thread` moves Mercury's progress loop to its own
+  dedicated execution stream, so polling no longer competes with RPC
+  handlers.
+* :code:`rpc_thread_count` creates an :code:`__rpc__` pool and N execution
+  streams pulling from it; every RPC handler is then dispatched into that
+  pool. With four ES, up to four RPCs can run truly concurrently.
+
+.. note::
+
+   In our case it is not necessary to set "use_progress_thread" to :code:`true`,
+   by default the progress loop will use the :code:`__primary__` execution
+   stream, which, if we specify a non-zero rpc_thread_count, is already
+   separated from the execution streams servicing RPCs.
+
+After restarting Bedrock, :code:`bedrock-query` will show the expanded
+:code:`margo.argobots` section with the additional pool and the additional
+xstreams that Margo generated for you.
+
+For finer control — CPU pinning, choosing the Argobots scheduler, or
+declaring multiple custom pools — you can write the long-form
+:code:`argobots.pools` and :code:`argobots.xstreams` arrays directly in
+the :code:`margo` section, and reference them by name from
+:code:`progress_pool`, :code:`rpc_pool`, or any provider's :code:`pool`
+dependency. The full schema is documented in
+`Margo's JSON configuration reference
+<https://mochi.readthedocs.io/en/latest/margo/09_config.html>`_. The next
+section uses that long form to dedicate execution streams to ABT-IO.
+
+
+Improving I/O performance
+-------------------------
+
+By default, the :code:`io_controller` (an ABT-IO provider) depends on
+:code:`__primary__`. Every read and write a partition issues runs there,
+contending with whatever else lives in that pool. Two complementary
+techniques help: dedicate execution streams to ABT-IO, and/or switch to
+the io_uring backend.
+
+
+Dedicating execution streams to ABT-IO
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Declare a new pool and two xstreams pulling from it in the :code:`margo`
+section:
+
+.. code-block:: json
+
+   "argobots": {
+       "pools": [
+           { "name": "__primary__", "kind": "fifo_wait", "access": "mpmc" },
+           { "name": "io_pool",     "kind": "fifo_wait", "access": "mpmc" }
+       ],
+       "xstreams": [
+           { "name": "__primary__",
+             "scheduler": { "type": "basic_wait", "pools": ["__primary__"] } },
+           { "name": "io_es_0",
+             "scheduler": { "type": "basic_wait", "pools": ["io_pool"] } },
+           { "name": "io_es_1",
+             "scheduler": { "type": "basic_wait", "pools": ["io_pool"] } }
+       ]
+   }
+
+Then point the :code:`io_controller` provider at the new pool by changing
+its :code:`pool` dependency:
+
+.. code-block:: json
+
+   {
+       "name": "io_controller",
+       "type": "abt_io",
+       "provider_id": 3,
+       "config": {},
+       "dependencies": { "pool": "io_pool" }
+   }
+
+Two execution streams sharing one :code:`mpmc` pool means ABT-IO ULTs
+can run on whichever ES is free, and they no longer compete with RPC
+handling for CPU time. If your workload is read-heavy and consumers
+fan out across many partitions, raising the xstream count further can
+help.
+
+
+Switching to io_uring
+~~~~~~~~~~~~~~~~~~~~~
+
+ABT-IO can also use Linux's `io_uring
+<https://en.wikipedia.org/wiki/Io_uring>`_ kernel interface as its
+backend. With io_uring, the kernel asynchronously processes submitted
+I/Os and reports completions through a ring buffer; the ABT-IO ULT only
+submits and then waits for completion. Because the kernel does the
+actual work, dedicating extra Argobots execution streams to this
+backend would mostly waste cores — :code:`__primary__` is the right
+target pool.
+
+Add a second ABT-IO provider alongside the first one:
+
+.. code-block:: json
+
+   {
+       "name": "io_uring_controller",
+       "type": "abt_io",
+       "provider_id": 4,
+       "config": {
+           "num_urings": 1,
+           "liburing_flags": ["IOSQE_ASYNC"]
+       },
+       "dependencies": { "pool": "__primary__" }
+   }
+
+A partition can then be told which ABT-IO instance to use by naming it
+in the partition's dependencies:
+
+.. code-block:: bash
+
+   diaspora-ctl topic create --name fast_topic \
+        --topic.config.type default \
+        --topic.num_partitions 1 \
+        --topic.config.partition.path /tmp/mofka \
+        --topic.dependencies.io_controller io_uring_controller
+
+.. note::
+
+   io_uring requires a recent enough Linux kernel and an :code:`abt-io`
+   build with liburing support (in Spack, the :code:`mochi-abt-io
+   +liburing` variant). If either is missing, fall back to the
+   thread-based backend with a dedicated pool as shown above.
+
+Full configuration
+------------------
+
+After all the modifications done above, here is the final configuration.
+
+.. literalinclude:: ../_code/advanced-config.json
+     :language: json

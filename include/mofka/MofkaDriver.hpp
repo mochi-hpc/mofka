@@ -222,7 +222,6 @@ class MofkaDriver : public diaspora::DriverInterface,
                             std::string_view partition_type = "memory",
                             const diaspora::Metadata& partition_config = diaspora::Metadata{"{}"},
                             const Dependencies& dependencies = {},
-                            std::string_view pool_name = "",
                             const UUID& partition_uuid = {});
 
     /**

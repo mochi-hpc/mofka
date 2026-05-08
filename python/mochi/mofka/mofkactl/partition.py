@@ -80,13 +80,14 @@ def add(
                     partition_config=partition_config,
                     pool_name=pool)
             else:
+                if pool and "pool" not in partition_dependencies:
+                    partition_dependencies["pool"] = pool
                 service.add_custom_partition(
                     topic_name=name,
                     server_rank=rank,
                     partition_type=type,
                     partition_config=partition_config,
-                    dependencies=partition_dependencies,
-                    pool_name=pool)
+                    dependencies=partition_dependencies)
         except ClientException as err:
             print(f"Error: {err}")
             del service
