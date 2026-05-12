@@ -1,0 +1,10 @@
+{
+    "num_partitions": 1,
+    "config": {
+        "type": "legacy"
+    },
+    "dependencies": {
+        "metadata": "metadata@local",
+        "data": "data@local"
+    }
+}

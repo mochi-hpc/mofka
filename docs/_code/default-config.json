@@ -2,7 +2,6 @@
     "libraries": [
         "libflock-bedrock-module.so",
         "libyokan-bedrock-module.so",
-        "libwarabi-bedrock-module.so",
         "libmofka-bedrock-module.so"
     ],
     "providers": [
@@ -25,24 +24,6 @@
             "tags" : [ "mofka:master" ],
             "config" : {
                 "database" : { "type": "map" }
-            }
-        },
-        {
-            "name": "my_metadata_provider",
-            "provider_id": 3,
-            "type": "yokan",
-            "tags" : [ "mofka:metadata" ],
-            "config" : {
-                "database" : { "type": "map" }
-            }
-        },
-        {
-            "name": "my_data_provider",
-            "provider_id": 4,
-            "type": "warabi",
-            "tags" : [ "mofka:data" ],
-            "config" : {
-                "target" : { "type": "memory" }
             }
         }
     ]

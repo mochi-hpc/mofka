@@ -14,8 +14,9 @@ endif ()
 
 set (MOFKA_TEST_BACKEND_ARGS
      "{\"group_file\":\"mofka.json\",\"margo\":{\"use_progress_thread\":true}}")
-file (READ mofka-default-topic-args.json MOFKA_TEST_DEFAULT_TOPIC_ARGS)
+file (READ mofka-legacy-topic-args.json MOFKA_TEST_LEGACY_TOPIC_ARGS)
 file (READ mofka-memory-topic-args.json MOFKA_TEST_MEMORY_TOPIC_ARGS)
+file (READ mofka-default-topic-args.json MOFKA_TEST_DEFAULT_TOPIC_ARGS)
 
 execute_process (
     COMMAND diaspora-run-tests.sh --list-binary-tests
@@ -35,11 +36,13 @@ if (DIASPORA_PYTHON_TESTS)
     string (REPLACE "\n" ";" DIASPORA_PYTHON_TESTS "${DIASPORA_PYTHON_TESTS}")
 endif ()
 
-foreach (partition_suffix IN ITEMS Default Memory)
-    if (partition_suffix STREQUAL "Default")
-        set (topic_args "${MOFKA_TEST_DEFAULT_TOPIC_ARGS}")
-    else ()
+foreach (partition_suffix IN ITEMS Legacy Memory Default)
+    if (partition_suffix STREQUAL "Legacy")
+        set (topic_args "${MOFKA_TEST_LEGACY_TOPIC_ARGS}")
+    elseif (partition_suffix STREQUAL "Memory")
         set (topic_args "${MOFKA_TEST_MEMORY_TOPIC_ARGS}")
+    else ()
+        set (topic_args "${MOFKA_TEST_DEFAULT_TOPIC_ARGS}")
     endif ()
 
     foreach (test_name IN LISTS DIASPORA_BINARY_TESTS)
@@ -69,6 +72,22 @@ foreach (partition_suffix IN ITEMS Default Memory)
                       "PYTHONPATH=${CMAKE_SOURCE_DIR}/python/:${CMAKE_BINARY_DIR}/python:$ENV{PYTHONPATH}")
     endforeach ()
 endforeach ()
+
+add_executable (MofkaAckEarlyTest ${CMAKE_CURRENT_SOURCE_DIR}/MofkaAckEarlyTest.cpp)
+target_link_libraries (MofkaAckEarlyTest
+    PRIVATE Catch2::Catch2WithMain bedrock-server mofka coverage_config warnings_config)
+add_test (NAME MofkaAckEarlyTest COMMAND
+          ${CMAKE_CURRENT_SOURCE_DIR}/run-test-with-mofka.sh ./MofkaAckEarlyTest)
+set_property (TEST MofkaAckEarlyTest PROPERTY
+              ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/src:$ENV{LD_LIBRARY_PATH}")
+
+add_executable (MofkaWriteCacheTest ${CMAKE_CURRENT_SOURCE_DIR}/MofkaWriteCacheTest.cpp)
+target_link_libraries (MofkaWriteCacheTest
+    PRIVATE Catch2::Catch2WithMain bedrock-server mofka coverage_config warnings_config)
+add_test (NAME MofkaWriteCacheTest COMMAND
+          ${CMAKE_CURRENT_SOURCE_DIR}/run-test-with-mofka.sh ./MofkaWriteCacheTest)
+set_property (TEST MofkaWriteCacheTest PROPERTY
+              ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/src:$ENV{LD_LIBRARY_PATH}")
 
 add_test (NAME MofkaBenchmark COMMAND
           ${CMAKE_CURRENT_SOURCE_DIR}/run-benchmark.sh)

@@ -1,0 +1,77 @@
+{
+    "libraries": [
+        "libflock-bedrock-module.so",
+        "libyokan-bedrock-module.so",
+        "libabt-io-bedrock-module.so",
+        "libmofka-bedrock-module.so"
+    ],
+    "margo": {
+        "use_progress_thread": true,
+        "rpc_thread_count": 4,
+        "argobots": {
+            "pools": [
+                { "name": "__primary__", "kind": "fifo_wait", "access": "mpmc" },
+                { "name": "io_pool",     "kind": "fifo_wait", "access": "mpmc" }
+            ],
+            "xstreams": [
+                { "name": "__primary__",
+                  "scheduler": { "type": "basic_wait", "pools": ["__primary__"] } },
+                { "name": "io_es_0",
+                  "scheduler": { "type": "basic_wait", "pools": ["io_pool"] } },
+                { "name": "io_es_1",
+                  "scheduler": { "type": "basic_wait", "pools": ["io_pool"] } }
+            ]
+        }
+    },
+    "providers": [
+        {
+            "name" : "group_manager",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "mpi",
+                "file": "mofka.json",
+                "group": {
+                    "type": "static"
+                }
+            }
+        },
+        {
+            "__if__": "$MPI_COMM_WORLD.rank == 0",
+            "name": "master",
+            "provider_id": 2,
+            "type": "yokan",
+            "tags" : [ "mofka:master" ],
+            "config" : {
+                "database" : {
+                    "type": "rocksdb",
+                    "config": {
+                        "create_if_missing": true,
+                        "path": "/tmp/mofka/master"
+                    }
+                }
+            }
+        },
+        {
+            "name" : "io_controller",
+            "type" : "abt_io",
+            "provider_id" : 3,
+            "config" : {},
+            "dependencies": {
+                "pool": "io_pool"
+            }
+        },
+        {
+            "name" : "io_uring_controller",
+            "type" : "abt_io",
+            "provider_id" : 4,
+            "config" : {
+                "num_urings": 1,
+                "liburing_flags": ["IOSQE_ASYNC"]
+            },
+            "dependencies": {
+                "pool": "__primary__"
+            }
+        }
+    ]
+}

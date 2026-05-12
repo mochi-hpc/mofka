@@ -1,4 +1,6 @@
 {
-    "partitions":1,
-    "partitions_type":"memory"
+    "num_partitions": 1,
+    "config": {
+        "type": "memory"
+    }
 }

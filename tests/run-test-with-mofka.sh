@@ -3,7 +3,7 @@
 rm -rf /tmp/mofka-logs
 mkdir /tmp/mofka-logs
 
-timeout 300s $@
+timeout 120s $@
 RET=$?
 
 rm -rf /tmp/mofka-logs

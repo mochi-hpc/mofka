@@ -28,7 +28,8 @@ MofkaProducer::MofkaProducer(
         diaspora::MaxNumBatches max_batch,
         diaspora::Ordering ordering,
         std::shared_ptr<MofkaThreadPool> thread_pool,
-        std::shared_ptr<MofkaTopicHandle> topic)
+        std::shared_ptr<MofkaTopicHandle> topic,
+        bool ack_early)
 : m_engine{std::move(engine)}
 , m_name{name}
 , m_batch_size{batch_size}
@@ -37,6 +38,7 @@ MofkaProducer::MofkaProducer(
 , m_thread_pool{std::move(thread_pool)}
 , m_topic(std::move(topic))
 , m_producer_send_batch(m_engine.define("mofka_producer_send_batch"))
+, m_ack_early{ack_early}
 {
     m_batch_queues.resize(m_topic->partitions().size());
 }
@@ -80,7 +82,8 @@ diaspora::Future<std::optional<diaspora::EventID>> MofkaProducer::push(
                             m_name, m_engine,
                             m_topic->m_serializer,
                             partition->m_ph,
-                            m_producer_send_batch);
+                            m_producer_send_batch,
+                            m_ack_early);
             };
             queue = std::make_shared<ActiveProducerBatchQueue>(
                     std::move(create_new_batch),

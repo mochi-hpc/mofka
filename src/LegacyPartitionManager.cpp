@@ -1,0 +1,163 @@
+/*
+ * (C) 2023 The University of Chicago
+ *
+ * See COPYRIGHT in top-level directory.
+ */
+#include "JsonUtil.hpp"
+#include "LegacyPartitionManager.hpp"
+
+#include <diaspora/DataDescriptor.hpp>
+#include <diaspora/BufferWrapperArchive.hpp>
+
+#include <spdlog/spdlog.h>
+#include <numeric>
+#include <iostream>
+
+namespace tl = thallium;
+
+namespace mofka {
+
+MOFKA_REGISTER_PARTITION_MANAGER_WITH_DEPENDENCIES(
+    legacy, LegacyPartitionManager,
+    {"data", "warabi", true, false, false},
+    {"metadata", "yokan", true, false, false});
+
+void LegacyPartitionManager::receiveBatch(
+          const thallium::request& req,
+          const std::string& producer_name,
+          size_t num_events,
+          const BulkRef& metadata_bulk,
+          const BulkRef& data_bulk)
+{
+    (void)producer_name;
+    Result<diaspora::EventID> first_id;
+
+    // --------- asynchronously transfer the data to the DataStore
+    auto future_descriptors = m_data_store->store(num_events, data_bulk);
+
+    // --------- meanwhile transfer the metadata to the EventStore
+    first_id = m_event_store->appendMetadata(num_events, metadata_bulk);
+    if(!first_id.success()) { req.respond(first_id); return; }
+
+    // --------- wait for the data transfers
+    std::vector<diaspora::DataDescriptor> descriptors;
+    try {
+        descriptors = future_descriptors.wait(-1);
+    } catch(const std::exception& ex) {
+        first_id.success() = false;
+        first_id.error() = ex.what();
+        req.respond(first_id);
+        return;
+    }
+
+    // --------- transfer the descriptors
+    auto ok = m_event_store->storeDataDescriptors(first_id.value(), descriptors);
+    if(!ok.success()) {
+        first_id.success() = false;
+        first_id.error() = ok.error();
+        req.respond(first_id);
+        return;
+    }
+
+    wakeUp();
+
+    req.respond(first_id);
+}
+
+void LegacyPartitionManager::wakeUp() {
+    m_event_store->wakeUp();
+}
+
+Result<void> LegacyPartitionManager::feedConsumer(
+    ConsumerHandle consumerHandle,
+    diaspora::BatchSize batchSize) {
+    Result<void> result;
+
+    diaspora::EventID first_id;
+    {
+        auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
+        if(m_consumer_cursor.count(consumerHandle.name()) == 0) {
+            m_consumer_cursor[consumerHandle.name()] = 0;
+        }
+        first_id = m_consumer_cursor[consumerHandle.name()];
+    }
+    m_event_store->feed(consumerHandle, first_id, batchSize);
+
+    return result;
+}
+
+Result<void> LegacyPartitionManager::acknowledge(
+    std::string_view consumer_name,
+    diaspora::EventID event_id) {
+    Result<void> result;
+    auto g = std::unique_lock<thallium::mutex>{m_consumer_cursor_mtx};
+    std::string consumer_name_str{consumer_name.data(), consumer_name.size()};
+    m_consumer_cursor[consumer_name_str] = event_id + 1;
+    return result;
+}
+
+Result<std::vector<Result<void>>> LegacyPartitionManager::getData(
+        const std::vector<diaspora::DataDescriptor>& descriptors,
+        const BulkRef& bulk) {
+    return m_data_store->load(descriptors, bulk);
+}
+
+Result<bool> LegacyPartitionManager::destroy() {
+    Result<bool> result;
+    // TODO wait for all the consumers to be done consuming
+    result.value() = true;
+    return result;
+}
+
+std::unique_ptr<mofka::PartitionManager> LegacyPartitionManager::create(
+        const thallium::engine& engine,
+        const std::string& topic_name,
+        const UUID& partition_uuid,
+        const diaspora::Metadata& config,
+        const bedrock::ResolvedDependencyMap& dependencies) {
+
+    static const nlohmann::json configSchema = R"(
+    {
+        "$schema": "https://json-schema.org/draft/2019-09/schema",
+        "type": "object",
+        "properties":{}
+    }
+    )"_json;
+
+    /* Validate configuration against schema */
+    static JsonSchemaValidator schemaValidator{configSchema};
+    auto validationErrors = schemaValidator.validate(config.json());
+    if(!validationErrors.empty()) {
+        std::string msg = "Error(s) while validating JSON config for LegacyPartitionManager:";
+        for(auto& error : validationErrors) msg += "\n\t" + error;
+        spdlog::error("[mofka] {}", msg);
+        throw diaspora::Exception{msg};
+    }
+
+    /* the data and metadata dependencies are required so we know they are in the map */
+    auto warabi_ph = dependencies.at("data")[0]->getHandle<tl::provider_handle>();
+    auto yokan_ph =  dependencies.at("metadata")[0]->getHandle<tl::provider_handle>();
+
+    /* pool is an optional dependency */
+    tl::pool pool;
+    if(dependencies.count("pool")) {
+        pool = dependencies.at("pool")[0]->getHandle<tl::pool>();
+    } else {
+        pool = engine.get_handler_pool();
+    }
+
+    /* create data store */
+    auto data_store = WarabiDataStore::create(engine, std::move(warabi_ph), pool);
+
+    /* create event store */
+    auto event_store = YokanEventStore::create(engine, topic_name, partition_uuid, std::move(yokan_ph));
+
+    /* create topic manager */
+    return std::unique_ptr<mofka::PartitionManager>(
+        new LegacyPartitionManager(std::move(config),
+                                    std::move(data_store),
+                                    std::move(event_store),
+                                    engine));
+}
+
+}

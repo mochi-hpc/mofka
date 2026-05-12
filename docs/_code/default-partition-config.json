@@ -2,13 +2,12 @@
     "libraries": [
         "libflock-bedrock-module.so",
         "libyokan-bedrock-module.so",
-        "libwarabi-bedrock-module.so",
         "libabt-io-bedrock-module.so",
         "libmofka-bedrock-module.so"
     ],
     "providers": [
         {
-            "name" : "group_manager",
+            "name" : "my_group_manager",
             "type" : "flock",
             "provider_id" : 1,
             "config": {
@@ -20,20 +19,18 @@
             }
         },
         {
-            "name": "master_database",
+            "name": "master",
             "provider_id": 2,
             "type": "yokan",
             "tags" : [ "mofka:master" ],
             "config" : {
-                "database" : {
-                    "type": "map"
-                }
+                "database" : { "type": "map" }
             }
         },
         {
-            "name" : "io_controller",
-            "type" : "abt_io",
-            "provider_id" : 3,
+            "name": "my_abt_io",
+            "provider_id": 3,
+            "type": "abt_io",
             "config" : {},
             "dependencies": {
                 "pool": "__primary__"

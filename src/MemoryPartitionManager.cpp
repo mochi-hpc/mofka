@@ -13,13 +13,14 @@ namespace mofka {
 
 MOFKA_REGISTER_PARTITION_MANAGER(memory, MemoryPartitionManager);
 
-Result<diaspora::EventID> MemoryPartitionManager::receiveBatch(
-          const thallium::endpoint& sender,
+void MemoryPartitionManager::receiveBatch(
+          const thallium::request& req,
           const std::string& producer_name,
           size_t num_events,
           const BulkRef& metadata_bulk,
           const BulkRef& data_bulk)
 {
+    auto sender = req.get_endpoint();
     (void)producer_name;
     Result<diaspora::EventID> result;
     diaspora::EventID first_id;
@@ -107,7 +108,7 @@ Result<diaspora::EventID> MemoryPartitionManager::receiveBatch(
     }
     m_events_cv.notify_all();
     result.value() = first_id;
-    return result;
+    req.respond(result);
 }
 
 void MemoryPartitionManager::wakeUp() {

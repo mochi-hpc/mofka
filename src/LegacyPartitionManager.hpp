@@ -3,50 +3,27 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef MEMORY_PARTITION_MANAGER_HPP
-#define MEMORY_PARTITION_MANAGER_HPP
+#ifndef LEGACY_TOPIC_MANAGER_HPP
+#define LEGACY_TOPIC_MANAGER_HPP
 
+#include <mofka/UUID.hpp>
 #include "PartitionManager.hpp"
-#include <diaspora/DataDescriptor.hpp>
+#include "WarabiDataStore.hpp"
+#include "YokanEventStore.hpp"
 
 namespace mofka {
 
 /**
- * Memory implementation of a mofka PartitionManager.
+ * Legacy implementation of a mofka PartitionManager.
  */
-class MemoryPartitionManager : public mofka::PartitionManager {
-
-    struct OffsetSize {
-
-        size_t offset;
-        size_t size;
-
-        std::string_view toString() const {
-            return std::string_view{reinterpret_cast<const char*>(this), sizeof(*this)};
-        }
-
-        void fromDataDescriptor(const diaspora::DataDescriptor& desc) {
-            std::memcpy(&offset, desc.location().data(), sizeof(offset));
-            std::memcpy(&size, desc.location().data() + sizeof(offset), sizeof(size));
-        }
-    };
+class LegacyPartitionManager : public mofka::PartitionManager {
 
     diaspora::Metadata m_config;
 
-    thallium::engine m_engine;
+    std::unique_ptr<WarabiDataStore> m_data_store;
+    std::unique_ptr<YokanEventStore> m_event_store;
 
-    std::vector<char>            m_events_metadata;
-    std::vector<size_t>          m_events_metadata_offsets;
-    std::vector<size_t>          m_events_metadata_sizes;
-    std::vector<char>            m_events_data;
-    std::vector<size_t>          m_events_data_offsets;
-    std::vector<size_t>          m_events_data_sizes;
-    std::vector<char>            m_events_data_desc;
-    std::vector<size_t>          m_events_data_desc_offsets;
-    std::vector<size_t>          m_events_data_desc_sizes;
-    thallium::mutex              m_events_metadata_mtx;
-    thallium::mutex              m_events_data_mtx;
-    thallium::condition_variable m_events_cv;
+    thallium::engine m_engine;
 
     std::unordered_map<std::string, diaspora::EventID> m_consumer_cursor;
     thallium::mutex                                    m_consumer_cursor_mtx;
@@ -56,36 +33,40 @@ class MemoryPartitionManager : public mofka::PartitionManager {
     /**
      * @brief Constructor.
      */
-    MemoryPartitionManager(
+    LegacyPartitionManager(
         const diaspora::Metadata& config,
+        std::unique_ptr<WarabiDataStore> data_store,
+        std::unique_ptr<YokanEventStore> event_store,
         thallium::engine engine)
     : m_config(config)
+    , m_data_store(std::move(data_store))
+    , m_event_store(std::move(event_store))
     , m_engine(engine) {}
 
     /**
      * @brief Move-constructor.
      */
-    MemoryPartitionManager(MemoryPartitionManager&&) = default;
+    LegacyPartitionManager(LegacyPartitionManager&&) = default;
 
     /**
      * @brief Copy-constructor.
      */
-    MemoryPartitionManager(const MemoryPartitionManager&) = delete;
+    LegacyPartitionManager(const LegacyPartitionManager&) = delete;
 
     /**
      * @brief Move-assignment operator.
      */
-    MemoryPartitionManager& operator=(MemoryPartitionManager&&) = default;
+    LegacyPartitionManager& operator=(LegacyPartitionManager&&) = default;
 
     /**
      * @brief Copy-assignment operator.
      */
-    MemoryPartitionManager& operator=(const MemoryPartitionManager&) = delete;
+    LegacyPartitionManager& operator=(const LegacyPartitionManager&) = delete;
 
     /**
      * @brief Destructor.
      */
-    virtual ~MemoryPartitionManager() = default;
+    virtual ~LegacyPartitionManager() = default;
 
     /**
      * @brief Receives a batch.
@@ -133,11 +114,11 @@ class MemoryPartitionManager : public mofka::PartitionManager {
 
     /**
      * @brief Static factory function used by the TopicFactory to
-     * create a MemoryPartitionManager.
+     * create a LegacyPartitionManager.
      *
-     * @param engine Thallium engine
-     * @param topic_name Topic name
-     * @param partition_uuid Partition UUID
+     * @param engine Thallium engine.
+     * @param topic_name Topic name.
+     * @param partition_uuid Partition UUID..
      * @param config Metadata configuration for the manager.
      * @param dependencies Dependencies provided by Bedrock.
      *

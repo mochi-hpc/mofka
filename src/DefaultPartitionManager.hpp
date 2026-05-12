@@ -3,134 +3,385 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef DEFAULT_TOPIC_MANAGER_HPP
-#define DEFAULT_TOPIC_MANAGER_HPP
+#ifndef DEFAULT_PARTITION_MANAGER_HPP
+#define DEFAULT_PARTITION_MANAGER_HPP
 
-#include <mofka/UUID.hpp>
 #include "PartitionManager.hpp"
-#include "WarabiDataStore.hpp"
-#include "YokanEventStore.hpp"
+#include <diaspora/DataDescriptor.hpp>
+#include <thallium/bulk_buffer.hpp>
+#include <thallium/bulk_buffer_pool.hpp>
+#include <abt-io.h>
+#include <fcntl.h>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string>
+#include <deque>
+#include <list>
+#include <memory>
+#include <algorithm>
+#include <unordered_map>
 
 namespace mofka {
 
+struct DefaultPartitionManagerOptions {
+    std::string        path;
+    size_t             max_chunk_size             = 64 * 1024 * 1024;
+    size_t             max_events_per_chunk       = 1000000;
+    bool               sync                       = true;
+    abt_io_instance_id abt_io                     = ABT_IO_INSTANCE_NULL;
+
+    size_t             metadata_pool_num_tiers    = 1;
+    size_t             metadata_pool_num_buffers  = 0;
+    size_t             metadata_pool_first_size   = 64 * 1024;
+    float              metadata_pool_size_multiple = 4.0f;
+
+    size_t             data_pool_num_tiers        = 1;
+    size_t             data_pool_num_buffers      = 0;
+    size_t             data_pool_first_size       = 64 * 1024 * 1024;
+    float              data_pool_size_multiple    = 4.0f;
+
+    size_t             consumer_metadata_pool_num_tiers    = 1;
+    size_t             consumer_metadata_pool_num_buffers  = 0;
+    size_t             consumer_metadata_pool_first_size   = 64 * 1024;
+    float              consumer_metadata_pool_size_multiple = 4.0f;
+
+    size_t             consumer_desc_pool_num_tiers        = 1;
+    size_t             consumer_desc_pool_num_buffers      = 0;
+    size_t             consumer_desc_pool_first_size       = 4 * 1024;
+    float              consumer_desc_pool_size_multiple    = 4.0f;
+
+    size_t             fd_cache_capacity                   = 64;
+};
+
 /**
- * Default implementation of a mofka PartitionManager.
+ * Default file-based implementation of a mofka PartitionManager.
+ * Stores events in append-only chunk files using ABT-IO.
  */
 class DefaultPartitionManager : public mofka::PartitionManager {
 
-    diaspora::Metadata m_config;
+    public:
 
-    std::unique_ptr<WarabiDataStore> m_data_store;
-    std::unique_ptr<YokanEventStore> m_event_store;
+    struct IndexRecord {
+        uint64_t metadata_offset;
+        uint32_t metadata_size;
+        uint64_t data_offset;
+        uint32_t data_size;
+        uint64_t data_desc_offset;
+        uint32_t data_desc_size;
+    };
 
-    thallium::engine m_engine;
+    struct FileDataDescriptor {
+        uint32_t chunk_id;
+        uint64_t offset;
+        uint32_t size;
 
+        std::string_view toString() const {
+            return std::string_view{reinterpret_cast<const char*>(this), sizeof(*this)};
+        }
+
+        static FileDataDescriptor fromDataDescriptor(const diaspora::DataDescriptor& desc) {
+            FileDataDescriptor fdd;
+            std::memcpy(&fdd, desc.location().data(), sizeof(fdd));
+            return fdd;
+        }
+    };
+
+    private:
+
+    // LRU cache of open read-only file descriptors, keyed by path.
+    struct FDCache {
+        // Each open file is reference-counted via shared_ptr. The fd is closed
+        // only when both the cache and all outstanding FDGuards release it.
+        struct Entry {
+            std::string path;
+            int         fd = -1;
+            Entry(std::string p, int f) noexcept : path(std::move(p)), fd(f) {}
+            Entry(const Entry&) = delete;
+            Entry& operator=(const Entry&) = delete;
+            Entry(Entry&&) = delete;
+            Entry& operator=(Entry&&) = delete;
+            ~Entry() noexcept { if(fd >= 0) ::close(fd); }
+        };
+        using EntryPtr = std::shared_ptr<Entry>;
+
+        size_t                                                          m_capacity = 0;
+        abt_io_instance_id                                              m_abt_io = ABT_IO_INSTANCE_NULL;
+        std::list<EntryPtr>                                             m_lru;
+        std::unordered_map<std::string, std::list<EntryPtr>::iterator>  m_map;
+        thallium::mutex                                                 m_mtx;
+
+        FDCache() = default;
+        FDCache(abt_io_instance_id ai, size_t capacity)
+        : m_capacity(capacity), m_abt_io(ai) {}
+
+        FDCache(const FDCache&) = delete;
+        FDCache& operator=(const FDCache&) = delete;
+        FDCache(FDCache&&) = delete;
+        FDCache& operator=(FDCache&&) = delete;
+
+        ~FDCache() noexcept { close_all(); }
+
+        // Returns a shared_ptr to the entry. The caller must keep it alive
+        // for the duration of any in-flight abt_io_pread_nb ops on entry->fd.
+        // Eviction only occurs when use_count == 1 (cache is sole owner).
+        EntryPtr get(const std::string& path) {
+            auto g = std::unique_lock<thallium::mutex>{m_mtx};
+            auto it = m_map.find(path);
+            if(it != m_map.end()) {
+                m_lru.splice(m_lru.begin(), m_lru, it->second);
+                return *it->second;
+            }
+            int fd = abt_io_open(m_abt_io, path.c_str(), O_RDONLY, 0);
+            if(fd < 0) return {};
+            while(m_lru.size() >= m_capacity) {
+                bool evicted = false;
+                for(auto eit = m_lru.rbegin(); eit != m_lru.rend(); ++eit) {
+                    if((*eit).use_count() == 1) {
+                        m_map.erase((*eit)->path);
+                        m_lru.erase(std::next(eit).base());
+                        evicted = true;
+                        break;
+                    }
+                }
+                if(!evicted) break;  // all slots in-use; allow temporary growth
+            }
+            auto entry = std::make_shared<Entry>(path, fd);
+            m_lru.push_front(entry);
+            m_map[path] = m_lru.begin();
+            return entry;
+        }
+
+        void close_all() noexcept {
+            auto g = std::unique_lock<thallium::mutex>{m_mtx};
+            // Drop the cache's strong refs. Entries held by FDGuards remain
+            // alive until those guards are destroyed; their fd is then closed
+            // by Entry::~Entry().
+            m_lru.clear();
+            m_map.clear();
+        }
+    };
+
+    // Resolved configuration (with defaults filled in), published via getConfig()
+    diaspora::Metadata  m_config;
+
+    // Config
+    std::string         m_path;
+    size_t              m_max_chunk_size;
+    size_t              m_max_events_per_chunk;
+    bool                m_sync;
+
+    // ABT-IO
+    abt_io_instance_id  m_abt_io;
+
+    // File descriptor cache
+    FDCache             m_fd_cache;
+
+    // Engine
+    thallium::engine    m_engine;
+
+    // Buffer pools for incoming producer RDMA transfers (write_only)
+    thallium::bulk_buffer_pool<> m_metadata_buffer_pool;
+    thallium::bulk_buffer_pool<> m_data_buffer_pool;
+
+    // Buffer pools for outgoing consumer RDMA transfers (read_only)
+    thallium::bulk_buffer_pool<> m_consumer_metadata_buffer_pool;
+    thallium::bulk_buffer_pool<> m_consumer_desc_buffer_pool;
+
+    // Current chunk write state
+    uint32_t            m_current_chunk_id = 0;
+    int                 m_fd_meta = -1;
+    int                 m_fd_data = -1;
+    int                 m_fd_desc = -1;
+    int                 m_fd_idx  = -1;
+    uint64_t            m_meta_offset = 0;
+    uint64_t            m_data_offset = 0;
+    uint64_t            m_desc_offset = 0;
+    size_t              m_events_in_current_chunk = 0;
+
+    // In-memory index cache — protected by m_index_mtx
+    std::vector<IndexRecord>  m_index;
+    std::vector<uint32_t>     m_event_chunk_ids;
+    thallium::mutex           m_index_mtx;
+
+    // Event tracking
+    size_t                       m_assigned_events = 0; // IDs handed out (may not yet be written)
+    size_t                       m_total_events = 0;    // events written and available to consumers — protected by m_events_mtx
+    thallium::mutex              m_events_mtx;
+    thallium::condition_variable m_events_cv;
+
+    // Consumer cursors
     std::unordered_map<std::string, diaspora::EventID> m_consumer_cursor;
     thallium::mutex                                    m_consumer_cursor_mtx;
 
+    // Encapsulates the arguments of a receiveBatch call.
+    struct PushOperation {
+
+        enum class State : uint8_t {
+            submitted,
+            assigned,
+            transfers_started,
+            transfers_completed,
+            stored
+        };
+
+        DefaultPartitionManager&     m_manager;
+        thallium::request            m_req;
+        std::string                  m_producer_name;
+        size_t                       m_num_events;
+        BulkRef                      m_remote_metadata_bulk;
+        BulkRef                      m_remote_data_bulk;
+        // Buffers populated by startTransfers
+        thallium::bulk_buffer<>                      m_metadata_buffer;
+        std::span<size_t>                            m_metadata_sizes;
+        std::span<char>                              m_metadata_content;
+        thallium::bulk_buffer<>                      m_data_buffer;
+        std::span<size_t>                            m_data_sizes;
+        std::span<char>                              m_data_content;
+        std::optional<thallium::async_bulk_op>       m_metadata_async_op;
+        std::optional<thallium::async_bulk_op>       m_data_async_op;
+        diaspora::EventID            m_first_id = 0;
+        State                        m_state = State::submitted;
+        bool                         m_responded = false;
+        thallium::mutex              m_state_mtx;
+        thallium::condition_variable m_state_cv;
+
+        PushOperation(DefaultPartitionManager& manager,
+                      const thallium::request& req,
+                      const std::string& producer_name,
+                      size_t num_events,
+                      const BulkRef& metadata_bulk,
+                      const BulkRef& data_bulk)
+        : m_manager(manager)
+        , m_req(req)
+        , m_producer_name(producer_name)
+        , m_num_events(num_events)
+        , m_remote_metadata_bulk(metadata_bulk)
+        , m_remote_data_bulk(data_bulk)
+        {}
+
+        size_t metadataContentSize() const { return m_remote_metadata_bulk.size - m_num_events * sizeof(size_t); }
+        size_t dataContentSize()     const { return m_remote_data_bulk.size     - m_num_events * sizeof(size_t); }
+
+        void changeState(State new_state) {
+            auto g = std::unique_lock<thallium::mutex>{m_state_mtx};
+            if(new_state <= m_state) return;
+            m_state = new_state;
+            m_state_cv.notify_all();
+        }
+
+        void sendResponse(Result<diaspora::EventID> result) {
+            if(m_responded) return;
+            m_responded = true;
+            m_req.respond(result);
+        }
+
+        void waitState(State expected) {
+            auto g = std::unique_lock<thallium::mutex>{m_state_mtx};
+            m_state_cv.wait(g, [this, expected]() { return m_state >= expected; });
+        }
+
+        void assignFirstID() {
+            m_first_id = m_manager.m_assigned_events;
+            m_manager.m_assigned_events += m_num_events;
+            changeState(State::assigned);
+        }
+
+        void startTransfers();
+        void waitTransfers();
+        void writeToFiles();
+    };
+
+    // Write queue
+    std::deque<std::shared_ptr<PushOperation>> m_write_queue;
+    thallium::mutex                            m_write_queue_mtx;
+    thallium::condition_variable               m_write_queue_cv;
+    bool                                       m_stop = false;
+    thallium::managed<thallium::thread>        m_write_ult;
+
+    void writeLoop();
+
+    // RAII handle for a batch of in-flight abt_io_pread_nb operations.
+    struct PendingReads {
+        abt_io_instance_id              m_abt_io = ABT_IO_INSTANCE_NULL;
+        std::vector<abt_io_op_t*>       m_ops;
+        std::vector<ssize_t>            m_rets;     // stable pointers after reserve()
+        std::vector<FDCache::EntryPtr>  m_entries;  // keeps fds alive until wait()
+
+        PendingReads() = default;
+        explicit PendingReads(abt_io_instance_id ai) : m_abt_io(ai) {}
+        PendingReads(PendingReads&&) = default;
+        PendingReads& operator=(PendingReads&&) = default;
+        PendingReads(const PendingReads&) = delete;
+        PendingReads& operator=(const PendingReads&) = delete;
+        ~PendingReads() noexcept { wait(); }
+
+        void wait() {
+            for(auto* op : m_ops) { abt_io_op_wait(op); abt_io_op_free(op); }
+            m_ops.clear();
+            m_rets.clear();
+            m_entries.clear();
+        }
+    };
+
+    // Helpers
+    std::string chunkPath(uint32_t chunk_id, const std::string& ext) const;
+    void openChunk(uint32_t chunk_id);
+    void closeCurrentChunk();
+    void rotateChunk();
+    bool shouldRotate() const;
+
+    PendingReads readMetadataFromDisk(diaspora::EventID first_id, size_t count,
+                                       size_t* sizes_out, char* content_out);
+    PendingReads readDescriptorsFromDisk(diaspora::EventID first_id, size_t count,
+                                          size_t* sizes_out, char* content_out);
+    void readDataFromDisk(const std::vector<diaspora::DataDescriptor>& descriptors,
+                          char* buffer, size_t total_size,
+                          std::vector<Result<void>>& results);
+
     public:
 
-    /**
-     * @brief Constructor.
-     */
-    DefaultPartitionManager(
-        const diaspora::Metadata& config,
-        std::unique_ptr<WarabiDataStore> data_store,
-        std::unique_ptr<YokanEventStore> event_store,
-        thallium::engine engine)
-    : m_config(config)
-    , m_data_store(std::move(data_store))
-    , m_event_store(std::move(event_store))
-    , m_engine(engine) {}
+    DefaultPartitionManager(thallium::engine engine,
+                             DefaultPartitionManagerOptions opts);
 
-    /**
-     * @brief Move-constructor.
-     */
-    DefaultPartitionManager(DefaultPartitionManager&&) = default;
-
-    /**
-     * @brief Copy-constructor.
-     */
+    DefaultPartitionManager(DefaultPartitionManager&&) = delete;
     DefaultPartitionManager(const DefaultPartitionManager&) = delete;
-
-    /**
-     * @brief Move-assignment operator.
-     */
-    DefaultPartitionManager& operator=(DefaultPartitionManager&&) = default;
-
-    /**
-     * @brief Copy-assignment operator.
-     */
+    DefaultPartitionManager& operator=(DefaultPartitionManager&&) = delete;
     DefaultPartitionManager& operator=(const DefaultPartitionManager&) = delete;
 
-    /**
-     * @brief Destructor.
-     */
-    virtual ~DefaultPartitionManager() = default;
+    virtual ~DefaultPartitionManager();
 
-    /**
-     * @brief Receives a batch.
-     */
-    Result<diaspora::EventID> receiveBatch(
-            const thallium::endpoint& sender,
+    void receiveBatch(
+            const thallium::request& req,
             const std::string& producer_name,
             size_t num_events,
             const BulkRef& metadata_bulk,
             const BulkRef& data_bulk) override;
 
-    /**
-     * @brief Wake up the PartitionManager's blocked ConsumerHandles.
-     */
     void wakeUp() override;
 
-    /**
-     * @see PartitionManager::feedConsumer.
-     */
     Result<void> feedConsumer(
             ConsumerHandle consumerHandle,
             diaspora::BatchSize batchSize) override;
 
-    /**
-     * @see PartitionManager::acknowledge.
-     */
     Result<void> acknowledge(
           std::string_view consumer_name,
           diaspora::EventID event_id) override;
 
-    /**
-     * @see PartitionManager::getData.
-     */
     Result<std::vector<Result<void>>> getData(
           const std::vector<diaspora::DataDescriptor>& descriptors,
           const BulkRef& bulk) override;
 
-    /**
-     * @brief Destroys the underlying topic.
-     *
-     * @return a Result<bool> instance indicating
-     * whether the database was successfully destroyed.
-     */
-    mofka::Result<bool> destroy() override;
+    Result<bool> destroy() override;
 
-    /**
-     * @brief Static factory function used by the TopicFactory to
-     * create a DefaultPartitionManager.
-     *
-     * @param engine Thallium engine.
-     * @param topic_name Topic name.
-     * @param partition_uuid Partition UUID..
-     * @param config Metadata configuration for the manager.
-     * @param dependencies Dependencies provided by Bedrock.
-     *
-     * @return a unique_ptr to a PartitionManager.
-     */
+    diaspora::Metadata getConfig() const override { return m_config; }
+
     static std::unique_ptr<mofka::PartitionManager> create(
         const thallium::engine& engine,
         const std::string& topic_name,
         const UUID& partition_uuid,
         const diaspora::Metadata& config,
         const bedrock::ResolvedDependencyMap& dependencies);
-
 };
 
 }

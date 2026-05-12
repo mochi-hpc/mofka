@@ -16,18 +16,11 @@ RPC and RDMA library and a high level of on-node concurrency using
 
 Mofka follows the
 `Diaspora Streaming API <https://github.com/diaspora-project/diaspora-stream-api>`_,
-a C++ and Python API for developing streaming systems for HPC. The present documentation
-is as much about the Diaspora Streaming API as it is about Mofka.
-
-One of the particularities of this API is that it
-splits events into two parts: a **data** part, referencing potentially large, raw data,
-and a **metadata** part, which consists of structured information about the data
-(usually expressed in JSON).
-This separation allows the system to optimize independently the data and metadata
-transfers, for instance by relying on zero-copy mechanisms, RDMA, or batching.
-This interface is also often more adapted to HPC applications, which manipulate
-large datasets and their metadata.
-
+a C++ and Python API for using and developing streaming systems for HPC.
+Client applications (producers and consumers) using Mofka should refer to
+its `documentation <https://diaspora-stream-api.readthedocs.io/>`_.
+The present documentation only covers the configuration of the Mofka engine
+and the use of the Mofka driver for the Diaspora Stream API.
 
 .. toctree::
    :maxdepth: 2
@@ -35,11 +28,8 @@ large datasets and their metadata.
 
    usage/installation.rst
    usage/quickstart.rst
-   usage/topics.rst
-   usage/producer.rst
-   usage/consumer.rst
-   usage/deployment.rst
-   usage/restarting.rst
+   usage/advanced.rst
+   usage/architecture.rst
 
 
 Indices and tables

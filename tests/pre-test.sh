@@ -21,6 +21,12 @@ disown $BEDROCK_PID
 
 echo "==> Waiting for mofka.json to appear..."
 while [ ! -f "mofka.json" ]; do
+    if ! kill -0 "$BEDROCK_PID" 2>/dev/null; then
+        echo "==> Bedrock (PID ${BEDROCK_PID}) exited before mofka.json appeared" >&2
+        echo "==> mofka.err:" >&2
+        cat mofka.err >&2
+        exit 1
+    fi
     sleep 1
 done
 

@@ -86,8 +86,8 @@ class PartitionManager {
      *
      * @return a Result containing the result.
      */
-    virtual Result<diaspora::EventID> receiveBatch(
-        const thallium::endpoint& sender,
+    virtual void receiveBatch(
+        const thallium::request& req,
         const std::string& producer_name,
         size_t num_events,
         const BulkRef& metadata_bulk,
@@ -142,6 +142,19 @@ class PartitionManager {
      * whether the database was successfully destroyed.
      */
     virtual Result<bool> destroy() = 0;
+
+    /**
+     * @brief Return the effective configuration of this partition manager,
+     * including any defaults the implementation filled in. The provider
+     * uses this to publish the resolved config (so e.g. bedrock-query
+     * shows the actual values in use).
+     *
+     * The default implementation returns an empty object, in which case
+     * the provider leaves its stored partition config untouched.
+     */
+    virtual diaspora::Metadata getConfig() const {
+        return diaspora::Metadata{nlohmann::json::object()};
+    }
 
 };
 

@@ -1,9 +1,12 @@
 {
-    "partitions":1,
-    "partitions_type":"default",
-    "partitions_config": {},
-    "partitions_dependencies": {
-        "metadata": "metadata@local",
-        "data": "data@local"
+    "num_partitions": 1,
+    "config": {
+        "type": "default",
+        "partition": {
+            "path": "/tmp/mofka-default-test"
+        }
+    },
+    "dependencies": {
+        "io_controller": "my_abt_io"
     }
 }

@@ -86,6 +86,16 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
             partition_type, get_engine(), m_topic, m_uuid,
             partition_config, dependencies);
 
+        /* Update m_config["partition"] with the manager's effective config
+         * (with defaults filled in), so bedrock-query reflects what's
+         * actually in use. Skip if the manager returned an empty object. */
+        auto resolved = m_partition_manager->getConfig().json();
+        if(resolved.is_object() && !resolved.empty()) {
+            auto cfg_json = m_config.json();
+            cfg_json["partition"] = std::move(resolved);
+            m_config = diaspora::Metadata{std::move(cfg_json)};
+        }
+
         spdlog::trace("[mofka:{0}] Registered provider {1} with uuid {0}", id(), m_uuid.to_string());
     }
 
@@ -109,9 +119,10 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
         /* Validate configuration against schema */
         auto errors = jsonValidator.validate(config.json());
         if(!errors.empty()) {
-            spdlog::error("[mofka] Error(s) while validating JSON config for provider:");
-            for(auto& error : errors) spdlog::error("[mofka] \t{}", error);
-            throw diaspora::Exception{"Error(s) while validating JSON config for provider"};
+            std::string msg = "Error(s) while validating JSON config for provider:";
+            for(auto& error : errors) msg += "\n\t" + error;
+            spdlog::error("[mofka] {}", msg);
+            throw diaspora::Exception{msg};
         }
     }
 
@@ -126,18 +137,24 @@ class ProviderImpl : public tl::provider<ProviderImpl> {
     void receiveBatch(const tl::request& req,
                       const std::string& producer_name,
                       size_t count,
+                      bool ack_early_requested,
                       const BulkRef& metadata,
                       const BulkRef& data) {
-        spdlog::trace("[mofka:{}] Received receiveBatch request (topic: {}, count:{})", id(), m_topic, count);
+        spdlog::trace("[mofka:{}] Received receiveBatch request (topic: {}, count:{}, ack_early:{})",
+                      id(), m_topic, count, ack_early_requested);
         Result<diaspora::EventID> result;
-        tl::auto_respond<decltype(result)> ensureResponse(req, result);
+        if(!m_partition_manager) {
+            result.error() = "No partition manager attached to this provider";
+            result.success() = false;
+            req.respond(result);
+            return;
+        }
         try {
-            ENSURE_VALID_PARTITION_MANAGER(result);
-            result = m_partition_manager->receiveBatch(
-                req.get_endpoint(), producer_name, count, metadata, data);
+            m_partition_manager->receiveBatch(req, producer_name, count, metadata, data);
         } catch(const std::exception& ex) {
             result.error() = ex.what();
             result.success() = false;
+            req.respond(result);
         }
         spdlog::trace("[mofka:{}] Done executing receiveBatch", id());
     }

@@ -24,10 +24,13 @@ def add(
                               help="Pool for the partition manager to use")] = "__primary__",
         metadata: Annotated[
             str, typer.Option("-m", "--metadata",
-                              help="Metadata provider (default partition manager only)")] = "",
+                              help="Metadata provider (legacy partition manager only)")] = "",
         data: Annotated[
             str, typer.Option("-d", "--data",
-                              help="Data provider (default partition manager only)")] = "",
+                              help="Data provider (legacy partition manager only)")] = "",
+        abt_io: Annotated[
+            str, typer.Option("--abt-io",
+                              help="ABT-IO instance locator (default partition manager only)")] = "",
         groupfile: Annotated[
             str, typer.Option("-g", "--groupfile",
                               help="Flock group file of the service")] = "./mofka.json"
@@ -61,22 +64,30 @@ def add(
                     topic_name=name,
                     server_rank=rank,
                     pool_name=pool)
-            elif type == "default":
-                service.add_default_partition(
+            elif type == "legacy":
+                service.add_legacy_partition(
                     topic_name=name,
                     server_rank=rank,
                     metadata_provider=metadata,
                     data_provider=data,
                     partition_config=partition_config,
                     pool_name=pool)
-            else:
+            elif type == "default":
                 service.add_default_partition(
+                    topic_name=name,
+                    server_rank=rank,
+                    abt_io_instance=abt_io,
+                    partition_config=partition_config,
+                    pool_name=pool)
+            else:
+                if pool and "pool" not in partition_dependencies:
+                    partition_dependencies["pool"] = pool
+                service.add_custom_partition(
                     topic_name=name,
                     server_rank=rank,
                     partition_type=type,
                     partition_config=partition_config,
-                    dependencies=partition_dependencies,
-                    pool_name=pool)
+                    dependencies=partition_dependencies)
         except ClientException as err:
             print(f"Error: {err}")
             del service

@@ -13,6 +13,7 @@
 #include <diaspora/PartitionSelector.hpp>
 #include <diaspora/Metadata.hpp>
 #include <diaspora/Driver.hpp>
+#include <mofka/UUID.hpp>
 
 #include <yokan/cxx/database.hpp>
 #include <yokan/cxx/collection.hpp>
@@ -144,7 +145,7 @@ class MofkaDriver : public diaspora::DriverInterface,
     /**
      * @brief Create a Yokan provider on the target server, returning the
      * name an address of the provider in a form that can be passed to
-     * addDefaultPartition.
+     * addLegacyPartition.
      *
      * If the configuration is not provided, an in-memory map database
      * will be used. Otherwise, the config parameter should be a Metadata containing
@@ -176,7 +177,7 @@ class MofkaDriver : public diaspora::DriverInterface,
     /**
      * @brief Create a Warabi provider on the target server, returning the
      * name an address of the provider in a form that can be passed to
-     * addDefaultPartition.
+     * addLegacyPartition.
      *
      * If the configuration is not provided, an in-memory target
      * will be used. Otherwise, the config parameter should be a Metadata containing
@@ -221,11 +222,11 @@ class MofkaDriver : public diaspora::DriverInterface,
                             std::string_view partition_type = "memory",
                             const diaspora::Metadata& partition_config = diaspora::Metadata{"{}"},
                             const Dependencies& dependencies = {},
-                            std::string_view pool_name = "");
+                            const UUID& partition_uuid = {});
 
     /**
      * @brief Add an in-memory partition. Full in-memory partitions are useful
-     * for testing, but in general we advise using addDefaultPartition to add
+     * for testing, but in general we advise using addLegacyPartition to add
      * a partition that is backed up by Yokan and Warabi providers for Metadata
      * and Data storage respectively.
      *
@@ -235,10 +236,11 @@ class MofkaDriver : public diaspora::DriverInterface,
      */
     void addMemoryPartition(std::string_view topic_name,
                             size_t server_rank,
-                            std::string_view pool_name = "");
+                            std::string_view pool_name = "",
+                            const UUID& partition_uuid = {});
 
     /**
-     * @brief Add a partition backed by Mofka' default partition manager implementation.
+     * @brief Add a partition backed by Mofka' legacy partition manager implementation.
      * This partition manager uses a Yokan provider for Metadata storage and a Warabi
      * provider for Data storage.
      *
@@ -249,12 +251,32 @@ class MofkaDriver : public diaspora::DriverInterface,
      * @param partition_config Configuration for the partition.
      * @param pool_name Pool name in the server.
      */
-    void addDefaultPartition(std::string_view topic_name,
+    void addLegacyPartition(std::string_view topic_name,
                              size_t server_rank,
                              std::string_view metadata_provider = {},
                              std::string_view data_provider = {},
                              const diaspora::Metadata& config = {},
-                             std::string_view pool_name = "");
+                             std::string_view pool_name = "",
+                             const UUID& partition_uuid = {});
+
+    /**
+     * @brief Add a partition backed by Mofka's default partition manager.
+     * This partition manager stores events in append-only log files using
+     * ABT-IO for I/O operations.
+     *
+     * @param topic_name Topic name.
+     * @param server_rank Rank of the server.
+     * @param abt_io_instance Locator of the ABT-IO instance (e.g. "my_abt_io@local").
+     *                        If empty, searches for an ABT-IO component in the server.
+     * @param config Partition configuration (path, max_chunk_size, etc.).
+     * @param pool_name Pool name in the server.
+     */
+    void addDefaultPartition(std::string_view topic_name,
+                             size_t server_rank,
+                             std::string_view abt_io_instance = {},
+                             const diaspora::Metadata& config = {},
+                             std::string_view pool_name = "",
+                             const UUID& partition_uuid = {});
 
 };
 

@@ -2,7 +2,7 @@
 # See COPYRIGHT in top-level directory.
 cmake_minimum_required (VERSION 3.21)
 project (mofka C CXX)
-set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 enable_testing ()
 
@@ -84,6 +84,8 @@ find_package (warabi REQUIRED)
 find_package (yokan REQUIRED)
 # search for flock
 find_package (flock REQUIRED)
+# search for abt-io
+pkg_check_modules (abt_io REQUIRED IMPORTED_TARGET abt-io)
 
 if (ENABLE_PYTHON)
     find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
@@ -92,7 +94,6 @@ if (ENABLE_PYTHON)
 endif ()
 
 add_subdirectory (src)
-add_subdirectory (docs/_code)
 add_subdirectory (example)
 
 if (${ENABLE_TESTS})
