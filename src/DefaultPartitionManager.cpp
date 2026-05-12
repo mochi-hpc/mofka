@@ -450,8 +450,10 @@ Result<void> DefaultPartitionManager::feedConsumer(
         }
         if(stop_with_no_events) {
             if(prev_future) prev_future.wait(-1);
-            consumerHandle.feed(
-                0, diaspora::NoMoreEvents, BulkRef{}, BulkRef{}, BulkRef{}, BulkRef{});
+            // The consumer has unsubscribed (m_should_stop is only ever set
+            // by removeConsumer). Don't send a final NoMoreEvents recvBatch:
+            // the client is already tearing down and a late RPC racing
+            // engine finalize causes a segfault in margo cleanup.
             return result;
         }
 
