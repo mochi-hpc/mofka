@@ -73,6 +73,8 @@ struct Promise {
                 clock_gettime(CLOCK_REALTIME, &now);
                 deadline = now;
                 deadline.tv_nsec += timeout_ms*1000*1000;
+                deadline.tv_sec  += deadline.tv_nsec / 1'000'000'000;
+                deadline.tv_nsec %= 1'000'000'000;
                 while(!m_is_set
                     && (now.tv_sec < deadline.tv_sec
                         || (now.tv_sec == deadline.tv_sec && now.tv_nsec < deadline.tv_nsec))) {
