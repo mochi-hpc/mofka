@@ -458,12 +458,13 @@ std::unordered_map<std::string, diaspora::Metadata> MofkaDriver::listTopics() co
         keys[i].resize(4096);
         keyptrs[i] = keys[i].data();
     }
+    std::string prefix{"MOFKA:GLOBAL:"};
     std::string from_key = "";
     try {
         while(true) {
             m_yk_master_db.listKeys(
                     from_key.c_str(), from_key.size(),
-                    "MOFKA:GLOBAL:", 13,
+                    prefix.data(), prefix.size(),
                     48, keyptrs.data(), ksizes.data(),
                     YOKAN_MODE_DEFAULT);
             for(size_t i = 0; i < 48; ++i) {
@@ -471,7 +472,7 @@ std::unordered_map<std::string, diaspora::Metadata> MofkaDriver::listTopics() co
                     goto done;
                 auto& key = keys[i];
                 auto k = std::string{key.data(), ksizes[i]};
-                auto s = k.substr(13);
+                auto s = k.substr(prefix.size());
                 s = s.substr(0, s.find(':'));
                 result[s]; // TODO add metadata
             }
