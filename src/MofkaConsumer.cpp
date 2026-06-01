@@ -178,6 +178,7 @@ void MofkaConsumer::recvBatch(const tl::request& req,
 
     m_pending_ults.fetch_add(1, std::memory_order_relaxed);
     auto ult = [this,
+                self = shared_from_this_mofka(),
                 count, startID, batch = std::move(batch),
                 serializer = m_topic->m_serializer,
                 partition = m_partitions[partition_index],
@@ -227,9 +228,10 @@ void MofkaConsumer::recvBatch(const tl::request& req,
             data_desc_offset += batch->m_data_desc_sizes[i];
         }
 
-        // Signal completion so unsubscribe() can proceed
-        m_pending_ults.fetch_sub(1, std::memory_order_acq_rel);
-        m_pending_ults_cv.notify_all();
+        // Signal completion so unsubscribe() can proceed.
+        // Use `self` to keep the consumer alive until the ULT finishes.
+        self->m_pending_ults.fetch_sub(1, std::memory_order_acq_rel);
+        self->m_pending_ults_cv.notify_all();
     };
     m_thread_pool->pushWork(std::move(ult));
 }

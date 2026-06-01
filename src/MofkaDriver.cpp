@@ -102,6 +102,15 @@ std::shared_ptr<diaspora::DriverInterface> MofkaDriver::create(const diaspora::M
         auto margo_config = config.value("margo", nlohmann::json::object());
         if(!margo_config.is_object())
             throw diaspora::Exception{"\"margo\" key should map to object"};
+        // Default to a dedicated progress thread on the client side. Without
+        // one, mofka_producer_send_batch (and other yielding RPCs issued from
+        // python or other single-threaded callers) can be left waiting for a
+        // response that margo never gets a chance to receive, because the
+        // calling thread holds the only execution stream and is itself
+        // blocked inside the RPC. Users may override by passing margo config
+        // explicitly.
+        if(!margo_config.contains("use_progress_thread"))
+            margo_config["use_progress_thread"] = true;
 
         // find a possible driver
         auto driver_wptr = s_drivers[protocol];

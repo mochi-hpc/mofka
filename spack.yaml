@@ -28,10 +28,10 @@ spack:
   repos:
     mochi:
       git: https://github.com/mochi-hpc/mochi-spack-packages.git
-      destination: $env/repos
+      destination: $env/repos/mochi
     diaspora:
       git: https://github.com/diaspora-project/diaspora-spack-packages.git
-      destination: $env/repos
+      destination: $env/repos/diaspora
   packages:
     catch2:
       require: "@3.6.0:"

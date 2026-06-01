@@ -82,7 +82,6 @@ class ProducerBatch {
     }
 
     void send() {
-
         m_meta_sizes.reserve(count());
         bool first_entry = true;
         diaspora::BufferWrapperOutputArchive archive(m_meta_buffer);

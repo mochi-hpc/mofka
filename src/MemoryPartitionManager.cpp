@@ -7,7 +7,6 @@
 #include <diaspora/DataDescriptor.hpp>
 #include <diaspora/BufferWrapperArchive.hpp>
 #include <numeric>
-#include <iostream>
 
 namespace mofka {
 
@@ -23,68 +22,70 @@ void MemoryPartitionManager::receiveBatch(
     auto sender = req.get_endpoint();
     (void)producer_name;
     Result<diaspora::EventID> result;
+
+    // Pull metadata and data into local staging buffers WITHOUT holding any
+    // partition lock. Bulk transfers are yielding operations; holding
+    // m_events_metadata_mtx or m_events_data_mtx across them blocks
+    // concurrent getData / feedConsumer ULTs on the same Argobots pool and
+    // can deadlock if their progress is required for the bulk pull to make
+    // forward progress on a busy pool.
+    auto metadata_size = metadata_bulk.size - num_events*sizeof(size_t);
+    auto data_size     = data_bulk.size     - num_events*sizeof(size_t);
+
+    std::vector<size_t> tmp_metadata_sizes(num_events);
+    std::vector<char>   tmp_metadata(metadata_size);
+    std::vector<size_t> tmp_data_sizes(num_events);
+    std::vector<char>   tmp_data(data_size);
+
+    {
+        auto local_metadata_bulk = m_engine.expose(
+            {{(char*)tmp_metadata_sizes.data(), num_events*sizeof(size_t)},
+             {tmp_metadata.data(), metadata_size}},
+            thallium::bulk_mode::write_only);
+        local_metadata_bulk << metadata_bulk.handle.on(sender).select(
+            metadata_bulk.offset, metadata_bulk.size);
+    }
+    {
+        auto local_data_bulk = m_engine.expose(
+            {{(char*)tmp_data_sizes.data(), num_events*sizeof(size_t)},
+             {tmp_data.data(), data_size}},
+            thallium::bulk_mode::write_only);
+        local_data_bulk << data_bulk.handle.on(sender).select(
+            data_bulk.offset, data_bulk.size);
+    }
+
     diaspora::EventID first_id;
     {
         auto g = std::unique_lock<thallium::mutex>{m_events_metadata_mtx};
         first_id = m_events_metadata_sizes.size();
-        // --------- transfer the metadata
-        auto metadata_size = metadata_bulk.size - num_events*sizeof(size_t);
-        // resize the sizes and offsets arrays, and metadata array
-        if(m_events_metadata_sizes.capacity() < first_id + num_events) {
-            m_events_metadata_sizes.reserve(2*(first_id + num_events));
-        }
-        if(m_events_metadata_offsets.capacity() < first_id + num_events) {
-            m_events_metadata_offsets.reserve(2*(first_id + num_events));
-        }
-        m_events_metadata_sizes.resize(first_id + num_events);
-        m_events_metadata_offsets.resize(first_id + num_events);
         size_t first_metadata_offset = m_events_metadata.size();
-        if(m_events_metadata.capacity() < first_metadata_offset + metadata_size) {
-            m_events_metadata.reserve(2*(first_metadata_offset + metadata_size));
-        }
-        m_events_metadata.resize(first_metadata_offset + metadata_size);
-        // transfer the metadata sizes and content
-        auto local_metadata_bulk = m_engine.expose(
-            {{(char*)(m_events_metadata_sizes.data() + first_id), num_events*sizeof(size_t)},
-             {m_events_metadata.data() + first_metadata_offset, metadata_size}},
-            thallium::bulk_mode::write_only);
-        local_metadata_bulk << metadata_bulk.handle.on(sender).select(
-            metadata_bulk.offset, metadata_bulk.size);
-        // TODO check that metadata_size = sum of m_events_metadata_sizes recveived
-        // update the metadata offsets vector
-        auto metadata_offset = first_metadata_offset;
-        for(size_t i = first_id; i < m_events_metadata_sizes.size(); ++i) {
+        m_events_metadata_sizes.insert(
+            m_events_metadata_sizes.end(),
+            tmp_metadata_sizes.begin(), tmp_metadata_sizes.end());
+        m_events_metadata.insert(
+            m_events_metadata.end(),
+            tmp_metadata.begin(), tmp_metadata.end());
+        m_events_metadata_offsets.resize(first_id + num_events);
+        size_t metadata_offset = first_metadata_offset;
+        for(size_t i = first_id; i < first_id + num_events; ++i) {
             m_events_metadata_offsets[i] = metadata_offset;
             metadata_offset += m_events_metadata_sizes[i];
         }
-        // --------- transfer the data
+
+        // Data section: take m_events_data_mtx briefly to update the data
+        // vectors. We hold both locks here, but only to do in-memory copies
+        // — no yielding operations.
         std::unique_lock<thallium::mutex> data_lock{m_events_data_mtx};
-        auto data_size = data_bulk.size - num_events*sizeof(size_t);
-        // resize the sizes and offsets arrays, and data array
-        if(m_events_data_sizes.capacity() < first_id + num_events) {
-            m_events_data_sizes.reserve(2*(first_id + num_events));
-        }
-        if(m_events_data_offsets.capacity() < first_id + num_events) {
-            m_events_data_offsets.reserve(2*(first_id + num_events));
-        }
-        m_events_data_sizes.resize(first_id + num_events);
-        m_events_data_offsets.resize(first_id + num_events);
         size_t first_data_offset = m_events_data.size();
-        if(m_events_data.capacity() < first_data_offset + data_size) {
-            m_events_data.reserve(2*(first_data_offset + data_size));
-        }
-        m_events_data.resize(first_data_offset + data_size);
-        // transfer the data sizes and content
-        auto local_data_bulk = m_engine.expose(
-            {{(char*)(m_events_data_sizes.data() + first_id), num_events*sizeof(size_t)},
-             {m_events_data.data() + first_data_offset, data_size}},
-            thallium::bulk_mode::write_only);
-        local_data_bulk << data_bulk.handle.on(sender).select(
-            data_bulk.offset, data_bulk.size);
-        // TODO check that data_size = sum of m_events_data_sizes recveived
-        // update the data offsets vector
-        auto data_offset = first_data_offset;
-        for(size_t i = first_id; i < m_events_data_sizes.size(); ++i) {
+        m_events_data_sizes.insert(
+            m_events_data_sizes.end(),
+            tmp_data_sizes.begin(), tmp_data_sizes.end());
+        m_events_data.insert(
+            m_events_data.end(),
+            tmp_data.begin(), tmp_data.end());
+        m_events_data_offsets.resize(first_id + num_events);
+        size_t data_offset = first_data_offset;
+        for(size_t i = first_id; i < first_id + num_events; ++i) {
             m_events_data_offsets[i] = data_offset;
             data_offset += m_events_data_sizes[i];
         }
@@ -95,7 +96,7 @@ void MemoryPartitionManager::receiveBatch(
         m_events_data_desc_sizes.resize(first_id + num_events);
         m_events_data_desc_offsets.resize(first_id + num_events);
         diaspora::BufferWrapperOutputArchive output_archive{m_events_data_desc};
-        for(size_t i = first_id; i < m_events_data_desc_sizes.size(); ++i) {
+        for(size_t i = first_id; i < first_id + num_events; ++i) {
             auto offset_size = OffsetSize{m_events_data_offsets[i], m_events_data_sizes[i]};
             auto data_descriptor = diaspora::DataDescriptor(offset_size.toString(), offset_size.size);
             size_t m_events_data_desc_size = m_events_data_desc.size();
@@ -105,8 +106,10 @@ void MemoryPartitionManager::receiveBatch(
             m_events_data_desc_offsets[i] = data_desc_offset;
             data_desc_offset += data_descriptor_size;
         }
+        // Notify under the lock so a feedConsumer ULT waiting on m_events_cv
+        // cannot miss the wake-up (the wait re-checks its predicate under the same mutex).
+        m_events_cv.notify_all();
     }
-    m_events_cv.notify_all();
     result.value() = first_id;
     req.respond(result);
 }
@@ -224,7 +227,6 @@ Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
 
     std::vector<std::pair<void*, size_t>> local_segments;
     std::unique_lock<thallium::mutex> lock{m_events_data_mtx};
-
     for(auto& desc : descriptors) {
         OffsetSize event_location;
         event_location.fromDataDescriptor(desc);
@@ -236,7 +238,6 @@ Result<std::vector<Result<void>>> MemoryPartitionManager::getData(
             });
         }
     }
-
     auto local_data_bulk = m_engine.expose(local_segments, thallium::bulk_mode::read_only);
     bulk.handle.on(client_address) << local_data_bulk;
 
